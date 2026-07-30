@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 150" role="img" aria-labelledby="title desc">
+  <title id="title">ScholarForge OS｜研语工坊</title>
+  <desc id="desc">ScholarForge OS brand lockup with academic shield and bilingual wordmark.</desc>
+  <defs>
+    <linearGradient id="shield" x1="18" y1="10" x2="78" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#24375D"/><stop offset="1" stop-color="#101A30"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="20" y1="8" x2="75" y2="98" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1AF61"/><stop offset="1" stop-color="#C96B3E"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(10 10)">
+    <path d="M54 0 101 16v37c0 33.9-18.4 59-47 74C25.4 112 7 86.9 7 53V16L54 0Z" fill="url(#copper)"/>
+    <path d="M54 7 94 21v32c0 29.1-15 51.1-40 65-25-13.9-40-35.9-40-65V21L54 7Z" fill="url(#shield)" stroke="#F8E9D2" stroke-opacity=".45"/>
+    <path d="M80.4 26.2c-10.7 1.3-21.3 6.3-28.8 14.3-7 7.5-11.2 17-10.4 24.5.8 7 6.9 10.4 15.7 13.6 6.9 2.4 10.3 4.6 10.2 8.4-.1 5.2-6.1 9.1-13.5 9.1-7.6 0-13.7-2.9-19.4-9l-7.5 8.5c7.2 8 15.8 12.2 26.6 12.2 15.6 0 27.7-8.5 28.1-20.7.3-10.9-8.1-16.3-20.6-20.6-5.2-1.8-7.9-3.4-8.3-6.6-.4-4.1 2.4-9.8 7.4-14.7 5.7-5.7 13.3-9.3 21.3-10.4l-.8-8.6Z" fill="#FFF8EA"/>
+    <path d="M81 25c-3 9.7-9.6 18.4-19 24.9l-8.2 5.7 6.5 2.2 5.3 7.2 2.5-9.4c2.9-10.9 8.1-21.1 15.5-29.8L81 25Z" fill="#FFF8EA"/>
+    <path d="m59.1 56.8 13.7-13.7M64.1 60.8l13.5-13.5" stroke="#C96B3E" stroke-width="1.8" stroke-linecap="round" opacity=".72"/>
+    <path d="m34 67.2 3 7.9 7.9 3-7.9 3-3 7.9-3-7.9-7.9-3 7.9-3 3-7.9Z" fill="#F1AF61"/>
+  </g>
+  <g fill="#17233D">
+    <text x="138" y="68" font-family="Georgia, 'Times New Roman', serif" font-size="49" font-weight="700" letter-spacing="-1.5">ScholarForge OS</text>
+    <text x="141" y="108" font-family="'Songti SC','STSong','Noto Serif CJK SC',serif" font-size="25" font-weight="600" letter-spacing="4">研语工坊</text>
+    <text x="142" y="132" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="2.2" fill="#667189">EVIDENCE-AWARE ACADEMIC WRITING WORKSPACE</text>
+  </g>
+</svg>
