@@ -1,43 +1,23 @@
-import type { AgentRun, ReviewResult } from './types';
+import type { AgentRun, ReviewMode, ReviewResult, ReviewSection } from './types';
 
 export const SAMPLE_MANUSCRIPT = `Low-field nuclear magnetic resonance (LF-NMR) tests were conducted using an NMR spectrometer to measure the T2 spectra of seawater-cured specimens. The test temperature was controlled at 22–28 °C, and the number of scans was 32. The results can well prove that the pore structure became much denser after curing. This phenomenon resulted in the increase of compressive strength. However, the number of specimens and the method used to calculate the average value were not reported.`;
 
 const DEMO_RUNS: AgentRun[] = [
-  {
-    agent: 'terminology',
-    status: 'demo',
-    durationMs: 612,
-    issueCount: 1,
-    summary: 'Terminology and abbreviation usage were checked for consistency.',
-    model: 'demo-fixture',
-  },
-  {
-    agent: 'language',
-    status: 'demo',
-    durationMs: 884,
-    issueCount: 1,
-    summary: 'Academic expression and sentence-level clarity were improved conservatively.',
-    model: 'demo-fixture',
-  },
-  {
-    agent: 'logic',
-    status: 'demo',
-    durationMs: 771,
-    issueCount: 1,
-    summary: 'One causal statement exceeded the evidence shown in the passage.',
-    model: 'demo-fixture',
-  },
-  {
-    agent: 'method',
-    status: 'demo',
-    durationMs: 806,
-    issueCount: 1,
-    summary: 'Missing specimen count and data-reduction details were retained as author actions.',
-    model: 'demo-fixture',
-  },
+  { agent: 'terminology', status: 'demo', durationMs: 612, issueCount: 1, summary: 'Terminology and abbreviation usage were checked for consistency.', model: 'demo-fixture' },
+  { agent: 'language', status: 'demo', durationMs: 884, issueCount: 1, summary: 'Academic expression and sentence-level clarity were improved conservatively.', model: 'demo-fixture' },
+  { agent: 'logic', status: 'demo', durationMs: 771, issueCount: 1, summary: 'One causal statement exceeded the evidence shown in the passage.', model: 'demo-fixture' },
+  { agent: 'method', status: 'demo', durationMs: 806, issueCount: 1, summary: 'Missing specimen count and data-reduction details were retained as author actions.', model: 'demo-fixture' },
 ];
 
-export function createDemoReview(text: string): ReviewResult {
+export function createDemoReview(
+  text: string,
+  profile: {
+    projectTitle?: string;
+    targetJournal?: string;
+    sectionType?: ReviewSection;
+    reviewMode?: ReviewMode;
+  } = {},
+): ReviewResult {
   const source = text.trim() || SAMPLE_MANUSCRIPT;
   const revisedText = source
     .replace('The results can well prove that', 'The results indicate that')
@@ -50,15 +30,19 @@ export function createDemoReview(text: string): ReviewResult {
   return {
     mode: 'demo',
     executionMode: 'safe-demo',
-    workflowVersion: '0.2.0-demo',
-    summary:
-      'Four deterministic demo specialists completed the review. The passage contains one language issue, one causal overstatement, one reproducibility issue, and one terminology recommendation.',
+    workflowVersion: '0.7.0-demo',
+    profile: {
+      projectTitle: profile.projectTitle?.trim() || 'Untitled manuscript review',
+      targetJournal: profile.targetJournal?.trim() || '',
+      sectionType: profile.sectionType || 'general',
+      reviewMode: profile.reviewMode || 'balanced',
+    },
+    summary: 'Four deterministic demo specialists completed a section-aware review. The passage contains one language issue, one causal overstatement, one reproducibility issue, and one terminology recommendation.',
     revisedText,
     scoreBefore: 72,
     scoreAfter: 78,
     decision: 'major_revision',
-    decisionReason:
-      'Two author-dependent logic or reproducibility issues remain unresolved, so a high language score alone cannot make the passage submission-ready.',
+    decisionReason: 'Two author-dependent logic or reproducibility issues remain unresolved, so a high language score alone cannot make the passage submission-ready.',
     generatedAt: new Date().toISOString(),
     terminology: [
       {

@@ -4,13 +4,15 @@ import type {
   IssueSeverity,
   ReviewGuardrail,
   ReviewIssue,
+  ReviewMode,
   ReviewResult,
+  ReviewSection,
   TerminologyItem,
 } from './types';
 
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DEFAULT_MODEL = 'qwen-plus';
-const WORKFLOW_VERSION = '0.2.0';
+const WORKFLOW_VERSION = '0.7.0';
 const AGENT_IDS: AgentId[] = ['terminology', 'language', 'logic', 'method'];
 
 const SHARED_RULES = `
@@ -101,6 +103,22 @@ Return this exact JSON shape:
 }`,
 };
 
+const SECTION_GUIDANCE: Record<ReviewSection, string> = {
+  general: 'Treat the passage as a general manuscript excerpt. Apply normal cross-disciplinary academic review criteria.',
+  abstract: 'Prioritize concision, objective-method-result-conclusion balance, quantified claims already present, scope alignment, and avoidance of unsupported novelty or impact claims.',
+  introduction: 'Prioritize research-gap clarity, literature-to-gap logic, objective alignment, novelty boundaries, and a coherent progression from context to research question.',
+  methods: 'Prioritize reproducibility, materials and specimen definitions, equipment and parameter reporting, sample counts, controls, statistics, equations, and standards.',
+  results: 'Prioritize objective reporting, distinction between observation and interpretation, consistency with figures/tables, statistical wording, and avoidance of causal claims not established by the design.',
+  discussion: 'Prioritize mechanism claims, comparison with prior work, alternative explanations, limitations, generalizability, and evidence-bounded interpretation.',
+  conclusion: 'Prioritize concise synthesis, alignment with presented evidence, practical implications, limitation awareness, and removal of overgeneralized or promotional claims.',
+};
+
+const MODE_GUIDANCE: Record<ReviewMode, string> = {
+  conservative: 'Use minimal intervention. Flag only clear risks and make the smallest defensible wording changes. Preserve author voice and sentence structure whenever possible.',
+  balanced: 'Balance readability improvement with scientific caution. Identify meaningful language, terminology, logic, and reporting issues without over-editing.',
+  deep: 'Perform a thorough diagnostic review. Surface subtle consistency, logic, reproducibility, and reporting risks, while still obeying all no-invention and scientific-meaning guardrails.',
+};
+
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>;
   error?: { message?: string };
@@ -119,11 +137,7 @@ interface AgentExecution {
 }
 
 function stripJsonFence(value: string): string {
-  return value
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
+  return value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 }
 
 function asString(value: unknown, fallback = ''): string {
@@ -135,9 +149,7 @@ function normalizeSeverity(value: unknown): IssueSeverity {
 }
 
 function normalizeAgentPayload(raw: unknown, agent: AgentId): AgentPayload {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error(`${agent} returned an invalid object.`);
-  }
+  if (!raw || typeof raw !== 'object') throw new Error(`${agent} returned an invalid object.`);
 
   const data = raw as Record<string, unknown>;
   const rawIssues = Array.isArray(data.issues) ? data.issues : [];
@@ -177,6 +189,8 @@ async function runSpecialist(
   agent: AgentId,
   text: string,
   targetJournal: string | undefined,
+  sectionType: ReviewSection,
+  reviewMode: ReviewMode,
   apiKey: string,
   baseUrl: string,
   model: string,
@@ -188,10 +202,7 @@ async function runSpecialist(
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         temperature: agent === 'language' ? 0.15 : 0.1,
@@ -200,7 +211,16 @@ async function runSpecialist(
           { role: 'system', content: AGENT_PROMPTS[agent] },
           {
             role: 'user',
-            content: `Target journal: ${targetJournal || 'Not specified'}\n\nManuscript passage:\n${text}`,
+            content: [
+              `Target journal: ${targetJournal || 'Not specified'}`,
+              `Manuscript section: ${sectionType}`,
+              `Review mode: ${reviewMode}`,
+              `Section-specific guidance: ${SECTION_GUIDANCE[sectionType]}`,
+              `Review-mode guidance: ${MODE_GUIDANCE[reviewMode]}`,
+              '',
+              'Manuscript passage:',
+              text,
+            ].join('\n'),
           },
         ],
       }),
@@ -209,14 +229,10 @@ async function runSpecialist(
     });
 
     const body = await response.json() as ChatCompletionResponse;
-    if (!response.ok) {
-      throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
-    }
+    if (!response.ok) throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
 
     const content = body.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error(`${agent} returned an empty response.`);
-    }
+    if (!content) throw new Error(`${agent} returned an empty response.`);
 
     const payload = normalizeAgentPayload(JSON.parse(stripJsonFence(content)) as unknown, agent);
     return {
@@ -296,14 +312,12 @@ function decide(scoreAfter: number, issues: ReviewIssue[]): Pick<ReviewResult, '
       decisionReason: `${unresolvedMajor.length} major logic or reproducibility issues remain author-dependent; the manuscript is not yet submission-ready.`,
     };
   }
-
   if (scoreAfter < 92 || majorIssues.length > 0) {
     return {
       decision: 'minor_revision',
       decisionReason: 'The language revision improves readability, but at least one substantive or author-dependent issue still requires confirmation.',
     };
   }
-
   return {
     decision: 'ready',
     decisionReason: 'No major evidence, logic, or reproducibility issue remains in the reviewed passage.',
@@ -322,16 +336,8 @@ function hasNewNumericToken(source: string, revised: string): boolean {
 function buildGuardrails(source: string, revised: string, issues: ReviewIssue[]): ReviewGuardrail[] {
   const methodMajors = issues.filter((issue) => issue.agent === 'method' && issue.severity === 'major');
   return [
-    {
-      id: 'numbers',
-      label: 'No new numerical value was introduced by the revision.',
-      passed: !hasNewNumericToken(source, revised),
-    },
-    {
-      id: 'meaning',
-      label: 'No specialist explicitly marked a scientific meaning change.',
-      passed: !issues.some((issue) => issue.meaningChanged),
-    },
+    { id: 'numbers', label: 'No new numerical value was introduced by the revision.', passed: !hasNewNumericToken(source, revised) },
+    { id: 'meaning', label: 'No specialist explicitly marked a scientific meaning change.', passed: !issues.some((issue) => issue.meaningChanged) },
     {
       id: 'missing-info',
       label: 'Missing reproducibility details remain visible as author actions.',
@@ -340,21 +346,38 @@ function buildGuardrails(source: string, revised: string, issues: ReviewIssue[])
   ];
 }
 
-export async function reviewWithBailian(text: string, targetJournal?: string): Promise<ReviewResult> {
+export async function reviewWithBailian(
+  text: string,
+  options: {
+    projectTitle?: string;
+    targetJournal?: string;
+    sectionType?: ReviewSection;
+    reviewMode?: ReviewMode;
+  } = {},
+): Promise<ReviewResult> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new Error('DASHSCOPE_API_KEY is not configured.');
 
   const baseUrl = (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
   const model = process.env.DASHSCOPE_MODEL || DEFAULT_MODEL;
+  const sectionType = options.sectionType || 'general';
+  const reviewMode = options.reviewMode || 'balanced';
 
   const executions = await Promise.all(
-    AGENT_IDS.map((agent) => runSpecialist(agent, text, targetJournal, apiKey, baseUrl, model)),
+    AGENT_IDS.map((agent) => runSpecialist(
+      agent,
+      text,
+      options.targetJournal,
+      sectionType,
+      reviewMode,
+      apiKey,
+      baseUrl,
+      model,
+    )),
   );
 
   const completed = executions.filter((execution) => execution.run.status === 'completed');
-  if (completed.length === 0) {
-    throw new Error('All specialist agents failed. Check the Model Studio model, quota, and endpoint.');
-  }
+  if (completed.length === 0) throw new Error('All specialist agents failed. Check the Model Studio model, quota, and endpoint.');
 
   const issues = uniqueIssues(completed.flatMap((execution) => execution.payload.issues));
   const terminology = uniqueTerms(completed.flatMap((execution) => execution.payload.terminology));
@@ -363,10 +386,7 @@ export async function reviewWithBailian(text: string, targetJournal?: string): P
   const revisedText = hasNewNumericToken(text, candidateRevision) ? text : candidateRevision;
 
   const scoreBefore = clampScore(100 - issues.reduce((total, issue) => total + scorePenalty(issue), 0));
-  const scoreAfter = clampScore(Math.max(
-    scoreBefore,
-    100 - issues.reduce((total, issue) => total + remainingPenalty(issue), 0),
-  ));
+  const scoreAfter = clampScore(Math.max(scoreBefore, 100 - issues.reduce((total, issue) => total + remainingPenalty(issue), 0)));
   const decision = decide(scoreAfter, issues);
   const failedCount = executions.length - completed.length;
 
@@ -374,7 +394,13 @@ export async function reviewWithBailian(text: string, targetJournal?: string): P
     mode: 'live',
     executionMode: 'parallel-multi-agent',
     workflowVersion: WORKFLOW_VERSION,
-    summary: `${completed.length} independent specialist agents completed the review${failedCount ? `; ${failedCount} agent failed and was excluded from aggregation` : ''}. The final score and reviewer decision were calculated deterministically from the normalized issue set rather than accepted from a model response.`,
+    profile: {
+      projectTitle: options.projectTitle?.trim() || 'Untitled manuscript review',
+      targetJournal: options.targetJournal?.trim() || '',
+      sectionType,
+      reviewMode,
+    },
+    summary: `${completed.length} independent specialist agents completed the ${sectionType} review in ${reviewMode} mode${failedCount ? `; ${failedCount} agent failed and was excluded from aggregation` : ''}. The final score and reviewer decision were calculated deterministically from the normalized issue set rather than accepted from a model response.`,
     revisedText,
     scoreBefore,
     scoreAfter,
