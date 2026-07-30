@@ -19,6 +19,13 @@ const SPECIALISTS = [
   ['M', 'Method Auditor', '方法完整性与复现'],
 ] as const;
 
+function getDestination() {
+  if (typeof window === 'undefined') return '/';
+  const requested = new URLSearchParams(window.location.search).get('next');
+  if (!requested || !requested.startsWith('/') || requested.startsWith('//')) return '/';
+  return requested;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const {
@@ -62,7 +69,7 @@ export default function LoginPage() {
 
       setNotice({ tone: result.ok ? 'success' : 'error', message: result.message });
       if (result.ok && !result.needsConfirmation) {
-        window.setTimeout(() => router.replace('/'), 520);
+        window.setTimeout(() => router.replace(getDestination()), 520);
       }
     } finally {
       setSubmitting(false);
@@ -73,7 +80,7 @@ export default function LoginPage() {
     setSubmitting(true);
     const result = await continueAsGuest();
     setNotice({ tone: 'success', message: result.message });
-    window.setTimeout(() => router.replace('/'), 360);
+    window.setTimeout(() => router.replace(getDestination()), 360);
   }
 
   async function handleReset() {
@@ -89,7 +96,7 @@ export default function LoginPage() {
       <div className="auth-page-glow auth-page-glow-two" />
 
       <section className="auth-story" aria-label="ScholarForge OS 产品介绍">
-        <Link className="auth-brand" href="/">
+        <Link className="auth-brand" href="/login">
           <span className="auth-brand-mark">S</span>
           <span><strong>ScholarForge OS｜研语工坊</strong><small>Evidence-aware academic writing workspace</small></span>
         </Link>
@@ -97,7 +104,7 @@ export default function LoginPage() {
         <div className="auth-story-copy">
           <div className="auth-eyebrow">Academic review workspace</div>
           <h1>让每一次科研英语修改，<em>都能被解释。</em></h1>
-          <p>登录后，你将拥有一个面向论文审校、作者待办和结果交付的统一入口。账户体系不会改变科研安全边界，也不会让模型替作者虚构数据。</p>
+          <p>登录、注册或选择访客身份后进入论文工作台。账户入口负责确认当前会话，科研安全边界仍由多 Agent 工作流与确定性规则共同保护。</p>
         </div>
 
         <div className="auth-agent-board">
@@ -143,16 +150,16 @@ export default function LoginPage() {
               <span className="auth-existing-avatar">{user.displayName.slice(0, 2).toUpperCase()}</span>
               <div className="auth-eyebrow">Active session</div>
               <h2>欢迎回来，{user.displayName}</h2>
-              <p>{user.mode === 'supabase' ? '你的云端账户会话仍然有效。' : '当前设备已保存一个本地会话。'}</p>
-              <button className="auth-primary-button" onClick={() => router.replace('/')} type="button">继续进入论文工作区 <span>→</span></button>
-              <Link className="auth-secondary-link" href="/">返回公开体验页</Link>
+              <p>{user.mode === 'supabase' ? '你的云端账户会话仍然有效。' : user.mode === 'guest' ? '当前设备已保存访客会话。' : '当前设备已保存本地演示账户会话。'}</p>
+              <button className="auth-primary-button" onClick={() => router.replace(getDestination())} type="button">继续进入论文工作台 <span>→</span></button>
+              <a className="auth-secondary-link" href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">查看项目仓库</a>
             </div>
           ) : (
             <>
               <div className="auth-panel-heading">
                 <div className="auth-eyebrow">Account access</div>
-                <h2>{tab === 'signin' ? '登录论文工作区' : '创建 ScholarForge 账户'}</h2>
-                <p>{tab === 'signin' ? '继续你的论文审校与作者待办流程。' : '为后续云端项目、版本历史和文档交付做好准备。'}</p>
+                <h2>{tab === 'signin' ? '登录论文工作台' : '创建 ScholarForge 账户'}</h2>
+                <p>{tab === 'signin' ? '完成身份确认后进入论文审校、作者待办与结果交付页面。' : '创建账户，为后续云端项目、版本历史和文档交付做好准备。'}</p>
               </div>
 
               <div className="auth-tabs" role="tablist" aria-label="登录或注册">
@@ -213,7 +220,7 @@ export default function LoginPage() {
                 {notice ? <div aria-live="polite" className={`auth-notice tone-${notice.tone}`}>{notice.message}</div> : null}
 
                 <button className="auth-primary-button" disabled={submitting} type="submit">
-                  {submitting ? '正在处理…' : tab === 'signin' ? '登录并进入工作区' : '创建账户'}
+                  {submitting ? '正在处理…' : tab === 'signin' ? '登录并进入工作台' : '创建账户'}
                   {!submitting ? <span>→</span> : null}
                 </button>
               </form>
@@ -222,16 +229,16 @@ export default function LoginPage() {
 
               <button className="auth-guest-button" disabled={submitting} onClick={handleGuest} type="button">
                 <span className="auth-guest-icon">游</span>
-                <span><b>直接体验工作台</b><small>无需账户，草稿只保存在当前浏览器</small></span>
+                <span><b>以访客身份进入</b><small>先创建访客会话，草稿只保存在当前浏览器</small></span>
                 <i>→</i>
               </button>
 
-              <p className="auth-legal">继续即表示你理解：当前版本不会把论文正文同步到用户数据库；百炼审校请求仍由服务端处理。</p>
+              <p className="auth-legal">工作台需要有效会话。访客无需注册，但退出后不会拥有云端项目或跨设备历史记录。</p>
             </>
           )}
         </div>
 
-        <Link className="auth-back-link" href="/">← 返回公开审校工作台</Link>
+        <a className="auth-back-link" href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">查看 GitHub 仓库 ↗</a>
       </section>
     </main>
   );
