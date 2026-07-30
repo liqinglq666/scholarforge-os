@@ -69,6 +69,14 @@ function isLocalSession(value: unknown): value is ScholarForgeUser {
     && (candidate.mode === 'demo' || candidate.mode === 'guest');
 }
 
+function removeLocalItem(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Restricted storage should never block the in-memory account session.
+  }
+}
+
 function migrateAuthorEditingSession() {
   try {
     const current = window.localStorage.getItem(AUTHOR_EDITING_SESSION_KEY);
@@ -86,22 +94,26 @@ function readDemoSession() {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!isLocalSession(parsed)) {
-      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      removeLocalItem(DEMO_SESSION_KEY);
       return null;
     }
     return parsed;
   } catch {
-    window.localStorage.removeItem(DEMO_SESSION_KEY);
+    removeLocalItem(DEMO_SESSION_KEY);
     return null;
   }
 }
 
 function writeDemoSession(user: ScholarForgeUser | null) {
-  if (!user || user.mode === 'supabase') {
-    window.localStorage.removeItem(DEMO_SESSION_KEY);
-    return;
+  try {
+    if (!user || user.mode === 'supabase') {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      return;
+    }
+    window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
+  } catch {
+    // Keep the current in-memory session even when persistence is unavailable.
   }
-  window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -218,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     writeDemoSession(demoUser);
     setUser(demoUser);
-    return { ok: true, message: '本地演示账户已创建。当前设备会记住此会话。' };
+    return { ok: true, message: '本地演示账户已创建。当前页面会保留此会话；浏览器允许存储时可在刷新后恢复。' };
   }, []);
 
   const continueAsGuest = useCallback(async (): Promise<AuthActionResult> => {
@@ -230,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     writeDemoSession(guestUser);
     setUser(guestUser);
-    return { ok: true, message: '已进入访客模式。草稿仅保存在当前浏览器。' };
+    return { ok: true, message: '已进入访客模式。浏览器允许存储时，草稿和会话会保留在当前设备。' };
   }, []);
 
   const requestPasswordReset = useCallback(async (emailInput: string): Promise<AuthActionResult> => {
