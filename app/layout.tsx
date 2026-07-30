@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AccountDock } from '@/components/account-dock';
+import { AuthGate } from '@/components/auth-gate';
 import { AuthProvider } from '@/components/auth-provider';
 import './globals.css';
 import './v04.css';
@@ -23,8 +24,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         <AuthProvider>
-          {children}
-          <AccountDock />
+          <AuthGate>
+            {children}
+            <AccountDock />
+          </AuthGate>
         </AuthProvider>
       </body>
     </html>
