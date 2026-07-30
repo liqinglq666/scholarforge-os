@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/auth-provider';
 import './globals.css';
 import './v04.css';
 import './auth.css';
+import './auth-inline.css';
 
 export const metadata: Metadata = {
   title: 'ScholarForge OS｜研语工坊',
