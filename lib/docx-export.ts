@@ -1,3 +1,4 @@
+import type { ParagraphChild } from 'docx';
 import type { IssueDecision, ReviewIssue } from '@/lib/types';
 import type { AppliedEdit } from '@/lib/author-editing';
 import { composeWorkingText } from '@/lib/author-editing';
@@ -84,7 +85,7 @@ export async function exportAuthorDocx(options: AuthorDocxExportOptions) {
       }))
     : paragraphRanges(options.sourceText).map((range) => {
         const paragraphEdits = orderedEdits.filter((edit) => edit.start >= range.start && edit.end <= range.end);
-        const children: InstanceType<typeof TextRun>[] | Array<InstanceType<typeof TextRun> | InstanceType<typeof InsertedTextRun> | InstanceType<typeof DeletedTextRun>> = [];
+        const children: ParagraphChild[] = [];
         let cursor = range.start;
 
         for (const edit of paragraphEdits) {
