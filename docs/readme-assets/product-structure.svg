@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">ScholarForge OS product structure</title>
+  <desc id="desc">Product modules from manuscript input through four specialist agents, evidence workspace, reviewer decision, and deliverables.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#17233D" flood-opacity=".10"/></filter>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#17233D"/><stop offset="1" stop-color="#40547F"/></linearGradient>
+  </defs>
+  <rect width="1200" height="680" rx="28" fill="#F7F4ED"/>
+  <text x="60" y="72" font-family="Arial, PingFang SC, sans-serif" font-size="28" font-weight="700" fill="#17233D">ScholarForge OS 产品结构</text>
+  <text x="60" y="104" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">从科研文本到可追踪证据、确定性评分与真实交付物</text>
+  <g filter="url(#shadow)">
+    <rect x="60" y="155" width="220" height="160" rx="22" fill="#FFFDF8" stroke="#D8D4CB"/>
+    <text x="90" y="195" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#EF8058">INPUT LAYER</text>
+    <text x="90" y="235" font-family="Arial, PingFang SC, sans-serif" font-size="22" font-weight="700" fill="#17233D">论文审校入口</text>
+    <text x="90" y="270" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">• 目标期刊</text>
+    <text x="90" y="295" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">• 科研英文段落</text>
+  </g>
+  <path d="M285 235H355" stroke="#EF8058" stroke-width="4" stroke-linecap="round"/><path d="M343 225l14 10-14 10" fill="none" stroke="#EF8058" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)">
+    <rect x="360" y="135" width="420" height="250" rx="26" fill="url(#hero)"/>
+    <text x="395" y="177" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#F6B08E">PARALLEL AGENT TEAM</text>
+    <text x="395" y="210" font-family="Arial, PingFang SC, sans-serif" font-size="23" font-weight="700" fill="#FFFDF8">四个独立百炼 Agent 并行审查</text>
+    <g font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#FFFDF8">
+      <rect x="395" y="235" width="165" height="50" rx="14" fill="#FFFFFF" fill-opacity=".10"/><text x="415" y="266">Terminology</text>
+      <rect x="580" y="235" width="165" height="50" rx="14" fill="#FFFFFF" fill-opacity=".10"/><text x="600" y="266">Language</text>
+      <rect x="395" y="300" width="165" height="50" rx="14" fill="#FFFFFF" fill-opacity=".10"/><text x="415" y="331">Logic</text>
+      <rect x="580" y="300" width="165" height="50" rx="14" fill="#FFFFFF" fill-opacity=".10"/><text x="600" y="331">Method</text>
+    </g>
+  </g>
+  <path d="M785 235H855" stroke="#EF8058" stroke-width="4" stroke-linecap="round"/><path d="M843 225l14 10-14 10" fill="none" stroke="#EF8058" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)">
+    <rect x="860" y="155" width="280" height="160" rx="22" fill="#FFFDF8" stroke="#D8D4CB"/>
+    <text x="890" y="195" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#EF8058">EVIDENCE WORKSPACE</text>
+    <text x="890" y="235" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="700" fill="#17233D">统一聚合与校准</text>
+    <text x="890" y="270" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">• 问题去重与归类</text>
+    <text x="890" y="295" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">• 代码确定性评分</text>
+  </g>
+  <path d="M570 390V448" stroke="#EF8058" stroke-width="4" stroke-linecap="round"/><path d="M560 436l10 14 10-14" fill="none" stroke="#EF8058" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)">
+    <rect x="245" y="455" width="300" height="150" rx="22" fill="#FFFDF8" stroke="#D8D4CB"/>
+    <text x="275" y="495" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#2F8C6B">REVIEW DECISION</text>
+    <text x="275" y="535" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="700" fill="#17233D">投稿准备度</text>
+    <text x="275" y="570" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">Major / Minor / Ready</text>
+  </g>
+  <path d="M550 530H650" stroke="#EF8058" stroke-width="4" stroke-linecap="round"/><path d="M638 520l14 10-14 10" fill="none" stroke="#EF8058" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)">
+    <rect x="655" y="455" width="300" height="150" rx="22" fill="#FFFDF8" stroke="#D8D4CB"/>
+    <text x="685" y="495" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#2F8C6B">DELIVERABLES</text>
+    <text x="685" y="535" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="700" fill="#17233D">真实下载交付</text>
+    <text x="685" y="570" font-family="Arial, PingFang SC, sans-serif" font-size="15" fill="#68728A">TXT · Markdown · JSON</text>
+  </g>
+</svg>
