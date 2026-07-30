@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { AccountDock } from '@/components/account-dock';
 import { AuthGate } from '@/components/auth-gate';
 import { AuthProvider } from '@/components/auth-provider';
+import { AuthorEditingDock } from '@/components/author-editing-dock';
 import { CloudWorkspaceDock } from '@/components/cloud-workspace-dock';
 import { DocumentImportDock } from '@/components/document-import-dock';
 import './globals.css';
@@ -17,15 +18,16 @@ import './v09.css';
 import './v10.css';
 import './v10-fixes.css';
 import './v11.css';
+import './v12.css';
 
 export const metadata: Metadata = {
   title: {
     default: 'ScholarForge OS｜研语工坊',
     template: '%s · ScholarForge OS',
   },
-  description: '支持 DOCX/PDF 章节导入、云端论文项目与阿里云百炼多 Agent 审校的科研写作工作台',
+  description: '支持 DOCX/PDF 章节导入、云端论文项目、逐条作者修改和 Word 修订痕迹导出的科研写作工作台',
   applicationName: 'ScholarForge OS',
-  keywords: ['科研英语', 'DOCX 论文导入', 'PDF 章节解析', '学术翻译', '英文润色', '审稿回复', '云端论文项目', '多智能体', '阿里云百炼', 'qwen-plus'],
+  keywords: ['科研英语', 'DOCX 论文导入', 'Word 修订痕迹', '作者修改', '学术翻译', '英文润色', '审稿回复', '云端论文项目', '多智能体', '阿里云百炼', 'qwen-plus'],
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'ScholarForge OS｜研语工坊',
-    description: '导入 DOCX/PDF 论文章节，进入翻译、润色、投稿预检和返修信工作流，让每次修改都留在用户隔离的证据链里。',
+    description: '导入论文、运行多 Agent 审校、逐条安全应用建议，并导出带 Word 原生修订标记的作者工作稿。',
     type: 'website',
   },
 };
@@ -48,6 +50,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <AccountDock />
             <CloudWorkspaceDock />
             <DocumentImportDock />
+            <AuthorEditingDock />
           </AuthGate>
         </AuthProvider>
       </body>
