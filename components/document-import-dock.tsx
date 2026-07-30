@@ -9,7 +9,7 @@ import {
   type IngestedDocument,
   type IngestedSection,
 } from '@/lib/document-ingestion';
-import { bindOriginalDocxSource, saveOriginalDocx } from '@/lib/original-docx-store';
+import { bindOriginalDocxSource, deleteOriginalDocx, saveOriginalDocx } from '@/lib/original-docx-store';
 import type { ReviewMode, WorkspaceTask } from '@/lib/types';
 
 const DRAFT_KEY = 'scholarforge-os-paperlens-draft-v1';
@@ -144,6 +144,7 @@ export function DocumentImportDock() {
     if (!document) return;
     setImporting(true);
     setError('');
+    let storedDocumentId = '';
     try {
       const existing = safeParseDraft();
       const savedAt = new Date().toISOString();
@@ -151,6 +152,7 @@ export function DocumentImportDock() {
       if (document.fileType === 'docx' && sourceFile) {
         try {
           const stored = await saveOriginalDocx(sourceFile);
+          storedDocumentId = stored.id;
           const binding = await bindOriginalDocxSource(stored, section.text, section.title, section.sourceLabel);
           originalPackage = {
             stored: true,
@@ -159,6 +161,13 @@ export function DocumentImportDock() {
             storage: 'browser-indexeddb',
           };
         } catch (storageError) {
+          if (storedDocumentId) {
+            try {
+              await deleteOriginalDocx(storedDocumentId);
+            } catch {
+              // Preserve the primary storage error; later cleanup will remove old unbound packages.
+            }
+          }
           originalPackage = {
             stored: false,
             error: storageError instanceof Error ? storageError.message : '浏览器无法保留原始 DOCX。',
