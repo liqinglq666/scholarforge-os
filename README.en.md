@@ -7,12 +7,12 @@
 </p>
 
 <p align="center">
-  <strong>A document-aware, Model Studio-powered multi-agent workspace for scientific writing</strong>
+  <strong>An end-to-end scientific writing workspace from document ingestion and multi-agent review to author editing and Word revisions</strong>
 </p>
 
 <p align="center">
-  Import DOCX or text-based PDF sections, then run scientific translation, conservative polishing,<br />
-  pre-submission review, or reviewer-response workflows with shared guardrails and author decisions.
+  Scientific translation, conservative polishing, pre-submission review, reviewer responses,<br />
+  cloud projects, safe issue application, undo/redo, and DOCX tracked changes.
 </p>
 
 <p align="center">
@@ -20,15 +20,16 @@
   <a href="https://scholarforge-os.vercel.app/login">Sign in</a> ·
   <a href="docs/PRD.md">PRD</a> ·
   <a href="docs/technical.md">Technical Docs</a> ·
-  <a href="docs/cloud-workspace.md">Cloud Workspace Setup</a>
+  <a href="docs/cloud-workspace.md">Cloud Setup</a> ·
+  <a href="docs/releases/v1.2-author-editing-workflow.md">v1.2 Release Notes</a>
 </p>
 
 <p align="center">
-  <img alt="App v1.1.0" src="https://img.shields.io/badge/app-v1.1.0-17233d" />
+  <img alt="App v1.2.0" src="https://img.shields.io/badge/app-v1.2.0-17233d" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
-  <img alt="Model qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
+  <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
   <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
-  <img alt="DOCX and PDF ingestion" src="https://img.shields.io/badge/import-DOCX%20%2B%20PDF-b56836" />
+  <img alt="DOCX tracked changes" src="https://img.shields.io/badge/DOCX-tracked%20changes-b86836" />
   <img alt="Supabase Auth and RLS" src="https://img.shields.io/badge/cloud-Supabase%20Auth%20%2B%20RLS-3ecf8e" />
 </p>
 
@@ -36,62 +37,24 @@
 
 ## Product scope
 
-ScholarForge OS is an evidence-aware scientific writing system for graduate students, researchers, supervisors, and academic editors.
-
-> **Models make specialist judgments; code owns constraints, protection, scoring, and final workflow state.**
-
-The product currently supports:
-
-- browser-side DOCX and text-based PDF extraction;
-- automatic Abstract, Introduction, Methods, Results, Discussion, and Conclusion detection;
-- Chinese-to-academic-English translation;
-- conservative English polishing;
-- reviewer-style pre-submission review;
-- evidence-bounded reviewer-response drafting;
-- terminology locks and numeric guardrails;
-- accept, defer, dismiss, or keep-pending author decisions;
-- local project history and structured exports;
-- optional Supabase cloud projects with cross-device restore and RLS isolation.
-
-## v1.1 document ingestion
-
-Open **Import Manuscript** from the lower-left action in the authenticated workspace.
-
-Supported input:
-
-- `.docx`;
-- text-based `.pdf`;
-- up to 20 MB per file.
+ScholarForge OS is built for graduate students, researchers, supervisors, and academic editors. It is not a generic rewrite box. It covers this workflow:
 
 ```text
-Select DOCX / PDF
-  ↓
-Browser-side extraction
-  ↓
-Section and page-range detection
-  ↓
-Preview text and extraction warnings
-  ↓
-Select one section or chunk
-  ↓
-Import into PaperLens
-  ↓
-Verify the text, then start the four-agent workflow
+DOCX / PDF manuscript
+→ section detection and scope selection
+→ four parallel Model Studio agents
+→ issue evidence and scientific guardrails
+→ author decisions
+→ safe issue-level application
+→ clean DOCX / Word tracked changes
+→ local or user-isolated cloud project
 ```
 
-### Processing boundary
+Core principle:
 
-- Mammoth reads DOCX semantic headings and text.
-- Mozilla PDF.js extracts selectable PDF text page by page.
-- Sections above the existing 12,000-character workflow limit are split at paragraph boundaries.
-- The original file is not persisted as a ScholarForge server attachment.
-- Only the selected text enters the existing review request after the author explicitly starts a workflow.
-- Scanned-image PDF OCR is not included.
-- Equations, tables, two-column order, headers, footers, and tracked revisions require author verification.
+> **Models make specialist judgments; deterministic code owns constraints, anchoring, conflict handling, scoring, and final workflow state.**
 
-Release notes: [`docs/releases/v1.1-document-ingestion.md`](docs/releases/v1.1-document-ingestion.md)
-
-## Four writing workflows
+## Four scientific writing workflows
 
 | Workflow | Input | Main purpose | Primary output |
 | --- | --- | --- | --- |
@@ -99,6 +62,8 @@ Release notes: [`docs/releases/v1.1-document-ingestion.md`](docs/releases/v1.1-d
 | **Conservative Polishing** | English manuscript text | Improve grammar and academic style without inventing facts | Conservative Revision |
 | **Pre-submission Review** | English manuscript text | Audit terminology, language, logic, methods, and readiness | Revision + Evidence |
 | **Reviewer Response** | Reviewer comment + author evidence | Draft a formal response without fabricating experiments or locations | Response to Reviewer Draft |
+
+All workflows share seven section profiles, three review modes, terminology locks, issue evidence, author decisions, and scientific guardrails.
 
 ## Four independent Model Studio agents
 
@@ -109,46 +74,74 @@ Release notes: [`docs/releases/v1.1-document-ingestion.md`](docs/releases/v1.1-d
 | **Logic Auditor** | Causality, evidence boundaries, claim strength, and response completeness |
 | **Method Auditor** | Samples, equipment, parameters, statistics, reproducibility, and author evidence |
 
-A normal run sends four independent `qwen-plus` requests through Alibaba Cloud Model Studio and executes them in parallel with `Promise.all`.
-
-## Runtime architecture
+A normal workflow sends four independent `qwen-plus` requests through Alibaba Cloud Model Studio and executes them in parallel with `Promise.all`.
 
 ```text
-DOCX / PDF
-  ↓ browser-side parsing
-Mammoth / PDF.js
-  ↓ selected section
-PaperLens Workspace
-  ↓ Next.js POST /api/review
-4 × qwen-plus through Alibaba Cloud Model Studio
+Browser
   ↓
-Deterministic Aggregator
+Next.js POST /api/review
   ↓
-Primary output + issue evidence + terminology + guardrails + author decisions
+4 independent specialist requests
+  ↓
+Alibaba Cloud Model Studio · qwen-plus
+  ↓
+Deterministic aggregator and scientific guardrails
+  ↓
+Primary output + issue evidence + terminology + author decisions
 ```
 
-Key implementation files:
+The Model Studio API key is server-side only. Readiness scores and reviewer decisions are calculated from normalized issues by code rather than freely generated by the model.
 
-- [`lib/document-ingestion.ts`](lib/document-ingestion.ts) — extraction, section detection, and safe chunking;
-- [`components/document-import-dock.tsx`](components/document-import-dock.tsx) — drag-and-drop, preview, selection, and import;
-- [`lib/bailian.ts`](lib/bailian.ts) — task-aware agent prompts, calls, and aggregation;
-- [`app/api/review/route.ts`](app/api/review/route.ts) — request validation and live/demo routing;
-- [`lib/cloud-workspace.ts`](lib/cloud-workspace.ts) — local and Supabase project sync;
-- [`supabase/migrations/20260730_cloud_workspace.sql`](supabase/migrations/20260730_cloud_workspace.sql) — project table and RLS.
+## v1.1 document ingestion
 
-## Cloud projects and isolation
+Browser-side ingestion supports:
 
-Supabase email accounts can explicitly sync the current project, migrate all local projects, restore a project on another browser, or delete only the cloud copy.
+- semantic DOCX headings and paragraphs with Mammoth;
+- page-aware extraction from text-based PDFs with Mozilla PDF.js;
+- Abstract, Introduction, Methods, Results, Discussion, and Conclusion detection;
+- paragraph-aware splitting above the 12,000-character workflow limit;
+- section preview and exact scope selection;
+- warnings for formulas, tables, two-column order, headers, footers, and scanned PDFs.
 
-`public.scholarforge_projects` uses Row Level Security:
+Selecting a file does not automatically upload the original DOCX or PDF. Only text explicitly imported into PaperLens and submitted by the author enters the review request.
 
-```sql
-auth.uid() = owner_id
+Scanned-PDF OCR is not implemented.
+
+## v1.2 author editing workflow
+
+An issue is eligible for automatic application only when:
+
+1. both the original fragment and proposed revision are present;
+2. the original fragment has one unique anchor in the reviewed source;
+3. the revision does not contain `[Please provide ...]`;
+4. the replacement does not cross paragraph boundaries;
+5. the range does not overlap another accepted edit.
+
+Anchor strategy:
+
+```text
+exact match
+→ unique whitespace-normalized match
+→ manual author action when missing, repeated, overlapping, or cross-paragraph
 ```
 
-Signing in does not automatically upload existing local manuscripts. Guest and local demo sessions remain browser-only.
+The Author Editing dock provides:
 
-Setup guide: [`docs/cloud-workspace.md`](docs/cloud-workspace.md)
+- issue-by-issue apply;
+- apply-all-safe;
+- working manuscript preview;
+- undo and redo;
+- reset to the reviewed source;
+- write accepted text back to PaperLens;
+- browser-local editing session recovery.
+
+### Word deliverables
+
+- **Clean DOCX** — the current accepted manuscript text;
+- **Tracked Changes DOCX** — native WordprocessingML insertions and deletions;
+- **Author Decision Appendix** — applied, pending, deferred, and dismissed suggestions.
+
+Boundary: v1.2 generates a new author working document. It does not preserve every style, image, equation, comment, field, or complex table from the originally uploaded DOCX. Patching the original Word package in place is a later milestone.
 
 ## Scientific guardrails
 
@@ -156,20 +149,60 @@ ScholarForge OS currently enforces:
 
 - no new numeric values outside source text and author-provided evidence;
 - no fabricated experiments, samples, equipment, standards, or references;
-- no silent conversion of correlation into causality;
-- missing method details remain `[Please provide ...]` author tasks;
+- no automatic conversion of correlation into causality;
+- missing method details remain `[Please provide ...]` tasks;
 - major logic and method risks are not erased by smoother language;
-- locked terminology is passed to all four agents and rechecked in the final result.
+- locked terminology is passed to all four agents and rechecked;
+- missing, repeated, cross-paragraph, and overlapping anchors are never auto-replaced.
 
-These safeguards do not replace peer review, statistical review, or reference verification.
+These safeguards do not replace peer review, statistical review, reference verification, or author responsibility.
+
+## Cloud manuscript projects
+
+Supabase email accounts can explicitly:
+
+- sync the current local project;
+- migrate all local projects;
+- restore a project on another browser or device;
+- delete the cloud copy without deleting the local copy.
+
+The `public.scholarforge_projects` table uses Row Level Security. Every operation requires:
+
+```sql
+auth.uid() = owner_id
+```
+
+Signing in never automatically uploads existing local manuscripts. Guest and local demo sessions remain browser-only.
+
+## Architecture
+
+```text
+Next.js 16 + React 19 + TypeScript
+├─ Project Hub
+├─ Browser document ingestion
+│  ├─ Mammoth DOCX parser
+│  └─ Mozilla PDF.js
+├─ PaperLens Workspace
+│  ├─ four writing workflows
+│  ├─ terminology locks
+│  ├─ issue evidence and author decisions
+│  └─ local history and exports
+├─ Author Editing Engine
+│  ├─ exact / whitespace anchors
+│  ├─ overlap protection
+│  ├─ undo / redo
+│  └─ docx.js tracked revisions
+├─ Review API
+│  └─ Alibaba Cloud Model Studio · 4 × qwen-plus
+└─ Account & Cloud
+   ├─ Supabase Auth
+   ├─ RLS isolation
+   └─ browser-local fallback
+```
 
 ## Quick start
 
-Requirements:
-
-- Node.js `>= 22.12`;
-- Alibaba Cloud Model Studio API key;
-- optional Supabase project.
+Requirements: Node.js `>= 22.12`.
 
 ```bash
 git clone https://github.com/liqinglq666/scholarforge-os.git
@@ -178,46 +211,59 @@ npm install
 cp .env.example .env.local
 ```
 
+Model Studio variables:
+
 ```env
 DASHSCOPE_API_KEY=your_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-plus
+```
 
+Optional Supabase variables:
+
+```env
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
-To enable cloud projects, run this file in the Supabase SQL editor:
+Run this migration in Supabase SQL Editor:
 
 ```text
 supabase/migrations/20260730_cloud_workspace.sql
 ```
 
-Validate:
+Start and validate:
 
 ```bash
+npm run dev
 npm run typecheck
 npm run build
 ```
 
-## Current boundaries
+## Key files
 
-- PDF import supports selectable text, not scanned-image OCR.
-- DOCX/PDF import does not reconstruct the original visual page layout.
-- Cloud projects keep the latest eight task snapshots, not unlimited versions or attachments.
-- Accepting a suggestion records a decision but does not automatically edit the manuscript.
-- DOCX Track Changes export is not implemented.
-- Agent results arrive after the API response completes; SSE progress is not implemented.
+```text
+components/document-import-dock.tsx
+components/author-editing-dock.tsx
+components/paperlens-workspace.tsx
+lib/document-ingestion.ts
+lib/author-editing.ts
+lib/docx-export.ts
+lib/bailian.ts
+lib/cloud-workspace.ts
+app/api/review/route.ts
+app/api/health/route.ts
+supabase/migrations/20260730_cloud_workspace.sql
+```
 
-## Roadmap
+## Current boundaries and roadmap
 
-- safe issue-level apply, undo, and conflict resolution;
-- DOCX Track Changes export;
-- SSE agent progress;
-- optional OCR for scanned PDFs;
-- unlimited version history and attachments;
-- supervisor, student, and co-author collaboration;
-- DOI, citation, and cross-section numeric consistency checks.
+- scanned PDFs do not receive OCR;
+- cloud projects keep the latest eight task snapshots rather than unlimited history;
+- v1.2 DOCX files are newly generated working documents rather than patched originals;
+- cross-paragraph, ambiguous, missing, and overlapping suggestions require manual handling;
+- agent progress is returned after the API response rather than streamed through SSE;
+- planned work includes original-DOCX patching, unlimited versions, collaboration approval, DOI checks, and cross-section consistency analysis.
 
 ## License
 
