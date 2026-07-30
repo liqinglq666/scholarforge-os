@@ -7,12 +7,12 @@
 </p>
 
 <p align="center">
-  <strong>从论文导入、多 Agent 审校到作者修改与 Word 修订交付的一体化科研写作工作台</strong>
+  <strong>从论文导入、多 Agent 审校到作者修改与原始 DOCX 修订交付的一体化科研写作工作台</strong>
 </p>
 
 <p align="center">
   科研中译英、英文保守润色、投稿前预检、审稿回复、云端项目、<br />
-  问题级安全应用、撤销重做与 DOCX 修订痕迹导出。
+  问题级安全应用，以及保留原 Word 结构的 DOCX 修订补丁。
 </p>
 
 <p align="center">
@@ -21,15 +21,15 @@
   <a href="docs/PRD.md">PRD</a> ·
   <a href="docs/technical.md">技术文档</a> ·
   <a href="docs/cloud-workspace.md">云端项目部署</a> ·
-  <a href="docs/releases/v1.2-author-editing-workflow.md">v1.2 发布说明</a>
+  <a href="docs/releases/v1.3-original-docx-patching.md">v1.3 发布说明</a>
 </p>
 
 <p align="center">
-  <img alt="应用版本 v1.2.0" src="https://img.shields.io/badge/app-v1.2.0-17233d" />
+  <img alt="应用版本 v1.3.0" src="https://img.shields.io/badge/app-v1.3.0-17233d" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
   <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
   <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
-  <img alt="DOCX tracked changes" src="https://img.shields.io/badge/DOCX-tracked%20changes-b86836" />
+  <img alt="Original DOCX patching" src="https://img.shields.io/badge/DOCX-original%20package%20patch-2f6d67" />
   <img alt="Supabase Auth and RLS" src="https://img.shields.io/badge/cloud-Supabase%20Auth%20%2B%20RLS-3ecf8e" />
   <a href="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml/badge.svg" /></a>
 </p>
@@ -38,7 +38,7 @@
 
 ## 项目定位
 
-ScholarForge OS 面向硕士生、博士生、科研人员、导师和学术编辑。它不是只负责“把英文改流畅”的输入框，而是一套覆盖以下链路的科研写作系统：
+ScholarForge OS 面向硕士生、博士生、科研人员、导师和学术编辑。它不是只负责“把英文改流畅”的输入框，而是一套覆盖论文输入、专业审校、作者决策和 Word 交付的科研写作系统。
 
 ```text
 DOCX / PDF 论文
@@ -47,7 +47,7 @@ DOCX / PDF 论文
 → 问题证据与科学保护
 → 作者逐条决策
 → 安全应用到工作稿
-→ DOCX 清洁稿 / Word 修订痕迹
+→ 新工作稿 DOCX / 原始 DOCX 修订补丁
 → 本地或用户隔离的云端项目
 ```
 
@@ -93,7 +93,7 @@ Primary output + issue evidence + terminology + author decisions
 
 API Key 只从服务端环境变量读取。最终分数和 Reviewer Decision 由代码根据规范化问题集计算，不由模型自由生成。
 
-## v1.1 文档导入
+## 文档导入
 
 浏览器端支持：
 
@@ -104,15 +104,11 @@ API Key 只从服务端环境变量读取。最终分数和 Reviewer Decision �
 - 导入前章节预览和范围选择；
 - 公式、表格、双栏、页眉页脚和扫描 PDF 风险提示。
 
-原始文件在浏览器中解析。选择文件不会自动把完整 DOCX/PDF 上传给 ScholarForge 或百炼；只有作者导入工作台并主动启动任务后，所选文本才进入审校请求。
+选择文件不会自动把完整 DOCX/PDF 上传给 ScholarForge 或百炼。只有作者导入工作台并主动启动任务后，所选文本才进入审校请求。当前不执行扫描 PDF OCR。
 
-当前不执行扫描 PDF OCR。
+## 作者修改工作流
 
-## v1.2 作者修改工作流
-
-“接受建议”现在不再只是一个状态标签。
-
-系统只有在满足以下条件时才允许自动应用：
+系统只有在以下条件满足时才允许自动应用 Agent 建议：
 
 1. 原文和建议文本均存在；
 2. 原文在审校基线中只有一个定位结果；
@@ -120,31 +116,58 @@ API Key 只从服务端环境变量读取。最终分数和 Reviewer Decision �
 4. 修改不跨多个自然段；
 5. 修改范围不与已接受建议重叠。
 
-定位顺序：
-
 ```text
 精确匹配
 → 忽略空白差异后的唯一匹配
 → 不唯一 / 缺失 / 冲突时转人工处理
 ```
 
-作者修改台提供：
+作者修改台提供逐条应用、一键应用安全建议、工作稿预览、撤销、重做、恢复原稿和写回 PaperLens。
 
-- 逐条应用建议；
-- 一键应用全部可安全定位建议；
-- 工作稿实时预览；
-- 撤销与重做；
-- 恢复本次审校原稿；
-- 将工作稿写回 PaperLens；
-- 浏览器本地编辑会话恢复。
+### 两类 Word 交付物
 
-### Word 交付物
+**重新生成的作者工作稿**
 
-- **DOCX 清洁稿**：只包含作者当前接受后的正文；
-- **DOCX 修订痕迹**：使用 WordprocessingML 原生插入和删除标记；
-- **Author Decision Appendix**：记录已应用、待处理、暂缓和忽略的问题。
+- DOCX 清洁稿；
+- DOCX 原生插入/删除修订标记；
+- Author Decision Appendix。
 
-重要边界：v1.2 生成的是新的作者工作文档。它不会完整复制原上传 DOCX 的页面样式、图片、公式、批注、域和复杂表格。保留原始 Word 包并原位写入修订属于后续文档补丁阶段。
+它适合继续编辑，但不会完整继承原文件中的全部页面格式和复杂对象。
+
+**原始 DOCX 结构保留补丁（v1.3）**
+
+- 导入 DOCX 时，原始 OOXML 压缩包保存在当前浏览器 IndexedDB；
+- 所选审校文本通过 SHA-256 指纹与原文件绑定；
+- 作者在修改台确认建议后，可以重新打开原始包；
+- 仅修改 `word/document.xml` 中能够唯一定位的普通正文；
+- 使用 Word 原生 `w:del` / `w:ins` 修订节点；
+- 未被修改的样式、图片、表格、公式、页眉页脚、关系文件和其他包内条目继续保留；
+- 下载的是新副本，浏览器中的原始文件不会被覆盖。
+
+### 原文件补丁的安全跳过规则
+
+以下内容不会自动写回：
+
+- 表格单元格；
+- Word 公式；
+- 域、交叉引用和超链接；
+- 批注、书签和脚注/尾注引用；
+- 已经含有修订标记的段落；
+- 图形、对象和复杂内联结构；
+- 原文缺失、出现多次或与其他修改重叠的建议。
+
+导出后会显示补丁报告，列出成功写回和被安全跳过的 Issue ID。
+
+> v1.3 不是字节级无损复制。`word/document.xml` 和可用时的 `word/settings.xml` 会重新序列化，其余未修改的包内文件由 JSZip 保留并重新打包。
+
+### 本地原文件边界
+
+- 原始 DOCX 只保存在当前浏览器 IndexedDB；
+- 最多保留最近 6 个原始文件；
+- 不会自动同步到 Supabase；
+- 换设备或清理浏览器数据后，需要重新导入原文件；
+- v1.3 之前导入的 DOCX 需要重新导入才能建立绑定；
+- 导入后若手动改变审校原文，文本指纹将不再匹配原文件。
 
 ## 科研安全规则
 
@@ -162,20 +185,13 @@ API Key 只从服务端环境变量读取。最终分数和 Reviewer Decision �
 
 ## 云端论文项目
 
-Supabase 邮箱账户可以明确点击：
-
-- 同步当前项目；
-- 迁移全部本机项目；
-- 跨浏览器恢复项目；
-- 删除云端副本但保留本机数据。
-
-数据库表 `public.scholarforge_projects` 启用 Row Level Security，所有操作要求：
+Supabase 邮箱账户可以同步当前项目、迁移本机项目、跨浏览器恢复项目，并通过 Row Level Security 隔离数据：
 
 ```sql
 auth.uid() = owner_id
 ```
 
-首次登录不会自动上传本机论文。访客和本地演示账户始终使用浏览器本地存储。
+首次登录不会自动上传本机论文。访客和本地演示账户始终使用浏览器本地存储。原始 DOCX 二进制包不属于当前云端同步范围。
 
 部署说明：[`docs/cloud-workspace.md`](docs/cloud-workspace.md)
 
@@ -184,21 +200,20 @@ auth.uid() = owner_id
 ```text
 Next.js 16 + React 19 + TypeScript
 ├─ Project Hub
-├─ Browser document ingestion
+├─ Browser Document Ingestion
 │  ├─ Mammoth DOCX parser
 │  └─ Mozilla PDF.js
 ├─ PaperLens Workspace
-│  ├─ 4 writing workflows
-│  ├─ terminology locks
-│  ├─ issue evidence and author decisions
-│  └─ local history and exports
+│  └─ 4 × qwen-plus through Model Studio
 ├─ Author Editing Engine
 │  ├─ exact / whitespace anchors
 │  ├─ overlap protection
-│  ├─ undo / redo
-│  └─ docx.js tracked revisions
-├─ Review API
-│  └─ Alibaba Cloud Model Studio · 4 × qwen-plus
+│  └─ undo / redo
+├─ DOCX Delivery
+│  ├─ docx.js generated working document
+│  └─ JSZip + OOXML original-package patcher
+├─ Browser Original File Store
+│  └─ IndexedDB + SHA-256 source binding
 └─ Account & Cloud
    ├─ Supabase Auth
    ├─ RLS isolation
@@ -237,8 +252,6 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 supabase/migrations/20260730_cloud_workspace.sql
 ```
 
-启动和验证：
-
 ```bash
 npm run dev
 npm run typecheck
@@ -250,26 +263,26 @@ npm run build
 ```text
 components/document-import-dock.tsx
 components/author-editing-dock.tsx
-components/paperlens-workspace.tsx
+components/original-docx-patch-dock.tsx
 lib/document-ingestion.ts
 lib/author-editing.ts
 lib/docx-export.ts
+lib/original-docx-store.ts
+lib/original-docx-patcher.ts
 lib/bailian.ts
-lib/cloud-workspace.ts
 app/api/review/route.ts
 app/api/health/route.ts
-supabase/migrations/20260730_cloud_workspace.sql
 ```
 
 ## 当前边界与路线图
 
 - 扫描 PDF 暂不支持 OCR；
 - 云端项目保存最近 8 次任务，不是无限版本库；
-- v1.2 DOCX 是新生成的工作文档，不保留原 DOCX 全部复杂格式；
-- 跨段落、不唯一和重叠建议必须人工处理；
+- 原文件补丁只处理能够唯一定位的普通正文段落；
+- 原始 DOCX 不能跨设备同步；
 - 多 Agent 实时状态尚未使用 SSE；
-- 下一阶段将研究原始 DOCX 补丁、完整版本历史、协作审批、DOI 与跨章节一致性核验。
+- 后续将推进原文件段落映射增强、完整版本历史、协作审批、DOI 与跨章节一致性核验。
 
 ## License
 
-Copyright © ScholarForge OS contributors. Reuse前请检查仓库许可信息。
+Copyright © ScholarForge OS contributors. Reuse 前请检查仓库许可信息。
