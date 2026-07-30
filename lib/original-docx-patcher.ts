@@ -42,7 +42,8 @@ type RunRecord = {
 };
 
 function localName(node: Node) {
-  return node.localName || node.nodeName.split(':').pop() || node.nodeName;
+  const elementName = node.nodeType === Node.ELEMENT_NODE ? (node as Element).localName : '';
+  return elementName || node.nodeName.split(':').pop() || node.nodeName;
 }
 
 function elementChildren(node: Node) {
@@ -243,7 +244,7 @@ export async function patchOriginalDocx(
 
   for (const edit of edits) {
     const target = edit.original.trim();
-    if (!target || target.includes('\n')) {
+    if (!target || target.includes(String.fromCharCode(10))) {
       skipped.push({ issueId: edit.issueId, reason: '原文跨段或为空，不能写回原 DOCX。' });
       continue;
     }
