@@ -10,6 +10,8 @@ export function GET() {
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
     workflow: 'parallel-multi-agent',
     specialists: 4,
+    workspaceAccess: 'authenticated-session-required',
+    guestAccess: true,
     modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
     authProvider: 'Supabase Auth',
     authConfigured: Boolean(
