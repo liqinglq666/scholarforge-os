@@ -1,57 +1,121 @@
-import type { AgentId, IssueSeverity, ReviewResult } from './types';
+import type {
+  AgentId,
+  AgentRun,
+  IssueSeverity,
+  ReviewGuardrail,
+  ReviewIssue,
+  ReviewResult,
+  TerminologyItem,
+} from './types';
 
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DEFAULT_MODEL = 'qwen-plus';
+const WORKFLOW_VERSION = '0.2.0';
+const AGENT_IDS: AgentId[] = ['terminology', 'language', 'logic', 'method'];
 
-const SYSTEM_PROMPT = `You are the orchestration layer of ScholarForge OS, a multi-agent academic English review system.
-Simulate four specialist agents: terminology, language, logic, and method.
+const SHARED_RULES = `
+Hard rules:
+1. Never invent experiments, sample counts, numerical results, standards, references, equipment settings, statistical significance, or causal evidence.
+2. Preserve every reported number, unit, material name, specimen label, and scientific claim unless the wording itself is being cautiously qualified.
+3. When information is missing, write a visible author placeholder beginning with [Please provide ...].
+4. Do not introduce citations, DOI values, references, or claims that are absent from the source.
+5. Return JSON only. Do not use Markdown fences.
+`;
 
-Review the supplied manuscript passage under these hard rules:
-1. Never invent experiments, sample counts, numerical results, standards, references, or equipment settings.
-2. When required information is missing, use a visible author placeholder beginning with [Please provide ...].
-3. Preserve scientific meaning and all reported data.
-4. Distinguish language problems from scientific logic and reproducibility problems.
-5. Avoid overstating causality, significance, novelty, or certainty.
-6. Return JSON only, with no Markdown fences or commentary.
-
-The JSON must have this exact shape:
+const AGENT_PROMPTS: Record<AgentId, string> = {
+  terminology: `You are Terminology Guardian, one specialist in ScholarForge OS.
+Audit only terminology, abbreviations, units, nomenclature, spelling variants, and consistency. Do not rewrite the whole passage.
+${SHARED_RULES}
+Return this exact JSON shape:
 {
   "summary": "string",
-  "revisedText": "string",
-  "scoreBefore": 0,
-  "scoreAfter": 0,
-  "decision": "major_revision | minor_revision | ready",
-  "issues": [
-    {
-      "id": "string",
-      "agent": "terminology | language | logic | method",
-      "severity": "major | minor | suggestion",
-      "location": "string",
-      "original": "string",
-      "revised": "string",
-      "reason": "string",
-      "category": "string",
-      "meaningChanged": false
-    }
-  ],
-  "terminology": [
-    {
-      "preferred": "string",
-      "avoid": ["string"],
-      "note": "string"
-    }
-  ]
-}`;
+  "revisedText": "",
+  "issues": [{
+    "severity": "major | minor | suggestion",
+    "location": "string",
+    "original": "string",
+    "revised": "string",
+    "reason": "string",
+    "category": "string",
+    "meaningChanged": false
+  }],
+  "terminology": [{
+    "preferred": "string",
+    "avoid": ["string"],
+    "note": "string"
+  }]
+}`,
+  language: `You are Academic Editor, one specialist in ScholarForge OS.
+Improve grammar, syntax, academic tone, concision, cohesion, articles, tense, voice, and collocation. Produce a conservative full revised passage. Do not add scientific interpretation or missing experimental details.
+${SHARED_RULES}
+Return this exact JSON shape:
+{
+  "summary": "string",
+  "revisedText": "the complete conservatively revised passage",
+  "issues": [{
+    "severity": "major | minor | suggestion",
+    "location": "string",
+    "original": "string",
+    "revised": "string",
+    "reason": "string",
+    "category": "string",
+    "meaningChanged": false
+  }],
+  "terminology": []
+}`,
+  logic: `You are Logic Auditor, one specialist in ScholarForge OS.
+Audit argument structure, causal overstatement, unsupported generalization, ambiguity, consistency between claims, and whether wording exceeds the evidence presented. Do not rewrite the whole passage.
+${SHARED_RULES}
+Return this exact JSON shape:
+{
+  "summary": "string",
+  "revisedText": "",
+  "issues": [{
+    "severity": "major | minor | suggestion",
+    "location": "string",
+    "original": "string",
+    "revised": "a cautious evidence-bounded alternative",
+    "reason": "string",
+    "category": "string",
+    "meaningChanged": false
+  }],
+  "terminology": []
+}`,
+  method: `You are Method Auditor, one specialist in ScholarForge OS.
+Audit reproducibility and reporting completeness: materials, specimens, dimensions, sample counts, curing, devices, test parameters, repetitions, data reduction, uncertainty, statistics, standards, equations, symbols, and figure/table references. Do not invent missing details and do not rewrite the whole passage.
+${SHARED_RULES}
+Return this exact JSON shape:
+{
+  "summary": "string",
+  "revisedText": "",
+  "issues": [{
+    "severity": "major | minor | suggestion",
+    "location": "string",
+    "original": "string",
+    "revised": "[Please provide ...]",
+    "reason": "string",
+    "category": "string",
+    "meaningChanged": false
+  }],
+  "terminology": []
+}`,
+};
 
 interface ChatCompletionResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-  error?: {
-    message?: string;
-  };
+  choices?: Array<{ message?: { content?: string } }>;
+  error?: { message?: string };
+}
+
+interface AgentPayload {
+  summary: string;
+  revisedText: string;
+  issues: ReviewIssue[];
+  terminology: TerminologyItem[];
+}
+
+interface AgentExecution {
+  payload: AgentPayload;
+  run: AgentRun;
 }
 
 function stripJsonFence(value: string): string {
@@ -62,54 +126,36 @@ function stripJsonFence(value: string): string {
     .trim();
 }
 
-function asNumber(value: unknown, fallback: number): number {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(0, Math.min(100, Math.round(parsed)));
-}
-
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
-}
-
-function normalizeAgent(value: unknown): AgentId {
-  return value === 'terminology' || value === 'logic' || value === 'method'
-    ? value
-    : 'language';
 }
 
 function normalizeSeverity(value: unknown): IssueSeverity {
   return value === 'major' || value === 'suggestion' ? value : 'minor';
 }
 
-function normalizeResult(raw: unknown): Omit<ReviewResult, 'mode' | 'generatedAt'> {
+function normalizeAgentPayload(raw: unknown, agent: AgentId): AgentPayload {
   if (!raw || typeof raw !== 'object') {
-    throw new Error('Model returned an invalid review object.');
+    throw new Error(`${agent} returned an invalid object.`);
   }
 
   const data = raw as Record<string, unknown>;
   const rawIssues = Array.isArray(data.issues) ? data.issues : [];
   const rawTerms = Array.isArray(data.terminology) ? data.terminology : [];
-  const decision = data.decision === 'major_revision' || data.decision === 'ready'
-    ? data.decision
-    : 'minor_revision';
 
   return {
-    summary: asString(data.summary, 'The manuscript review was completed.'),
+    summary: asString(data.summary, `${agent} completed its audit.`),
     revisedText: asString(data.revisedText),
-    scoreBefore: asNumber(data.scoreBefore, 70),
-    scoreAfter: asNumber(data.scoreAfter, 85),
-    decision,
-    issues: rawIssues.slice(0, 24).map((item, index) => {
+    issues: rawIssues.slice(0, 16).map((item, index) => {
       const issue = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       return {
-        id: asString(issue.id, `issue-${index + 1}`),
-        agent: normalizeAgent(issue.agent),
+        id: `${agent}-${index + 1}`,
+        agent,
         severity: normalizeSeverity(issue.severity),
         location: asString(issue.location, 'Location not specified'),
         original: asString(issue.original),
         revised: asString(issue.revised),
-        reason: asString(issue.reason, 'Revision recommended for academic clarity.'),
+        reason: asString(issue.reason, 'Specialist review recommended a revision.'),
         category: asString(issue.category, 'Academic writing'),
         meaningChanged: issue.meaningChanged === true,
       };
@@ -127,16 +173,17 @@ function normalizeResult(raw: unknown): Omit<ReviewResult, 'mode' | 'generatedAt
   };
 }
 
-export async function reviewWithBailian(text: string, targetJournal?: string): Promise<ReviewResult> {
-  const apiKey = process.env.DASHSCOPE_API_KEY;
-  if (!apiKey) {
-    throw new Error('DASHSCOPE_API_KEY is not configured.');
-  }
-
-  const baseUrl = (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
-  const model = process.env.DASHSCOPE_MODEL || DEFAULT_MODEL;
+async function runSpecialist(
+  agent: AgentId,
+  text: string,
+  targetJournal: string | undefined,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+): Promise<AgentExecution> {
+  const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 52_000);
+  const timeout = setTimeout(() => controller.abort(), 46_000);
 
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -147,10 +194,10 @@ export async function reviewWithBailian(text: string, targetJournal?: string): P
       },
       body: JSON.stringify({
         model,
-        temperature: 0.2,
+        temperature: agent === 'language' ? 0.15 : 0.1,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: AGENT_PROMPTS[agent] },
           {
             role: 'user',
             content: `Target journal: ${targetJournal || 'Not specified'}\n\nManuscript passage:\n${text}`,
@@ -161,23 +208,181 @@ export async function reviewWithBailian(text: string, targetJournal?: string): P
       cache: 'no-store',
     });
 
-    const payload = await response.json() as ChatCompletionResponse;
+    const body = await response.json() as ChatCompletionResponse;
     if (!response.ok) {
-      throw new Error(payload.error?.message || `Model Studio request failed with status ${response.status}.`);
+      throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
     }
 
-    const content = payload.choices?.[0]?.message?.content;
+    const content = body.choices?.[0]?.message?.content;
     if (!content) {
-      throw new Error('Model Studio returned an empty response.');
+      throw new Error(`${agent} returned an empty response.`);
     }
 
-    const parsed = JSON.parse(stripJsonFence(content)) as unknown;
+    const payload = normalizeAgentPayload(JSON.parse(stripJsonFence(content)) as unknown, agent);
     return {
-      ...normalizeResult(parsed),
-      mode: 'live',
-      generatedAt: new Date().toISOString(),
+      payload,
+      run: {
+        agent,
+        status: 'completed',
+        durationMs: Date.now() - startedAt,
+        issueCount: payload.issues.length,
+        summary: payload.summary,
+        model,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      payload: { summary: '', revisedText: '', issues: [], terminology: [] },
+      run: {
+        agent,
+        status: 'failed',
+        durationMs: Date.now() - startedAt,
+        issueCount: 0,
+        summary: `${agent} did not complete.`,
+        model,
+        error: message,
+      },
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function uniqueIssues(items: ReviewIssue[]): ReviewIssue[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.agent}|${item.location}|${item.category}|${item.original}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 40);
+}
+
+function uniqueTerms(items: TerminologyItem[]): TerminologyItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.preferred.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 16);
+}
+
+function scorePenalty(issue: ReviewIssue): number {
+  if (issue.severity === 'suggestion') return 1;
+  if (issue.severity === 'minor') return issue.agent === 'method' || issue.agent === 'logic' ? 4 : 3;
+  return issue.agent === 'method' || issue.agent === 'logic' ? 10 : 7;
+}
+
+function remainingPenalty(issue: ReviewIssue): number {
+  if (issue.severity === 'suggestion') return 0;
+  if (issue.agent === 'method') return issue.severity === 'major' ? 9 : 3;
+  if (issue.agent === 'logic') return issue.severity === 'major' ? 7 : 2;
+  return issue.severity === 'major' ? 2 : 0;
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function decide(scoreAfter: number, issues: ReviewIssue[]): Pick<ReviewResult, 'decision' | 'decisionReason'> {
+  const majorIssues = issues.filter((issue) => issue.severity === 'major');
+  const unresolvedMajor = majorIssues.filter((issue) => issue.agent === 'method' || issue.agent === 'logic');
+
+  if (scoreAfter < 80 || unresolvedMajor.length >= 2) {
+    return {
+      decision: 'major_revision',
+      decisionReason: `${unresolvedMajor.length} major logic or reproducibility issues remain author-dependent; the manuscript is not yet submission-ready.`,
+    };
+  }
+
+  if (scoreAfter < 92 || majorIssues.length > 0) {
+    return {
+      decision: 'minor_revision',
+      decisionReason: 'The language revision improves readability, but at least one substantive or author-dependent issue still requires confirmation.',
+    };
+  }
+
+  return {
+    decision: 'ready',
+    decisionReason: 'No major evidence, logic, or reproducibility issue remains in the reviewed passage.',
+  };
+}
+
+function numericTokens(value: string): Set<string> {
+  return new Set(value.match(/\b\d+(?:\.\d+)?\b/g) || []);
+}
+
+function hasNewNumericToken(source: string, revised: string): boolean {
+  const sourceTokens = numericTokens(source);
+  return [...numericTokens(revised)].some((token) => !sourceTokens.has(token));
+}
+
+function buildGuardrails(source: string, revised: string, issues: ReviewIssue[]): ReviewGuardrail[] {
+  const methodMajors = issues.filter((issue) => issue.agent === 'method' && issue.severity === 'major');
+  return [
+    {
+      id: 'numbers',
+      label: 'No new numerical value was introduced by the revision.',
+      passed: !hasNewNumericToken(source, revised),
+    },
+    {
+      id: 'meaning',
+      label: 'No specialist explicitly marked a scientific meaning change.',
+      passed: !issues.some((issue) => issue.meaningChanged),
+    },
+    {
+      id: 'missing-info',
+      label: 'Missing reproducibility details remain visible as author actions.',
+      passed: methodMajors.length === 0 || methodMajors.every((issue) => issue.revised.startsWith('[Please provide')),
+    },
+  ];
+}
+
+export async function reviewWithBailian(text: string, targetJournal?: string): Promise<ReviewResult> {
+  const apiKey = process.env.DASHSCOPE_API_KEY;
+  if (!apiKey) throw new Error('DASHSCOPE_API_KEY is not configured.');
+
+  const baseUrl = (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
+  const model = process.env.DASHSCOPE_MODEL || DEFAULT_MODEL;
+
+  const executions = await Promise.all(
+    AGENT_IDS.map((agent) => runSpecialist(agent, text, targetJournal, apiKey, baseUrl, model)),
+  );
+
+  const completed = executions.filter((execution) => execution.run.status === 'completed');
+  if (completed.length === 0) {
+    throw new Error('All specialist agents failed. Check the Model Studio model, quota, and endpoint.');
+  }
+
+  const issues = uniqueIssues(completed.flatMap((execution) => execution.payload.issues));
+  const terminology = uniqueTerms(completed.flatMap((execution) => execution.payload.terminology));
+  const languageExecution = executions.find((execution) => execution.run.agent === 'language');
+  const candidateRevision = languageExecution?.payload.revisedText || text;
+  const revisedText = hasNewNumericToken(text, candidateRevision) ? text : candidateRevision;
+
+  const scoreBefore = clampScore(100 - issues.reduce((total, issue) => total + scorePenalty(issue), 0));
+  const scoreAfter = clampScore(Math.max(
+    scoreBefore,
+    100 - issues.reduce((total, issue) => total + remainingPenalty(issue), 0),
+  ));
+  const decision = decide(scoreAfter, issues);
+  const failedCount = executions.length - completed.length;
+
+  return {
+    mode: 'live',
+    executionMode: 'parallel-multi-agent',
+    workflowVersion: WORKFLOW_VERSION,
+    summary: `${completed.length} independent specialist agents completed the review${failedCount ? `; ${failedCount} agent failed and was excluded from aggregation` : ''}. The final score and reviewer decision were calculated deterministically from the normalized issue set rather than accepted from a model response.`,
+    revisedText,
+    scoreBefore,
+    scoreAfter,
+    ...decision,
+    issues,
+    terminology,
+    agentRuns: executions.map((execution) => execution.run),
+    guardrails: buildGuardrails(text, revisedText, issues),
+    generatedAt: new Date().toISOString(),
+  };
 }
