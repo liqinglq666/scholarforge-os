@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
+import { AccountDock } from '@/components/account-dock';
+import { AuthProvider } from '@/components/auth-provider';
 import './globals.css';
 import './v04.css';
+import './auth.css';
+import './auth-inline.css';
 
 export const metadata: Metadata = {
   title: 'ScholarForge OS｜研语工坊',
@@ -17,7 +21,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+          <AccountDock />
+        </AuthProvider>
+      </body>
     </html>
   );
 }

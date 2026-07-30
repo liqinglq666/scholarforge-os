@@ -1,0 +1,98 @@
+/* Integrates the optional auth control into the existing ScholarForge topbar. */
+
+.account-dock.is-inline,
+.account-login-entry.is-inline,
+.account-dock-loading.is-inline {
+  position: relative;
+  top: auto;
+  right: auto;
+  transform: none;
+  flex: 0 0 auto;
+}
+
+.account-login-entry.is-inline {
+  min-height: 40px;
+  padding: 4px 9px 4px 5px;
+  border-radius: 12px;
+  box-shadow: none;
+  background: rgba(255, 253, 248, 0.72);
+}
+
+.account-login-entry.is-inline .account-entry-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.account-dock.is-inline .account-trigger {
+  min-width: 150px;
+  min-height: 40px;
+  padding: 4px 8px 4px 5px;
+  border-radius: 12px;
+  box-shadow: none;
+  background: rgba(255, 253, 248, 0.72);
+}
+
+.account-dock.is-inline .account-avatar:not(.large) {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.account-dock-loading.is-inline {
+  width: 110px;
+  height: 40px;
+  border: 1px solid rgba(23, 35, 61, 0.1);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.account-dock.is-inline .account-menu {
+  z-index: 120;
+  top: calc(100% + 10px);
+}
+
+@media (max-width: 1280px) {
+  .account-login-entry.is-inline small,
+  .account-dock.is-inline .account-trigger-copy small {
+    display: none;
+  }
+
+  .account-dock.is-inline .account-trigger {
+    min-width: 124px;
+  }
+}
+
+@media (max-width: 980px) {
+  .account-login-entry.is-inline > span:last-child,
+  .account-dock.is-inline .account-trigger-copy,
+  .account-dock.is-inline .account-chevron {
+    display: none;
+  }
+
+  .account-login-entry.is-inline,
+  .account-dock.is-inline .account-trigger {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 5px;
+    place-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .account-login-entry.is-inline,
+  .account-dock.is-inline .account-trigger {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+  }
+
+  .account-dock.is-inline .account-menu {
+    position: fixed;
+    top: 68px;
+    right: 9px;
+    width: min(286px, calc(100vw - 18px));
+  }
+}
