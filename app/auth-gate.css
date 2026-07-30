@@ -1,0 +1,97 @@
+/* Protected workspace transition shown while the client restores or validates a session. */
+
+.auth-gate-loading {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #17233d;
+  background:
+    linear-gradient(rgba(23, 35, 61, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 35, 61, 0.022) 1px, transparent 1px),
+    radial-gradient(circle at 18% 12%, rgba(232, 119, 80, 0.14), transparent 28rem),
+    radial-gradient(circle at 86% 82%, rgba(45, 72, 119, 0.12), transparent 30rem),
+    #f4f0e7;
+  background-size: 40px 40px, 40px 40px, auto, auto, auto;
+}
+
+.auth-gate-card {
+  width: min(460px, 100%);
+  min-height: 104px;
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid rgba(23, 35, 61, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: 0 24px 70px rgba(23, 35, 61, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.auth-gate-mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(145deg, #17233d, #3b4e77);
+  box-shadow: 0 10px 24px rgba(23, 35, 61, 0.2);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
+}
+
+.auth-gate-card strong,
+.auth-gate-card small {
+  display: block;
+}
+
+.auth-gate-card strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.auth-gate-card small {
+  margin-top: 5px;
+  color: #667189;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.auth-gate-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(23, 35, 61, 0.14);
+  border-top-color: #e87750;
+  border-radius: 50%;
+  animation: authGateSpin 0.8s linear infinite;
+}
+
+@keyframes authGateSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 520px) {
+  .auth-gate-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+    padding: 18px;
+  }
+
+  .auth-gate-mark {
+    width: 44px;
+    height: 44px;
+  }
+
+  .auth-gate-spinner {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-gate-spinner {
+    animation-duration: 2.4s;
+  }
+}
