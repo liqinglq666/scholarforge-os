@@ -58,20 +58,33 @@ function userFromSupabase(user: User): ScholarForgeUser {
   };
 }
 
+function isLocalSession(value: unknown): value is ScholarForgeUser {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ScholarForgeUser>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.email === 'string'
+    && typeof candidate.displayName === 'string'
+    && (candidate.mode === 'demo' || candidate.mode === 'guest');
+}
+
 function readDemoSession() {
   try {
     const raw = window.localStorage.getItem(DEMO_SESSION_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ScholarForgeUser;
-    if (!parsed?.id || !parsed?.mode) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isLocalSession(parsed)) {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      return null;
+    }
     return parsed;
   } catch {
+    window.localStorage.removeItem(DEMO_SESSION_KEY);
     return null;
   }
 }
 
 function writeDemoSession(user: ScholarForgeUser | null) {
-  if (!user) {
+  if (!user || user.mode === 'supabase') {
     window.localStorage.removeItem(DEMO_SESSION_KEY);
     return;
   }
@@ -93,11 +106,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!alive) return;
-      setUser(data.session?.user ? userFromSupabase(data.session.user) : readDemoSession());
-      setLoading(false);
-    });
+    void supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!alive) return;
+        setUser(data.session?.user ? userFromSupabase(data.session.user) : readDemoSession());
+      })
+      .catch(() => {
+        if (!alive) return;
+        setUser(readDemoSession());
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!alive) return;
