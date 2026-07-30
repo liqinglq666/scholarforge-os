@@ -4,7 +4,8 @@ export function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'ScholarForge OS',
-    version: '0.5.1',
+    version: '0.6.0',
+    ui: 'professional-editorial-workspace',
     provider: 'Alibaba Cloud Model Studio',
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
     workflow: 'parallel-multi-agent',

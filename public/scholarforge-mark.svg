@@ -1,19 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
   <title id="title">ScholarForge OS mark</title>
-  <desc id="desc">A navy academic seal with an S monogram and four evidence nodes.</desc>
+  <desc id="desc">A navy academic shield containing a forged S-shaped quill and copper spark.</desc>
   <defs>
-    <linearGradient id="bg" x1="24" y1="20" x2="154" y2="164" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#17233D"/>
-      <stop offset="1" stop-color="#3E5079"/>
+    <linearGradient id="shield" x1="38" y1="20" x2="142" y2="158" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#263B65"/><stop offset="1" stop-color="#101A30"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="42" y1="14" x2="136" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1AF61"/><stop offset="1" stop-color="#C96B3E"/>
     </linearGradient>
   </defs>
-  <rect x="14" y="14" width="152" height="152" rx="44" fill="url(#bg)"/>
-  <circle cx="90" cy="90" r="53" fill="none" stroke="#F7F4ED" stroke-opacity=".32" stroke-width="2"/>
-  <path d="M112 59c-7-8-17-12-29-12-17 0-30 9-30 23 0 13 9 19 29 24 15 4 20 8 20 15 0 8-8 13-20 13-12 0-23-5-31-14" fill="none" stroke="#FFFDF8" stroke-width="10" stroke-linecap="round"/>
-  <g fill="#EF8058">
-    <circle cx="90" cy="28" r="5"/>
-    <circle cx="152" cy="90" r="5"/>
-    <circle cx="90" cy="152" r="5"/>
-    <circle cx="28" cy="90" r="5"/>
-  </g>
+  <rect width="180" height="180" rx="46" fill="#F7F3EA"/>
+  <path d="M90 17 147 37v45c0 40.7-22.2 71-57 89-34.8-18-57-48.3-57-89V37L90 17Z" fill="url(#copper)"/>
+  <path d="M90 26 138 43v39c0 34.9-18 61.2-48 77.8C60 143.2 42 116.9 42 82V43L90 26Z" fill="url(#shield)" stroke="#FFF8EA" stroke-opacity=".42"/>
+  <path d="M120.3 49.6c-12.1 1.4-24.1 7.1-32.6 16.1-7.9 8.5-12.7 19.2-11.8 27.6.9 7.9 7.7 11.7 17.7 15.3 7.8 2.7 11.6 5.2 11.5 9.6-.2 5.9-6.9 10.3-15.2 10.3-8.6 0-15.5-3.3-21.9-10.2l-8.5 9.6c8.1 9.1 17.8 13.8 30.1 13.8 17.6 0 31.3-9.6 31.7-23.3.3-12.3-9.1-18.4-23.2-23.2-5.8-2-8.9-3.8-9.3-7.5-.4-4.6 2.7-11.1 8.4-16.6 6.4-6.4 15-10.5 24-11.7l-.9-9.8Z" fill="#FFF8EA"/>
+  <path d="M121 48.3c-3.4 11-10.8 20.8-21.4 28.1l-9.3 6.5 7.3 2.5 6 8.1 2.8-10.6c3.3-12.3 9.1-23.9 17.5-33.7l-2.9-.9Z" fill="#FFF8EA"/>
+  <path d="m66.8 96.8 4 10.6 10.6 4-10.6 4-4 10.6-4-10.6-10.6-4 10.6-4 4-10.6Z" fill="#F1AF61"/>
 </svg>
