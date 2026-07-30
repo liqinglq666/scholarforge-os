@@ -7,243 +7,275 @@
 </p>
 
 <p align="center">
-  <strong>面向科研人员的多智能体学术英语审校、作者决策与投稿准备工作台</strong>
+  <strong>基于阿里云百炼的多智能体科研英语工作台</strong>
 </p>
 
 <p align="center">
-  先定义论文项目、章节与审校强度，<br />
-  再由四个百炼 Agent 并行审查，并由作者逐条做出最终决定。
+  科研中译英、英文保守润色、投稿前预检与审稿意见回复，<br />
+  共用一套术语锁、科学事实保护、问题证据和作者决策工作流。
 </p>
 
 <p align="center">
   <a href="https://scholarforge-os.vercel.app">在线体验</a> ·
   <a href="https://scholarforge-os.vercel.app/login">登录 / 注册</a> ·
-  <a href="docs/PRD.md">PRD</a> ·
   <a href="https://dcnua2ebj1ej.feishu.cn/wiki/IuKGwEAU9isxlck4V8ec8jJcnpe">产品文档</a> ·
   <a href="https://dcnua2ebj1ej.feishu.cn/wiki/JGxewZQa5izFL0kKQMycXkC9n0c">技术文档</a> ·
   <a href="https://scholarforge-os.vercel.app/api/health">健康检查</a>
 </p>
 
 <p align="center">
-  <img alt="应用版本 v0.7.0" src="https://img.shields.io/badge/app-v0.7.0-2563eb" />
-  <img alt="工作流版本 v0.7.0" src="https://img.shields.io/badge/workflow-v0.7.0-0f766e" />
+  <img alt="应用版本 v0.8.0" src="https://img.shields.io/badge/app-v0.8.0-2563eb" />
+  <img alt="工作流版本 v0.8.0" src="https://img.shields.io/badge/workflow-v0.8.0-0f766e" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
+  <img alt="Model qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
   <img alt="Supabase Auth" src="https://img.shields.io/badge/auth-Supabase-3ecf8e" />
-  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111827" />
   <a href="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml/badge.svg" />
   </a>
 </p>
 
+---
+
 ## 项目简介
 
-ScholarForge OS 将传统的“一次性整段润色”升级为一条可追踪、可决策的科研写作工作流：
+ScholarForge OS｜研语工坊是一套面向硕士生、博士生、科研人员和学术编辑的科研英语工作系统。
 
-```text
-论文项目
-→ 选择章节与审校强度
-→ 四个专业 Agent 并行审查
-→ 确定性聚合与科学保护
-→ 作者接受 / 暂缓 / 忽略每条建议
-→ 保存审校历史
-→ 导出修改稿、报告和决策日志
-```
+它继承了早期秒哒项目「研语｜科研英语 Agent / PaperLens」中最实用的产品能力，并将其重构为公开、可复现、可追踪的多 Agent 工程：
 
-项目的目标不是让句子看起来更华丽，而是让科研英文审校同时具备：
+- 科研中文到学术英文翻译；
+- 英文论文保守润色；
+- 投稿前 Reviewer-style 预检；
+- 审稿意见回复草稿；
+- 用户术语锁定；
+- 科学事实与数值保护；
+- 修改差异解释；
+- 作者逐条接受、暂缓或忽略建议；
+- 本地任务历史和结构化导出。
 
-- **专业分工**：术语、语言、逻辑和方法由独立 Agent 审查；
-- **章节意识**：摘要、引言、方法、结果、讨论和结论采用不同审查重点；
-- **科学保护**：不虚构实验、数值、标准、文献或方法细节；
-- **作者控制**：每条建议均可接受、暂缓、忽略或保留待处理；
-- **证据定位**：问题保留原文、建议、理由、位置和来源 Agent；
-- **结果一致**：评分与 Reviewer Decision 由代码规则生成；
-- **历史追踪**：浏览器本地保存最近八次审校快照；
-- **真实交付**：生成 TXT、Markdown 和 JSON 文件。
+项目的核心原则是：
 
-> 核心原则：**模型负责专业判断，代码负责最终规则，作者负责最终决定。**
+> **模型负责专业判断，代码负责规则、保护、评分和最终状态。**
 
-## 为什么需要 ScholarForge OS
+## 为什么不是普通润色工具
 
-| 科研写作风险 | ScholarForge OS 的处理方式 |
-| --- | --- |
-| 缩写、单位、材料或试件命名前后不一致 | Terminology Guardian 建立术语问题与统一规则 |
-| 语法正确但不符合学术表达习惯 | Academic Editor 生成保守修改稿 |
-| 因果、绝对化表述或结论超过证据 | Logic Auditor 标记证据边界与逻辑跳跃 |
-| 样本数、设备参数或数据处理信息缺失 | Method Auditor 提出可复现性作者待办 |
-| 摘要、方法和讨论需要相同的审查标准 | 章节感知 Prompt 为不同章节提供独立审查重点 |
-| AI 建议无法管理 | 作者逐条标记接受、暂缓、忽略或待处理 |
-| 多轮审校结果丢失 | 浏览器保存最近八次本地审校快照 |
-| 修改结果无法解释或评分相互冲突 | 聚合器统一问题结构、权重、评分和 Decision |
+普通科研英语工具通常把整个任务简化为一次“输入—改写”。用户能获得更流畅的文字，却很难回答：
 
-## v0.7 核心能力
+- 这次任务究竟是翻译、润色、预检还是返修信？
+- 某个专业术语是否被稳定使用？
+- AI 是否新增了原文没有的数值或实验事实？
+- 因果关系是否超过了已有证据？
+- Reviewer Comment 是否被真正回答？
+- 哪些建议需要作者补充实验、数据或位置？
+- 用户最终接受、暂缓或忽略了哪些问题？
 
-### 1. 论文任务配置
+ScholarForge OS 将这些问题组织为一条可追踪的专业工作链。
 
-每次审校包含：
+## 四种科研英语工作流
 
-- 项目名称
-- 目标期刊
-- 论文章节
-- 审校强度
-- 科研英文原文
+| 工作流 | 输入 | 核心任务 | 主要输出 |
+| --- | --- | --- | --- |
+| **科研中译英** | 中文科研段落 | 保留数据、术语和科学语气，生成学术英文 | Academic English Translation |
+| **英文保守润色** | 英文论文段落 | 改善语法、搭配、时态、语态和学术表达 | Conservative Revision |
+| **投稿前预检** | 待投稿英文稿件 | 像预审编辑一样检查术语、语言、逻辑和方法 | Precheck Revision + Evidence |
+| **审稿回复助手** | Reviewer Comment + 作者依据 | 生成不虚构事实的正式回应和修改说明 | Response to Reviewer Draft |
 
-支持七种章节：
+四种任务共用：
 
-`通用段落` · `摘要` · `引言` · `方法` · `结果` · `讨论` · `结论`
+- 七种论文章节类型；
+- 保守、平衡和深度三种处理模式；
+- 四个独立百炼 Agent；
+- 用户术语锁；
+- 数值与科学含义保护；
+- 作者问题决策；
+- 本地历史与导出。
 
-支持三种审校模式：
+## 四个专业 Agent
 
-| 模式 | 适用场景 |
-| --- | --- |
-| **保守审校** | 最小改动，优先保持作者声音和原句结构 |
-| **平衡审校** | 兼顾语言质量、逻辑风险和科学谨慎 |
-| **深度审校** | 发现更多术语、逻辑、方法和报告完整性问题 |
-
-### 2. 四个真实百炼 Agent
-
-| Agent | 主要职责 | 关键产出 |
+| Agent | 职责 | 在不同任务中的作用 |
 | --- | --- | --- |
-| **Terminology Guardian** | 缩写、术语、单位、符号与命名一致性 | 术语问题与规范化规则 |
-| **Academic Editor** | 语法、搭配、学术语气、清晰度与可读性 | 保守完整修改稿 |
-| **Logic Auditor** | 因果关系、证据边界、逻辑跳跃与过度表述 | 逻辑风险与谨慎替代表达 |
-| **Method Auditor** | 方法完整性、实验报告和可重复性 | 缺失信息与作者补充项 |
+| **Terminology Guardian** | 术语、缩写、单位、符号与命名 | 检查中英术语映射、团队规范与用户术语锁 |
+| **Academic Editor** | 主输出生成与语言质量 | 完整翻译、完整润色稿、预检修改稿或返修信草稿 |
+| **Logic Auditor** | 论证、因果和证据边界 | 防止结论扩大，检查返修信是否真正回应审稿意见 |
+| **Method Auditor** | 方法完整性与作者依据 | 检查样本、设备、统计、实验依据和返修证据是否充分 |
 
-四个 Agent 各自拥有独立 System Prompt、请求、响应、耗时和失败状态，并通过 `Promise.all` 并行执行。系统不是使用一个提示词模拟四个角色。
+每个 Agent 都拥有独立的 System Prompt、模型请求、响应、耗时和失败状态。系统不是通过一次提示词模拟四个角色。
 
-### 3. 作者问题决策
+## 阿里云百炼集成
 
-审校完成后，每条问题支持：
-
-- **待处理**
-- **接受建议**
-- **暂缓处理**
-- **忽略建议**
-
-问题中心可以按严重程度、来源 Agent、作者决策和关键词筛选。作者决策会写入 Markdown 报告和 JSON 证据文件。
-
-### 4. 本地审校历史
-
-系统在当前浏览器保存最近八次成功审校：
-
-- 项目名称
-- 原始文本
-- 目标期刊
-- 章节和审校模式
-- 分数与 Reviewer Decision
-- 全部 Agent 结果
-- 作者问题决策
-
-可以恢复或删除历史快照。该功能目前是浏览器本地历史，不是云端论文项目。
-
-### 5. 科学保护机制
-
-ScholarForge OS 把科学含义完整性放在语言流畅度之前：
-
-- 不虚构实验、样本数量、设备参数、标准、结果或参考文献；
-- 不在修改稿中新增原文不存在的数值 token；
-- 缺失信息使用 `[Please provide ...]` 作者占位符；
-- 不把语言润色伪装为科学结论修改；
-- 不让模型直接决定最终评分和 Reviewer Decision；
-- 不因英文变流畅而自动消除重大逻辑或方法问题。
-
-这些机制用于降低明显风险，不等同于完整事实核验、统计审查或同行评议。
-
-## 使用流程
-
-1. 在 `/login` 登录、注册或创建访客会话；
-2. 输入论文项目名称和目标期刊；
-3. 选择论文章节与审校强度；
-4. 粘贴 40—12,000 字符的科研英文；
-5. 启动审校，四个 Agent 并行调用百炼；
-6. 查看原文与修改稿对照、作者待办、问题、术语和运行轨迹；
-7. 对每条问题标记接受、暂缓、忽略或待处理；
-8. 保存本地审校历史；
-9. 下载修改稿、完整报告、作者决策日志或 JSON 证据。
-
-## 当前交付物
-
-| 文件 | 内容 |
-| --- | --- |
-| `Revised_Manuscript.txt` | Academic Editor 生成的保守修改稿 |
-| `Audit_Report.md` | 项目、章节、模式、摘要、问题、术语、轨迹和作者决策 |
-| `Author_Decisions.md` | 每条问题的作者处理状态与证据 |
-| `Review_Result.json` | 完整结构化结果、运行信息、保护状态和作者决策 |
-
-所有文件通过浏览器 `Blob` 和 Object URL 即时生成。
-
-## 阿里云百炼能力使用
+ScholarForge OS 的核心 AI 能力由阿里云百炼 Model Studio 提供。
 
 - 默认模型：`qwen-plus`；
 - 接口：DashScope OpenAI 兼容 API；
 - 调用位置：Next.js 服务端；
-- 单次全面审校：正常情况下四次独立模型请求；
-- API Key：仅服务端读取，不进入浏览器。
+- 单次任务：正常情况下发起 4 次独立模型请求；
+- 调度方式：`Promise.all` 并行执行；
+- API Key：仅从服务端环境变量读取，不进入浏览器。
 
 ```text
 Browser
   ↓
 POST /api/review
   ↓
-section + review mode context
+Task Router
+  ├─ Scientific Translation
+  ├─ Conservative Polishing
+  ├─ Pre-submission Precheck
+  └─ Response to Reviewers
   ↓
-4 independent specialist requests
+4 independent qwen-plus specialists
   ↓
-Alibaba Cloud Model Studio · qwen-plus
+Deterministic Aggregator + Guardrails
   ↓
-Deterministic Aggregator
-  ↓
-Author decisions + local history + downloadable evidence
+Primary output + Evidence + Decisions + Downloads
 ```
 
-核心代码：
+核心实现：
 
-- [`components/pro-workspace.tsx`](components/pro-workspace.tsx)：任务配置、结果阅读、作者决策和本地历史；
-- [`lib/bailian.ts`](lib/bailian.ts)：章节感知 Prompt、百炼调用、规范化、去重和评分；
-- [`app/api/review/route.ts`](app/api/review/route.ts)：请求验证、章节与模式枚举、真实 / 演示切换；
-- [`lib/types.ts`](lib/types.ts)：审校 Profile、Agent、问题和作者决策数据契约；
-- [`app/api/health/route.ts`](app/api/health/route.ts)：百炼、认证和工作流健康状态。
+- [`lib/bailian.ts`](lib/bailian.ts)：任务路由、四 Agent Prompt、百炼调用、聚合、评分和保护；
+- [`app/api/review/route.ts`](app/api/review/route.ts)：输入校验、术语锁清洗、真实 / 演示模式切换；
+- [`components/paperlens-workspace.tsx`](components/paperlens-workspace.tsx)：四任务工作台、差异、事实保护和作者决策；
+- [`lib/types.ts`](lib/types.ts)：任务、术语锁、Agent、问题和结果数据契约；
+- [`app/api/health/route.ts`](app/api/health/route.ts)：百炼、认证和工作流状态。
+
+## 用户术语锁
+
+用户可以为当前任务配置最多 12 条术语规则：
+
+```text
+来源词 / 触发词
+→ 必须采用的英文表达
+→ 可选说明
+```
+
+示例：
+
+```text
+应变硬化水泥基复合材料
+→ strain-hardening cementitious composite (SHCC)
+```
+
+术语锁会发送给四个 Agent，并进入确定性检查：
+
+- 当输入中出现触发词时，主输出应包含指定表达；
+- 锁定术语会合并进术语库；
+- 事实保护页面会显示每一条术语锁是否被执行；
+- 术语规则随本地任务快照保存。
+
+## 科学事实保护
+
+系统优先保护科学含义，而不是追求“看起来更高级”的文字。
+
+当前保护规则包括：
+
+1. 不虚构实验、样本数量、设备参数、标准、结果或参考文献；
+2. 不新增来源和作者依据之外的数字 token；
+3. 不把相关性自动改写为因果关系；
+4. 不把语言润色伪装成科学结论修改；
+5. 缺失信息必须显示为 `[Please provide ...]`；
+6. 用户锁定术语必须在主输出中保留；
+7. 返修信只能使用作者提供的证据和拟修改内容；
+8. 页码、行号和已完成实验不得由模型猜测。
+
+这些规则用于降低明显风险，不等同于完整的文献核验、统计审查或正式同行评议。
+
+## 输出阅读方式
+
+主输出支持三种视图：
+
+- **双栏**：输入与输出并排核对；
+- **清洁稿**：只阅读和复制最终主输出；
+- **变更高亮**：显示新增、替换和删除内容。
+
+长文本会采用整体区块高亮，避免浏览器执行超大规模词级差异计算。
+
+## 作者决策
+
+每条问题支持：
+
+```text
+Pending
+├─ Accepted
+├─ Deferred
+└─ Dismissed
+```
+
+作者决策会进入：
+
+- 右侧处理进度；
+- 问题筛选；
+- 本地任务快照；
+- Markdown Decision Log；
+- Markdown Evidence Report；
+- JSON 结构化结果。
+
+当前“接受建议”用于记录作者选择，尚不会自动把局部建议应用到工作稿。文本定位、冲突处理、撤销和重做属于下一阶段能力。
+
+## 账户与访问
+
+工作台采用登录优先流程：
+
+```text
+访问网站
+→ 登录 / 注册 / 访客入口
+→ 会话验证
+→ 进入科研写作工作台
+```
+
+支持：
+
+| 模式 | 说明 |
+| --- | --- |
+| **Supabase Auth** | 配置后支持邮箱注册、登录、确认、重置密码和会话保持 |
+| **本地演示账户** | 未配置 Supabase 时验证账户 UX，不上传密码 |
+| **访客模式** | 评委和首次用户无需注册即可体验公开 Demo |
+
+当前账户系统只负责身份和会话。论文项目、任务历史和术语锁仍保存在当前浏览器，尚未实现按用户隔离的云端同步。
+
+## 当前交付物
+
+| 文件 | 内容 |
+| --- | --- |
+| `*-translation.txt` / `*-revision.txt` / `*-reviewer-response.txt` | 当前任务主输出 |
+| `*-evidence-report.md` | 工作流、问题、保护、Agent 轨迹与作者决策 |
+| `*-author-decisions.md` | 作者逐条决策日志 |
+| `*-workflow-result.json` | 完整结构化任务数据 |
+
+文件由浏览器 `Blob` 和 Object URL 即时生成，不展示无法真正下载的虚假 DOCX / PDF 卡片。
 
 ## 技术架构
 
 | 层级 | 职责 |
 | --- | --- |
-| **Identity Layer** | Supabase Auth、访客模式和本地演示会话 |
-| **Client Workspace** | 项目配置、草稿、本地历史、作者决策和文件导出 |
-| **Application Layer** | Next.js Route Handlers、输入验证和健康检查 |
-| **Orchestration Layer** | 并行调度、规范化、去重、保护规则、评分与 Decision |
-| **Agent Layer** | 四个独立阿里云百炼请求 |
-| **Artifact Layer** | TXT、Markdown 与 JSON 生成 |
+| **Identity Layer** | Supabase Auth、访客模式、本地演示会话 |
+| **Workflow UI** | 四任务选择、动态输入、术语锁、输出视图和作者决策 |
+| **Application Layer** | Next.js Route Handlers、校验、错误边界与健康检查 |
+| **Task Router** | 翻译、润色、预检和返修信任务上下文 |
+| **Agent Layer** | 四个独立 qwen-plus 请求 |
+| **Safety Layer** | 数值、含义、缺失信息和术语锁保护 |
+| **Artifact Layer** | TXT、Markdown 和 JSON 浏览器端导出 |
 
-## 评分与 Reviewer Decision
+## 技术栈
 
-模型负责识别问题，代码负责最终评分。
-
-| Decision | 确定性条件 |
+| 领域 | 技术 |
 | --- | --- |
-| `Major Revision` | 修改后分数低于 80，或至少有 2 个重大 Logic / Method 问题 |
-| `Minor Revision` | 修改后分数低于 92，或仍有任意重大问题 |
-| `Ready for Submission` | 修改后分数至少 92，且没有重大问题 |
-
-评分仅用于产品内辅助判断，不代表目标期刊官方意见。
-
-## 账户与数据边界
-
-| 账户模式 | 当前能力 | 存储位置 |
-| --- | --- | --- |
-| **Supabase 云端账户** | 邮箱注册、登录、确认、重置和会话保持 | Supabase Auth |
-| **本地演示账户** | 验证账户 UX，不上传密码 | 当前浏览器 |
-| **访客模式** | 无需注册进入比赛 Demo | 当前浏览器 |
-
-当前账户只负责身份和会话。论文草稿、作者决策和审校历史仍保存在浏览器 `localStorage`，尚未按用户同步到云端。
+| 前端 | Next.js 16、React 19、TypeScript、原生 CSS |
+| 账户 | Supabase Auth（可选）、浏览器访客 / 演示会话 |
+| 服务端 | Next.js Route Handlers、Node.js Runtime |
+| 模型平台 | 阿里云百炼 Model Studio OpenAI 兼容接口 |
+| 多 Agent 调度 | `Promise.all` |
+| 本地状态 | `localStorage` |
+| 文件导出 | Browser Blob、Object URL |
+| 部署 | Vercel |
+| CI | GitHub Actions、Node.js 22 |
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js 22.12+
-- npm
-- 阿里云百炼 API Key（可选；未配置时使用演示审校）
-- Supabase 项目（可选；未配置时使用本地演示账户）
+- Node.js 22.12+；
+- npm；
+- 阿里云百炼 API Key（可选，未配置时使用明确标记的演示模式）；
+- Supabase 项目（可选，未配置时使用访客或本地演示账户）。
 
 ### 安装
 
@@ -252,6 +284,8 @@ git clone https://github.com/liqinglq666/scholarforge-os.git
 cd scholarforge-os
 npm install
 ```
+
+### 配置环境变量
 
 Windows CMD：
 
@@ -268,7 +302,7 @@ cp .env.example .env.local
 `.env.local`：
 
 ```env
-DASHSCOPE_API_KEY=你的百炼_API_Key
+DASHSCOPE_API_KEY=your_model_studio_api_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-plus
 
@@ -276,7 +310,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 ```
 
-不要使用 `NEXT_PUBLIC_DASHSCOPE_API_KEY`，否则百炼密钥会进入浏览器构建产物。
+不要使用 `NEXT_PUBLIC_DASHSCOPE_API_KEY`，否则百炼密钥会被打包到浏览器端。
 
 ### 启动与验证
 
@@ -286,53 +320,89 @@ npm run typecheck
 npm run build
 ```
 
-- 应用：`http://localhost:3000`
-- 登录页：`http://localhost:3000/login`
-- 健康检查：`http://localhost:3000/api/health`
+- 应用：`http://localhost:3000`；
+- 登录：`http://localhost:3000/login`；
+- 健康检查：`http://localhost:3000/api/health`。
+
+## 仓库结构
+
+```text
+.
+├── app/
+│   ├── api/
+│   │   ├── health/route.ts
+│   │   └── review/route.ts
+│   ├── login/page.tsx
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── v08.css
+├── components/
+│   ├── paperlens-workspace.tsx
+│   ├── auth-provider.tsx
+│   ├── auth-gate.tsx
+│   └── account-dock.tsx
+├── lib/
+│   ├── bailian.ts
+│   ├── demo-review.ts
+│   ├── types.ts
+│   └── supabase/client.ts
+├── public/
+│   ├── scholarforge-lockup.svg
+│   └── icon.svg
+├── .github/workflows/ci.yml
+├── .env.example
+├── package.json
+├── README.md
+└── README.en.md
+```
 
 ## 当前边界
 
-- 仅支持纯文本，暂不解析 PDF 或 DOCX；
-- 本地历史尚未同步至用户云端账户；
-- 作者“接受建议”目前记录决策，但不会自动将局部建议应用到正文；
-- 暂不支持 DOCX Track Changes；
-- `/api/review` 为比赛 Demo 保持匿名调用；
-- 数值保护为 token 级检测，不等同于完整事实核验；
-- 真实模式会将输入文本发送到阿里云百炼模型服务。
+- 仅支持文本输入，暂不解析 PDF 或 DOCX；
+- 返修信按单条 Reviewer Comment 处理，暂不自动拆分完整审稿信；
+- “接受建议”尚未自动应用到正文；
+- 词级差异对超长文本采用整体区块模式；
+- 本地任务历史不会跨设备同步；
+- 账户已实现，但暂无按用户隔离的云端论文项目；
+- `/api/review` 为公开比赛 Demo 保持可调用，尚未做用户配额；
+- 数值保护为 token 级检查，不等同于完整事实核验；
+- 真实模式会把输入和作者依据发送到阿里云百炼模型服务；
+- 当前不提供 DOCX Track Changes 和正式 PDF 报告。
 
 ## 路线图
 
-### v0.8 · 云端论文项目
+### P0 · 真实论文工作流
 
-- Supabase `projects`、`manuscript_versions`、`review_runs` 和 `issue_decisions`；
-- Row Level Security；
-- 按用户隔离论文项目；
-- 本地历史迁移；
-- 版本对比。
-
-### v0.9 · 文档审校
-
-- DOCX / PDF 上传；
-- 自动章节解析；
-- 逐条应用修改；
-- 撤销和重做；
-- 论文级术语记忆。
-
-### v1.0 · 正式投稿交付
-
+- DOCX / PDF 上传与章节解析；
+- Supabase 云端论文项目和 Row Level Security；
+- 逐条应用建议、撤销和重做；
+- 版本历史；
 - DOCX Track Changes；
-- SSE Agent 实时进度；
-- 正式 PDF 审校报告；
-- 用户配额与任务队列。
+- SSE Agent 实时进度。
 
-### v1.1 · 投稿与返修
+### P1 · 完整投稿与返修
 
-- Reviewer Comment Parser；
-- Response to Reviewers；
-- Cover Letter、Highlights 和声明材料；
-- 投稿检查清单。
+- Reviewer Comment 自动拆分；
+- 多 Reviewer Response 工作台；
+- Cover Letter；
+- Highlights；
+- Author Contributions；
+- Data Availability Statement；
+- 投稿文件检查清单。
 
-完整规划见 [`docs/PRD.md`](docs/PRD.md)。
+### P2 · 科研证据中心
+
+- 期刊指南知识库；
+- DOI 与引用核验；
+- 跨章节术语和数字一致性；
+- 主张—数据—图表—文献映射；
+- 团队自定义术语库。
+
+## 文档
+
+- [ScholarForge OS 产品文档（飞书）](https://dcnua2ebj1ej.feishu.cn/wiki/IuKGwEAU9isxlck4V8ec8jJcnpe)
+- [ScholarForge OS 技术文档（飞书）](https://dcnua2ebj1ej.feishu.cn/wiki/JGxewZQa5izFL0kKQMycXkC9n0c)
+- [产品需求与路线图](docs/PRD.md)
 
 ## License
 
