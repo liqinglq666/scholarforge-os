@@ -53,6 +53,7 @@ function PatchIcon({ name }: { name: 'package' | 'close' | 'download' | 'shield'
 }
 
 function readSnapshots() {
+  if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(window.localStorage.getItem(HISTORY_KEY) || '[]') as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -69,6 +70,7 @@ function readSnapshots() {
 
 function readAppliedEdits(snapshot: PatchSnapshot) {
   if (Array.isArray(snapshot.appliedEdits) && snapshot.appliedEdits.length) return snapshot.appliedEdits;
+  if (typeof window === 'undefined') return [];
   try {
     const session = JSON.parse(window.localStorage.getItem(AUTHOR_EDITING_SESSION_KEY) || 'null') as EditingSession | null;
     if (session?.snapshotId === snapshot.id && session.sourceText === snapshot.sourceText && Array.isArray(session.applied)) return session.applied;
