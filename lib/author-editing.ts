@@ -1,6 +1,6 @@
 import type { ReviewIssue } from '@/lib/types';
 
-export const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-v1';
+export const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
 
 export type AnchorState =
   | 'safe-exact'
