@@ -14,6 +14,7 @@ import './v07.css';
 import './v08.css';
 import './v09.css';
 import './v10.css';
+import './v10-fixes.css';
 
 export const metadata: Metadata = {
   title: {
