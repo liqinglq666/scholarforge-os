@@ -1,0 +1,134 @@
+.parallel-note {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(47, 140, 107, 0.16);
+  border-radius: 11px;
+  background: rgba(218, 241, 231, 0.5);
+  color: var(--green);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.agent-row.is-failed .agent-icon {
+  background: var(--red-soft);
+  border-color: rgba(184, 84, 84, 0.22);
+  color: var(--red);
+}
+
+.agent-row.is-failed .agent-state {
+  color: var(--red);
+}
+
+.guardrail.is-warning b,
+.guardrail.is-warning span {
+  color: var(--red);
+}
+
+.trace-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trace-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+}
+
+.trace-card.failed {
+  border-color: rgba(184, 84, 84, 0.28);
+  background: linear-gradient(180deg, rgba(247, 221, 221, 0.35), white 50%);
+}
+
+.trace-card.completed,
+.trace-card.demo {
+  border-color: rgba(47, 140, 107, 0.18);
+}
+
+.trace-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trace-name {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.trace-model {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.trace-card p {
+  min-height: 44px;
+  margin: 13px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.trace-metrics {
+  display: flex;
+  gap: 18px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.trace-metrics strong {
+  color: var(--ink);
+}
+
+.trace-error {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.decision-reason {
+  margin-top: 10px;
+  padding-left: 11px;
+  border-left: 2px solid var(--accent);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.deliverable-button {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.deliverable-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(23, 35, 61, 0.24);
+  box-shadow: 0 8px 20px rgba(23, 35, 61, 0.08);
+}
+
+.deliverable-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .trace-list {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions .status-chip {
+    display: none;
+  }
+}

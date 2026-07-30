@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
+  <title id="title">ScholarForge OS mark</title>
+  <desc id="desc">A navy academic seal with an S monogram and four evidence nodes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="154" y2="164" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17233D"/>
+      <stop offset="1" stop-color="#3E5079"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="152" height="152" rx="44" fill="url(#bg)"/>
+  <circle cx="90" cy="90" r="53" fill="none" stroke="#F7F4ED" stroke-opacity=".32" stroke-width="2"/>
+  <path d="M112 59c-7-8-17-12-29-12-17 0-30 9-30 23 0 13 9 19 29 24 15 4 20 8 20 15 0 8-8 13-20 13-12 0-23-5-31-14" fill="none" stroke="#FFFDF8" stroke-width="10" stroke-linecap="round"/>
+  <g fill="#EF8058">
+    <circle cx="90" cy="28" r="5"/>
+    <circle cx="152" cy="90" r="5"/>
+    <circle cx="90" cy="152" r="5"/>
+    <circle cx="28" cy="90" r="5"/>
+  </g>
+</svg>
