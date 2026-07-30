@@ -9,15 +9,16 @@ import './auth-inline.css';
 import './auth-gate.css';
 import './v06.css';
 import './v06-fixes.css';
+import './v07.css';
 
 export const metadata: Metadata = {
   title: {
     default: 'ScholarForge OS｜研语工坊',
     template: '%s · ScholarForge OS',
   },
-  description: '基于阿里云百炼 qwen-plus 的多智能体科研英语审校与投稿工作台',
+  description: '基于阿里云百炼 qwen-plus 的多智能体科研英语审校、作者决策与投稿工作台',
   applicationName: 'ScholarForge OS',
-  keywords: ['科研英语', '学术写作', '多智能体', '阿里云百炼', 'qwen-plus'],
+  keywords: ['科研英语', '学术写作', '多智能体', '阿里云百炼', 'qwen-plus', '论文审校'],
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'ScholarForge OS｜研语工坊',
-    description: '让科研英语修改像同行评审一样有证据。',
+    description: '让科研英语修改像同行评审一样有证据，并由作者逐条做出最终决定。',
     type: 'website',
   },
 };
