@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SAMPLE_MANUSCRIPT } from '@/lib/demo-review';
 import type { AgentId, ReviewIssue, ReviewResult } from '@/lib/types';
@@ -17,17 +17,19 @@ const AGENTS: Array<{
   { id: 'method', icon: 'M', name: 'Method Auditor', role: '方法完整性与复现' },
 ];
 
-const DELIVERABLES = [
-  ['DOCX', 'Manuscript_Revised.docx'],
-  ['XLSX', 'Revision_Matrix.xlsx'],
-  ['PDF', 'Language_Audit_Report.pdf'],
-];
-
 const AGENT_LABELS: Record<AgentId, string> = {
   terminology: '术语 Agent',
   language: '语言 Agent',
   logic: '逻辑 Agent',
   method: '方法 Agent',
+};
+
+type ResultTab = 'comparison' | 'issues' | 'terms' | 'trace';
+
+type ReviewPayload = ReviewResult & {
+  error?: string;
+  detail?: string;
+  requestId?: string;
 };
 
 function decisionLabel(decision?: ReviewResult['decision']) {
@@ -43,23 +45,99 @@ function severityLabel(severity: ReviewIssue['severity']) {
   return 'Suggestion';
 }
 
+function formatDuration(durationMs: number) {
+  if (durationMs < 1_000) return `${durationMs} ms`;
+  return `${(durationMs / 1_000).toFixed(1)} s`;
+}
+
+function safeFileStem(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'scholarforge-review';
+}
+
+function buildMarkdownReport(result: ReviewResult, source: string, targetJournal: string) {
+  const issueLines = result.issues.map((issue, index) => [
+    `### ${index + 1}. ${issue.category} · ${severityLabel(issue.severity)}`,
+    `- Agent: ${AGENT_LABELS[issue.agent]}`,
+    `- Location: ${issue.location}`,
+    `- Original: ${issue.original || 'Not supplied'}`,
+    `- Suggested revision: ${issue.revised || 'Author action required'}`,
+    `- Reason: ${issue.reason}`,
+    `- Scientific meaning changed: ${issue.meaningChanged ? 'Yes' : 'No'}`,
+  ].join('\n')).join('\n\n');
+
+  const termLines = result.terminology.length
+    ? result.terminology.map((term) => [
+        `- **${term.preferred}**`,
+        term.avoid.length ? `  - Avoid: ${term.avoid.join(', ')}` : '',
+        `  - Note: ${term.note}`,
+      ].filter(Boolean).join('\n')).join('\n')
+    : '- No terminology rule was generated for this passage.';
+
+  const traceLines = result.agentRuns.map((run) =>
+    `- ${AGENT_LABELS[run.agent]}: ${run.status}, ${formatDuration(run.durationMs)}, ${run.issueCount} issues, model=${run.model}`,
+  ).join('\n');
+
+  return `# ScholarForge OS Academic English Review\n\n` +
+    `- Target journal: ${targetJournal || 'Not specified'}\n` +
+    `- Generated at: ${result.generatedAt}\n` +
+    `- Workflow: ${result.workflowVersion} (${result.executionMode})\n` +
+    `- Decision: ${decisionLabel(result.decision)}\n` +
+    `- Score: ${result.scoreBefore} → ${result.scoreAfter}\n\n` +
+    `## Executive summary\n\n${result.summary}\n\n` +
+    `## Decision rationale\n\n${result.decisionReason}\n\n` +
+    `## Agent execution trace\n\n${traceLines}\n\n` +
+    `## Issues\n\n${issueLines || 'No issue was returned.'}\n\n` +
+    `## Terminology glossary\n\n${termLines}\n\n` +
+    `## Original manuscript\n\n${source}\n\n` +
+    `## ScholarForge revision\n\n${result.revisedText}\n`;
+}
+
+function downloadText(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function Home() {
   const [text, setText] = useState(SAMPLE_MANUSCRIPT);
   const [targetJournal, setTargetJournal] = useState('Construction and Building Materials');
   const [loading, setLoading] = useState(false);
-  const [activeAgent, setActiveAgent] = useState(-1);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [result, setResult] = useState<ReviewResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'comparison' | 'issues' | 'terms'>('comparison');
+  const [activeTab, setActiveTab] = useState<ResultTab>('comparison');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!loading) return;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 120);
+    return () => window.clearInterval(timer);
+  }, [loading]);
 
   const majorIssues = useMemo(
     () => result?.issues.filter((issue) => issue.severity === 'major').length ?? 0,
     [result],
   );
 
+  const failedAgents = useMemo(
+    () => result?.agentRuns.filter((run) => run.status === 'failed').length ?? 0,
+    [result],
+  );
+
   const progress = loading
-    ? Math.max(8, ((activeAgent + 1) / AGENTS.length) * 82)
+    ? Math.min(92, 18 + elapsedMs / 520)
     : result
       ? 100
       : 0;
@@ -67,14 +145,10 @@ export default function Home() {
   async function handleReview() {
     if (loading) return;
     setLoading(true);
+    setElapsedMs(0);
     setError('');
     setResult(null);
     setActiveTab('comparison');
-    setActiveAgent(0);
-
-    const timer = window.setInterval(() => {
-      setActiveAgent((current) => Math.min(current + 1, AGENTS.length - 1));
-    }, 850);
 
     try {
       const response = await fetch('/api/review', {
@@ -82,19 +156,16 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, targetJournal }),
       });
-      const payload = await response.json() as ReviewResult & { error?: string; detail?: string };
+      const payload = await response.json() as ReviewPayload;
 
       if (!response.ok) {
         throw new Error(payload.detail || payload.error || 'Review request failed.');
       }
 
       setResult(payload);
-      setActiveAgent(AGENTS.length);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '审校失败，请检查配置后重试。');
-      setActiveAgent(-1);
     } finally {
-      window.clearInterval(timer);
       setLoading(false);
     }
   }
@@ -103,7 +174,32 @@ export default function Home() {
     if (!result?.revisedText) return;
     await navigator.clipboard.writeText(result.revisedText);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
+    window.setTimeout(() => setCopied(false), 1_400);
+  }
+
+  function downloadArtifact(kind: 'revision' | 'report' | 'json') {
+    if (!result) return;
+    const stem = safeFileStem(targetJournal);
+
+    if (kind === 'revision') {
+      downloadText(`${stem}-revised.txt`, result.revisedText, 'text/plain;charset=utf-8');
+      return;
+    }
+
+    if (kind === 'report') {
+      downloadText(
+        `${stem}-audit-report.md`,
+        buildMarkdownReport(result, text, targetJournal),
+        'text/markdown;charset=utf-8',
+      );
+      return;
+    }
+
+    downloadText(
+      `${stem}-review-result.json`,
+      JSON.stringify({ targetJournal, sourceText: text, ...result }, null, 2),
+      'application/json;charset=utf-8',
+    );
   }
 
   return (
@@ -117,8 +213,8 @@ export default function Home() {
           </div>
         </div>
         <div className="topbar-actions">
-          <div className="status-chip"><span className="status-dot" /> Workspace protected</div>
-          <span className="small-chip">MVP · v0.1</span>
+          <div className="status-chip"><span className="status-dot" /> Model Studio connected</div>
+          <span className="small-chip">MVP · v0.2</span>
         </div>
       </header>
 
@@ -127,32 +223,35 @@ export default function Home() {
           <section className="panel-section">
             <div className="eyebrow">Current project</div>
             <h2 className="section-title">论文项目空间</h2>
-            <p className="section-copy">每篇论文独立保存术语、审校记录和投稿材料。</p>
+            <p className="section-copy">每次审校围绕同一段科研文本生成问题、术语、执行轨迹和可下载交付物。</p>
             <div className="project-card">
-              <div className="project-card-label">Active manuscript</div>
-              <h3>Binder-dependent performance of ECC</h3>
-              <p>Version 01 · Methods review</p>
+              <div className="project-card-label">Active review</div>
+              <h3>{targetJournal || 'Untitled journal review'}</h3>
+              <p>Workflow v0.2 · Parallel specialists</p>
             </div>
           </section>
 
           <section className="panel-section">
             <div className="eyebrow">Agent team</div>
+            <div className="parallel-note">4 次独立百炼调用并行执行</div>
             <div className="agent-list">
-              {AGENTS.map((agent, index) => {
-                const done = result ? true : activeAgent > index;
-                const running = loading && activeAgent === index;
+              {AGENTS.map((agent) => {
+                const run = result?.agentRuns.find((item) => item.agent === agent.id);
+                const done = run?.status === 'completed' || run?.status === 'demo';
+                const failed = run?.status === 'failed';
+                const running = loading;
                 return (
                   <div
-                    className={`agent-row ${done ? 'is-done' : ''} ${running ? 'is-running' : ''}`}
+                    className={`agent-row ${done ? 'is-done' : ''} ${running ? 'is-running' : ''} ${failed ? 'is-failed' : ''}`}
                     key={agent.id}
                   >
-                    <div className="agent-icon">{done ? '✓' : agent.icon}</div>
+                    <div className="agent-icon">{done ? '✓' : failed ? '!' : agent.icon}</div>
                     <div>
                       <div className="agent-name">{agent.name}</div>
                       <div className="agent-role">{agent.role}</div>
                     </div>
                     <div className="agent-state">
-                      {done ? '完成' : running ? '运行中' : '等待'}
+                      {done ? formatDuration(run.durationMs) : failed ? '失败' : running ? '并行运行' : '等待'}
                     </div>
                   </div>
                 );
@@ -163,9 +262,15 @@ export default function Home() {
           <section className="panel-section">
             <div className="eyebrow">Scientific guardrails</div>
             <div className="guardrail-list">
-              <div className="guardrail"><b>✓</b><span>不虚构实验数据、样本数量与参考文献</span></div>
-              <div className="guardrail"><b>✓</b><span>缺失信息使用作者占位符，不擅自补写</span></div>
-              <div className="guardrail"><b>✓</b><span>区分语言问题、逻辑问题与方法问题</span></div>
+              {(result?.guardrails || [
+                { id: 'numbers', label: '不新增原文没有的数值和试验结果', passed: true },
+                { id: 'meaning', label: '不把语言润色伪装成科学结论修改', passed: true },
+                { id: 'missing-info', label: '缺失信息保留为作者待补项', passed: true },
+              ]).map((guardrail) => (
+                <div className={`guardrail ${guardrail.passed ? '' : 'is-warning'}`} key={guardrail.id}>
+                  <b>{guardrail.passed ? '✓' : '!'}</b><span>{guardrail.label}</span>
+                </div>
+              ))}
             </div>
           </section>
         </aside>
@@ -174,9 +279,9 @@ export default function Home() {
           <div className="hero">
             <div className="hero-head">
               <div>
-                <div className="eyebrow">Multi-agent manuscript review</div>
+                <div className="eyebrow">Parallel multi-agent manuscript review</div>
                 <h1>让每一次科研英语修改<br />都有<em>依据</em>。</h1>
-                <p>四个专业 Agent 围绕同一论文空间协作，完成术语统一、语言润色、逻辑审校与方法完整性检查，并给出可追踪的修改理由。</p>
+                <p>四个独立专业 Agent 并行完成术语、语言、逻辑和方法审查；代码统一聚合问题、校准评分，并保留科学意义保护规则。</p>
               </div>
               <div className="hero-seal">SCIENTIFIC<br />MEANING<br />PROTECTED</div>
             </div>
@@ -211,7 +316,7 @@ export default function Home() {
                 onClick={handleReview}
                 type="button"
               >
-                {loading ? 'Agent 团队正在审校…' : '启动全面审校 →'}
+                {loading ? '四个 Agent 正在并行审校…' : '启动全面审校 →'}
               </button>
             </div>
             {error ? <div className="error-box">{error}</div> : null}
@@ -223,7 +328,7 @@ export default function Home() {
                 <div className="progress-value" style={{ width: `${progress}%` }} />
               </div>
               <div className="progress-copy">
-                <span>{loading ? `${AGENTS[Math.min(activeAgent, 3)]?.name ?? 'Orchestrator'} 正在处理` : '审校工作流已完成'}</span>
+                <span>{loading ? `并行调用百炼 · 已等待 ${(elapsedMs / 1_000).toFixed(1)} s` : `工作流 ${result?.workflowVersion} 已完成`}</span>
                 <span>{Math.round(progress)}%</span>
               </div>
             </div>
@@ -235,13 +340,14 @@ export default function Home() {
                 <button className={`tab ${activeTab === 'comparison' ? 'is-active' : ''}`} onClick={() => setActiveTab('comparison')}>对照审校</button>
                 <button className={`tab ${activeTab === 'issues' ? 'is-active' : ''}`} onClick={() => setActiveTab('issues')}>问题中心 · {result.issues.length}</button>
                 <button className={`tab ${activeTab === 'terms' ? 'is-active' : ''}`} onClick={() => setActiveTab('terms')}>术语库 · {result.terminology.length}</button>
+                <button className={`tab ${activeTab === 'trace' ? 'is-active' : ''}`} onClick={() => setActiveTab('trace')}>运行轨迹 · {result.agentRuns.length}</button>
               </div>
 
               <div className="result-content">
                 <div className="result-toolbar">
                   <span className={`mode-chip ${result.mode === 'live' ? 'live' : ''}`}>
                     <span className="status-dot" />
-                    {result.mode === 'live' ? '百炼实时审校' : '安全演示模式'}
+                    {result.mode === 'live' ? '百炼真实多 Agent' : '安全演示模式'}
                   </span>
                   {activeTab === 'comparison' ? (
                     <button className="copy-button" onClick={copyRevision}>{copied ? '已复制 ✓' : '复制修改稿'}</button>
@@ -255,7 +361,7 @@ export default function Home() {
                       <p>{text}</p>
                     </article>
                     <article className="text-paper revised">
-                      <div className="paper-label">ScholarForge revision</div>
+                      <div className="paper-label">ScholarForge conservative revision</div>
                       <p>{result.revisedText}</p>
                     </article>
                   </div>
@@ -292,12 +398,34 @@ export default function Home() {
                     )) : <div className="empty-result">本段未发现需要建立的术语规则。</div>}
                   </div>
                 ) : null}
+
+                {activeTab === 'trace' ? (
+                  <div className="trace-list">
+                    {result.agentRuns.map((run) => (
+                      <article className={`trace-card ${run.status}`} key={run.agent}>
+                        <div className="trace-head">
+                          <div>
+                            <div className="trace-name">{AGENT_LABELS[run.agent]}</div>
+                            <div className="trace-model">{run.model}</div>
+                          </div>
+                          <span className="small-chip">{run.status}</span>
+                        </div>
+                        <p>{run.summary}</p>
+                        <div className="trace-metrics">
+                          <span>耗时 <strong>{formatDuration(run.durationMs)}</strong></span>
+                          <span>问题 <strong>{run.issueCount}</strong></span>
+                        </div>
+                        {run.error ? <div className="trace-error">{run.error}</div> : null}
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
             <div className="empty-result">
               <div className="empty-icon">⌁</div>
-              <div>启动审校后，这里会显示原文对照、问题证据与术语规则。</div>
+              <div>启动审校后，这里会显示原文对照、问题证据、术语规则和真实 Agent 运行轨迹。</div>
             </div>
           )}
         </section>
@@ -320,7 +448,12 @@ export default function Home() {
                 <div className="score-value"><strong>{result?.scoreAfter ?? '--'}</strong><span>OF 100</span></div>
               </div>
             </div>
-            {result ? <div className="summary-box">{result.summary}</div> : null}
+            {result ? (
+              <>
+                <div className="summary-box">{result.summary}</div>
+                <div className="decision-reason">{result.decisionReason}</div>
+              </>
+            ) : null}
           </section>
 
           <section className="panel-section">
@@ -329,23 +462,26 @@ export default function Home() {
               <div className="metric-row"><span>发现问题</span><strong>{result?.issues.length ?? 0}</strong></div>
               <div className="metric-row"><span>重大问题</span><strong>{majorIssues}</strong></div>
               <div className="metric-row"><span>术语规则</span><strong>{result?.terminology.length ?? 0}</strong></div>
-              <div className="metric-row"><span>科学含义改变</span><strong>{result?.issues.filter((item) => item.meaningChanged).length ?? 0}</strong></div>
+              <div className="metric-row"><span>Agent 失败</span><strong>{failedAgents}</strong></div>
             </div>
           </section>
 
           <section className="panel-section">
             <div className="eyebrow">Deliverables</div>
-            <p className="section-copy">比赛后续版本将把已接受的修改导出为正式文件。</p>
+            <p className="section-copy">当前版本提供三种真实下载格式；DOCX/PDF 将在文档解析版本接入。</p>
             <div className="deliverable-list">
-              {DELIVERABLES.map(([type, name]) => (
-                <div className="deliverable" key={name}>
-                  <div className="file-icon">{type}</div>
-                  <div>
-                    <div className="file-name">{name}</div>
-                    <div className="file-state">{result ? '待导出模块接入' : '等待审校'}</div>
-                  </div>
-                </div>
-              ))}
+              <button className="deliverable deliverable-button" disabled={!result} onClick={() => downloadArtifact('revision')} type="button">
+                <div className="file-icon">TXT</div>
+                <div><div className="file-name">Revised_Manuscript.txt</div><div className="file-state">下载保守修改稿</div></div>
+              </button>
+              <button className="deliverable deliverable-button" disabled={!result} onClick={() => downloadArtifact('report')} type="button">
+                <div className="file-icon">MD</div>
+                <div><div className="file-name">Audit_Report.md</div><div className="file-state">下载完整审校报告</div></div>
+              </button>
+              <button className="deliverable deliverable-button" disabled={!result} onClick={() => downloadArtifact('json')} type="button">
+                <div className="file-icon">JSON</div>
+                <div><div className="file-name">Review_Result.json</div><div className="file-state">下载结构化证据数据</div></div>
+              </button>
             </div>
           </section>
         </aside>
