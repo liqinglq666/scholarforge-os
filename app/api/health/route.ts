@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 
 export function GET() {
+  const authConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  );
+
   return NextResponse.json({
     status: 'ok',
     service: 'ScholarForge OS',
-    version: '0.9.0',
-    ui: 'research-writing-project-hub',
+    version: '1.0.0',
+    ui: 'cloud-research-writing-project-hub',
     provider: 'Alibaba Cloud Model Studio',
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
     workflow: 'task-aware-parallel-multi-agent',
@@ -20,14 +25,16 @@ export function GET() {
     workflowTemplates: 4,
     localWorkspaceBackup: true,
     localWorkspaceRestore: true,
+    cloudWorkspaceSupported: true,
+    cloudWorkspaceConfigured: authConfigured,
+    cloudWorkspaceMigration: 'supabase/migrations/20260730_cloud_workspace.sql',
+    cloudWorkspaceIsolation: 'Supabase RLS by auth.uid()',
+    localFallback: true,
     workspaceAccess: 'authenticated-session-required',
     guestAccess: true,
     modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
     authProvider: 'Supabase Auth',
-    authConfigured: Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    ),
+    authConfigured,
     timestamp: new Date().toISOString(),
   });
 }

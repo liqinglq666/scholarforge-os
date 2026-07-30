@@ -7,288 +7,225 @@
 </p>
 
 <p align="center">
-  <strong>A Model Studio-powered multi-agent workspace for scientific English</strong>
+  <strong>A Model Studio-powered multi-agent workspace for scientific English and cloud manuscript projects</strong>
 </p>
 
 <p align="center">
   Scientific translation, conservative polishing, pre-submission review, and reviewer responses,<br />
-  with shared terminology locks, scientific guardrails, issue evidence, and author decisions.
+  with shared terminology locks, scientific guardrails, issue evidence, author decisions, and user-isolated projects.
 </p>
 
 <p align="center">
   <a href="https://scholarforge-os.vercel.app">Live Demo</a> ·
-  <a href="https://scholarforge-os.vercel.app/login">Sign in / Sign up</a> ·
-  <a href="https://scholarforge-os.vercel.app/api/health">Health Check</a> ·
-  <a href="https://github.com/liqinglq666/scholarforge-os">GitHub</a>
+  <a href="https://scholarforge-os.vercel.app/login">Sign in</a> ·
+  <a href="docs/PRD.md">PRD</a> ·
+  <a href="docs/technical.md">Technical Docs</a> ·
+  <a href="docs/cloud-workspace.md">Cloud Workspace Setup</a>
 </p>
 
 <p align="center">
-  <img alt="App v0.8.0" src="https://img.shields.io/badge/app-v0.8.0-2563eb" />
-  <img alt="Workflow v0.8.0" src="https://img.shields.io/badge/workflow-v0.8.0-0f766e" />
+  <img alt="App v1.0.0" src="https://img.shields.io/badge/app-v1.0.0-17233d" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
-  <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
-  <a href="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml/badge.svg" />
-  </a>
+  <img alt="Model qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
+  <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
+  <img alt="Supabase Auth and RLS" src="https://img.shields.io/badge/cloud-Supabase%20Auth%20%2B%20RLS-3ecf8e" />
 </p>
 
 ---
 
-## Overview
+## What ScholarForge OS does
 
-ScholarForge OS is a scientific-English workflow system for graduate students, researchers, supervisors, and academic editors.
+ScholarForge OS is an evidence-aware scientific writing system for graduate students, researchers, supervisors, and academic editors. It is not just a rewrite box: it tracks why a change was proposed, whether it may alter scientific meaning, what the author decided, and how the result can be delivered.
 
-Version 0.8 brings the most useful capabilities from the earlier Miaoda prototype, “PaperLens / 研语科研英语 Agent,” into a public and reproducible GitHub implementation:
+Core principle:
+
+> **Models make specialist judgments; code owns constraints, protection, scoring, and final workflow state.**
+
+The product currently supports:
 
 - Chinese-to-academic-English translation;
 - conservative English polishing;
-- reviewer-style pre-submission checks;
-- evidence-bounded Response to Reviewers drafting;
-- user-defined terminology locks;
-- numerical and scientific-meaning guardrails;
-- split, clean, and highlighted-diff output views;
-- issue evidence and author decisions;
-- local workflow history;
-- TXT, Markdown, and JSON deliverables.
+- reviewer-style pre-submission review;
+- evidence-aware reviewer response drafting;
+- user terminology locks;
+- numeric and scientific-meaning guardrails;
+- split, clean, and highlighted-diff views;
+- accept, defer, dismiss, or keep-pending author decisions;
+- local project history and structured exports;
+- optional Supabase cloud projects and cross-device restore.
 
-The core principle is:
+## Four writing workflows
 
-> **Models provide specialist judgement; deterministic code owns rules, guardrails, scoring, and final state.**
-
-## Four workflows
-
-| Workflow | Input | Purpose | Primary output |
+| Workflow | Input | Main purpose | Primary output |
 | --- | --- | --- | --- |
-| **Scientific translation** | Chinese scientific prose | Preserve facts, terminology, and claim strength in academic English | Academic English translation |
-| **Conservative polishing** | English manuscript text | Improve grammar, collocation, tone, tense, voice, and clarity | Conservative revision |
-| **Pre-submission precheck** | Submission-ready English draft | Audit terminology, language, logic, methods, and readiness | Precheck revision and evidence |
-| **Reviewer-response assistant** | Reviewer comment and author evidence | Draft a professional answer without inventing experiments or manuscript changes | Response to Reviewer draft |
+| **Scientific Translation** | Chinese research text | Preserve values, terminology, evidence strength, and scientific tone | Academic English Translation |
+| **Conservative Polishing** | English manuscript text | Improve grammar and academic style without inventing facts | Conservative Revision |
+| **Pre-submission Review** | English manuscript text | Audit terminology, language, logic, method, and readiness | Revision + Evidence |
+| **Reviewer Response** | Reviewer comment + author evidence | Draft a formal response without fabricating experiments or locations | Response to Reviewer Draft |
 
-All workflows share:
-
-- seven manuscript-section profiles;
-- conservative, balanced, and deep modes;
-- four independent Model Studio agents;
-- terminology locks;
-- deterministic scientific guardrails;
-- author issue decisions;
-- local history and exports.
-
-## Four specialist agents
+## Four independent Model Studio agents
 
 | Agent | Responsibility |
 | --- | --- |
-| **Terminology Guardian** | Terminology mapping, abbreviations, units, nomenclature, and user-locked expressions |
-| **Academic Editor** | Complete translation, revision, precheck output, or reviewer-response draft |
-| **Logic Auditor** | Claim scope, causality, evidence boundaries, and response completeness |
-| **Method Auditor** | Reproducibility, experimental reporting, and author-supplied response evidence |
+| **Terminology Guardian** | Terminology, abbreviations, units, symbols, naming, and locked terms |
+| **Academic Editor** | Translation, polishing, revision, or reviewer-response primary output |
+| **Logic Auditor** | Causality, evidence boundaries, claim strength, and response completeness |
+| **Method Auditor** | Samples, equipment, parameters, statistics, reproducibility, and author evidence |
 
-Each agent has its own system prompt, request, response, duration, issue count, and failure state. The interface does not simulate four agents from a single model answer.
+A normal run sends four independent `qwen-plus` requests through Alibaba Cloud Model Studio and executes them in parallel with `Promise.all`.
 
 ## Alibaba Cloud Model Studio integration
-
-- Default model: `qwen-plus`;
-- API: DashScope OpenAI-compatible endpoint;
-- Runtime: Next.js server route;
-- Normal workflow: four independent model requests per run;
-- Orchestration: `Promise.all`;
-- API key: server-side environment variable only.
 
 ```text
 Browser
   ↓
-POST /api/review
+Next.js POST /api/review
   ↓
 Task Router
-  ├─ Translation
-  ├─ Polishing
-  ├─ Precheck
-  └─ Reviewer Response
+  ├─ Terminology Guardian
+  ├─ Academic Editor
+  ├─ Logic Auditor
+  └─ Method Auditor
   ↓
-4 independent qwen-plus specialists
+Alibaba Cloud Model Studio · qwen-plus
   ↓
-Deterministic Aggregator + Guardrails
+Deterministic Aggregator
   ↓
-Primary output + Evidence + Decisions + Artifacts
+Primary output + issue evidence + terminology + guardrails + author decisions
 ```
 
-Key implementation files:
+- API: DashScope OpenAI-compatible endpoint;
+- location: Next.js server runtime;
+- default model: `qwen-plus`;
+- key handling: server-only environment variable;
+- final readiness and decision: calculated by code from normalized issues, not freely generated by the model.
 
-- [`lib/bailian.ts`](lib/bailian.ts) — task-aware prompts, Model Studio calls, aggregation, scoring, and guardrails;
-- [`app/api/review/route.ts`](app/api/review/route.ts) — validation, terminology sanitisation, live/demo routing;
-- [`components/paperlens-workspace.tsx`](components/paperlens-workspace.tsx) — workflow UI, diff, fact protection, decisions, and local history;
-- [`lib/types.ts`](lib/types.ts) — typed contracts;
-- [`app/api/health/route.ts`](app/api/health/route.ts) — workflow and configuration status.
+## v1.0 cloud manuscript projects
 
-## Terminology locks
+Supabase email accounts can explicitly:
 
-A user can define up to 12 task-level terminology rules:
+- sync the current browser-local project;
+- migrate all local projects;
+- restore a project on another browser or device;
+- delete the cloud copy without deleting the local copy.
 
-```text
-Source or trigger expression
-→ Required output expression
-→ Optional note
+A cloud project contains the current draft, workflow configuration, terminology locks, up to eight review snapshots, issue evidence, author decisions, readiness, and pending counts.
+
+### User isolation
+
+The table `public.scholarforge_projects` uses Row Level Security. Every operation requires:
+
+```sql
+auth.uid() = owner_id
 ```
 
-Terminology locks are:
+The browser uses the Supabase Publishable Key. Never expose a service-role key through `NEXT_PUBLIC_*` variables.
 
-- sent to all four agents;
-- merged into the terminology profile;
-- checked by a deterministic guardrail;
-- displayed in the fact-protection view;
-- stored with local workflow snapshots.
+Existing local manuscripts are **not uploaded automatically on sign-in**. The user must click a sync or migration action. Guest and local demo sessions always remain browser-only.
+
+Setup guide: [`docs/cloud-workspace.md`](docs/cloud-workspace.md)
 
 ## Scientific guardrails
 
-Current guardrails include:
+ScholarForge OS currently enforces:
 
-1. no invented experiments, sample counts, equipment parameters, standards, results, or references;
-2. no new numerical tokens outside the primary input or author-supplied context;
-3. no silent conversion of association into causation;
-4. missing information remains visible as `[Please provide ...]`;
-5. reviewer responses may only use author-supplied evidence and manuscript changes;
-6. user-locked terminology must be preserved;
-7. page and line numbers must not be guessed;
-8. models do not directly decide scores or readiness states.
+- no new numeric values outside source text and author-provided evidence;
+- no fabricated experiments, samples, equipment, standards, or references;
+- no automatic conversion of correlation into causality;
+- missing method details remain `[Please provide ...]` author tasks;
+- major logic and method risks are not erased by smoother language;
+- locked terminology is passed to all four agents and rechecked in the final result.
 
-These checks reduce obvious risks but do not replace literature verification, statistical review, or peer review.
-
-## Output views
-
-The primary output supports:
-
-- **Split view** — source and output side by side;
-- **Clean output** — focused reading and copying;
-- **Highlighted diff** — additions, replacements, and removals.
-
-Large inputs fall back to block highlighting to avoid expensive browser-side token comparisons.
-
-## Author decisions
-
-Each issue can be marked:
-
-```text
-Pending
-├─ Accepted
-├─ Deferred
-└─ Dismissed
-```
-
-Decisions are included in filters, local snapshots, Markdown reports, decision logs, and JSON exports.
-
-Accepting an issue currently records the author's judgement; it does not yet apply the local edit to the working manuscript. Reliable text anchoring, conflicts, undo, and redo are planned work.
-
-## Authentication and access
-
-The application uses a login-first flow and supports:
-
-- Supabase email authentication when configured;
-- an explicitly labelled local demo account;
-- a guest entry for public competition evaluation.
-
-Authentication currently manages identity and session state only. Manuscript tasks and history are still stored in browser `localStorage` and are not yet isolated cloud projects.
-
-## Deliverables
-
-| Artifact | Content |
-| --- | --- |
-| `*-translation.txt`, `*-revision.txt`, or `*-reviewer-response.txt` | Primary workflow output |
-| `*-evidence-report.md` | Workflow metadata, guardrails, issues, traces, and decisions |
-| `*-author-decisions.md` | Author decision log |
-| `*-workflow-result.json` | Complete structured workflow data |
-
-Artifacts are generated in the browser using Blob and Object URLs. The UI does not advertise fake DOCX or PDF downloads.
-
-## Technology
-
-| Area | Stack |
-| --- | --- |
-| Frontend | Next.js 16, React 19, TypeScript, native CSS |
-| Authentication | Optional Supabase Auth, local guest/demo sessions |
-| Server | Next.js Route Handlers, Node.js runtime |
-| Model platform | Alibaba Cloud Model Studio OpenAI-compatible API |
-| Agent orchestration | `Promise.all` |
-| Local state | `localStorage` |
-| Export | Browser Blob and Object URL |
-| Deployment | Vercel |
-| CI | GitHub Actions, Node.js 22 |
+These safeguards do not replace peer review, statistical review, or reference verification.
 
 ## Quick start
 
 Requirements:
 
-- Node.js 22.12+;
-- npm;
-- optional Model Studio API key;
-- optional Supabase project.
+- Node.js `>= 22.12`
+- Alibaba Cloud Model Studio API key
+- optional Supabase project
 
 ```bash
 git clone https://github.com/liqinglq666/scholarforge-os.git
 cd scholarforge-os
 npm install
 cp .env.example .env.local
-npm run dev
 ```
 
-Environment variables:
+Model Studio variables:
 
 ```env
-DASHSCOPE_API_KEY=your_model_studio_api_key
+DASHSCOPE_API_KEY=your_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-plus
-
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 ```
 
-Never expose the Model Studio key through a `NEXT_PUBLIC_` variable.
+Optional Supabase variables:
 
-Validation:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+```
+
+Then run this migration in the Supabase SQL editor:
+
+```text
+supabase/migrations/20260730_cloud_workspace.sql
+```
+
+Start and validate:
 
 ```bash
+npm run dev
 npm run typecheck
 npm run build
 ```
 
+## Repository map
+
+```text
+app/
+  api/review/route.ts
+  api/health/route.ts
+  login/page.tsx
+components/
+  workspace-hub.tsx
+  paperlens-workspace.tsx
+  cloud-workspace-dock.tsx
+  auth-provider.tsx
+lib/
+  bailian.ts
+  cloud-workspace.ts
+  supabase/client.ts
+supabase/migrations/
+  20260730_cloud_workspace.sql
+docs/
+  PRD.md
+  product.md
+  technical.md
+  cloud-workspace.md
+```
+
 ## Current boundaries
 
-- Text input only; no DOCX/PDF parsing yet;
-- reviewer responses currently handle one comment at a time;
-- accepted suggestions are not yet applied to a working document;
-- local history does not sync across devices;
-- authentication exists, but cloud manuscript projects and RLS are not implemented;
-- `/api/review` remains callable for the public demo and has no user quota yet;
-- numerical protection is token-based, not full fact verification;
-- live runs send the input and author context to Alibaba Cloud Model Studio;
-- no DOCX Track Changes or formal PDF report yet.
+- Input is still pasted text; DOCX/PDF parsing is not implemented.
+- Cloud projects keep the latest eight task snapshots, not unlimited versions or attachments.
+- Accepting a suggestion records a decision but does not automatically edit the manuscript.
+- DOCX Track Changes export is not implemented.
+- Agent execution results arrive after the API response completes; SSE progress is not implemented.
+- Guest and local demo accounts do not receive cloud projects.
 
 ## Roadmap
 
-### P0 — real manuscript workflow
-
-- DOCX/PDF upload and section extraction;
-- Supabase projects, versions, review runs, decisions, and RLS;
-- apply accepted suggestions with undo and conflict handling;
-- version history;
+- DOCX/PDF upload and section parsing;
+- safe issue-level apply, undo, and conflict resolution;
 - DOCX Track Changes;
-- SSE agent progress.
-
-### P1 — submission and revision studio
-
-- automatic reviewer-comment parsing;
-- multi-reviewer response workspace;
-- cover letters and highlights;
-- author contribution and data statements;
-- submission checklist.
-
-### P2 — evidence centre
-
-- journal-guideline knowledge base;
-- DOI and citation validation;
-- cross-section terminology and number consistency;
-- claim–data–figure–reference mapping;
-- reusable team terminology profiles.
+- SSE agent progress;
+- unlimited version history and attachments;
+- supervisor, student, and co-author collaboration;
+- DOI, citation, and cross-section numeric consistency checks.
 
 ## License
 
-No open-source licence is currently included. No permission to copy, modify, distribute, or commercially use the repository is granted by default.
+Copyright © ScholarForge OS contributors. Review repository licensing information before reuse.
