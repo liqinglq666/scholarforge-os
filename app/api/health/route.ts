@@ -4,11 +4,13 @@ export function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'ScholarForge OS',
-    version: '0.5.0',
+    version: '0.5.1',
     provider: 'Alibaba Cloud Model Studio',
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
     workflow: 'parallel-multi-agent',
     specialists: 4,
+    workspaceAccess: 'authenticated-session-required',
+    guestAccess: true,
     modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
     authProvider: 'Supabase Auth',
     authConfigured: Boolean(
