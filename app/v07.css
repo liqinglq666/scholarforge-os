@@ -1,0 +1,373 @@
+/* ScholarForge OS v0.7 — project profile, author decisions, local history */
+
+.sf-nav-button {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--sf-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.sf-nav-button:hover {
+  color: var(--sf-ink);
+  background: var(--sf-white);
+}
+
+.sf-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sf-profile-grid .sf-field {
+  margin-top: 18px;
+}
+
+.sf-profile-grid-selects {
+  margin-top: 15px;
+}
+
+.sf-select-field {
+  display: grid;
+  gap: 8px;
+  color: var(--sf-ink-2);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.sf-select-field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--sf-line-strong);
+  border-radius: 13px;
+  outline: 0;
+  color: var(--sf-ink);
+  background: var(--sf-white);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.sf-select-field select:focus {
+  border-color: rgba(207, 115, 69, .52);
+  box-shadow: 0 0 0 4px rgba(207, 115, 69, .09);
+}
+
+.sf-review-profile-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(207, 115, 69, .14);
+  border-radius: 13px;
+  color: var(--sf-copper);
+  background: var(--sf-copper-soft);
+}
+
+.sf-review-profile-note div,
+.sf-review-profile-note b,
+.sf-review-profile-note span {
+  display: block;
+}
+
+.sf-review-profile-note b {
+  color: var(--sf-ink);
+  font-size: 11px;
+}
+
+.sf-review-profile-note span {
+  margin-top: 4px;
+  color: var(--sf-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.sf-history-rail button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  display: block;
+  border: 1px solid var(--sf-line);
+  border-radius: 11px;
+  text-align: left;
+  color: var(--sf-ink);
+  background: rgba(255, 255, 255, .58);
+  cursor: pointer;
+}
+
+.sf-history-rail button:hover {
+  border-color: rgba(207, 115, 69, .22);
+  background: var(--sf-white);
+}
+
+.sf-history-rail button b,
+.sf-history-rail button small {
+  display: block;
+}
+
+.sf-history-rail button b {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-history-rail button small {
+  margin-top: 4px;
+  color: var(--sf-muted);
+  font-size: 8.5px;
+}
+
+.sf-history-rail > p {
+  margin: 10px 0 0;
+  color: var(--sf-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.sf-decision-metrics {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sf-decision-metrics > div {
+  min-height: 64px;
+  padding: 11px;
+  border: 1px solid var(--sf-line);
+  border-radius: 12px;
+  background: var(--sf-surface-2);
+}
+
+.sf-decision-metrics span,
+.sf-decision-metrics strong {
+  display: block;
+}
+
+.sf-decision-metrics span {
+  color: var(--sf-muted);
+  font-size: 9px;
+}
+
+.sf-decision-metrics strong {
+  margin-top: 6px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+}
+
+.sf-decision-metrics .is-accepted {
+  color: var(--sf-green);
+  border-color: rgba(36, 116, 91, .16);
+  background: var(--sf-green-soft);
+}
+
+.sf-decision-metrics .is-deferred {
+  color: var(--sf-amber);
+  border-color: rgba(149, 101, 30, .16);
+  background: var(--sf-amber-soft);
+}
+
+.sf-decision-metrics .is-dismissed {
+  color: var(--sf-muted);
+  background: var(--sf-blue-soft);
+}
+
+.sf-decision-chip {
+  font-style: normal !important;
+}
+
+.sf-decision-chip.is-accepted {
+  color: var(--sf-green) !important;
+  background: var(--sf-green-soft) !important;
+}
+
+.sf-decision-chip.is-deferred {
+  color: var(--sf-amber) !important;
+  background: var(--sf-amber-soft) !important;
+}
+
+.sf-decision-chip.is-dismissed {
+  color: var(--sf-muted) !important;
+  background: var(--sf-blue-soft) !important;
+}
+
+.sf-decision-chip.is-pending {
+  color: var(--sf-copper) !important;
+  background: var(--sf-copper-soft) !important;
+}
+
+.sf-decision-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--sf-line);
+}
+
+.sf-decision-actions > span {
+  margin-right: 4px;
+  color: var(--sf-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.sf-decision-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--sf-line);
+  border-radius: 9px;
+  color: var(--sf-muted);
+  background: var(--sf-white);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.sf-decision-actions button:hover,
+.sf-decision-actions button.is-active {
+  color: var(--sf-ink);
+  border-color: rgba(207, 115, 69, .28);
+  background: var(--sf-copper-soft);
+}
+
+.sf-issue-card.decision-accepted {
+  border-color: rgba(36, 116, 91, .2);
+}
+
+.sf-issue-card.decision-dismissed {
+  opacity: .72;
+}
+
+.sf-history-view {
+  min-height: 340px;
+}
+
+.sf-history-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 9px;
+}
+
+.sf-history-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 7px;
+}
+
+.sf-history-list article > button:first-child {
+  min-width: 0;
+  min-height: 70px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--sf-line);
+  border-radius: 13px;
+  text-align: left;
+  color: var(--sf-ink);
+  background: var(--sf-white);
+  cursor: pointer;
+}
+
+.sf-history-list article > button:first-child:hover {
+  border-color: rgba(207, 115, 69, .22);
+  box-shadow: var(--sf-shadow-xs);
+}
+
+.sf-history-list button span,
+.sf-history-list button b,
+.sf-history-list button small {
+  display: block;
+}
+
+.sf-history-list button b {
+  font-size: 12px;
+}
+
+.sf-history-list button small {
+  margin-top: 5px;
+  color: var(--sf-muted);
+  font-size: 9px;
+}
+
+.sf-history-list button strong {
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
+.sf-history-list button i {
+  color: var(--sf-muted);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.sf-history-list article > button:last-child {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--sf-line);
+  border-radius: 12px;
+  color: var(--sf-muted);
+  background: var(--sf-white);
+  cursor: pointer;
+}
+
+.sf-history-list article > button:last-child:hover {
+  color: var(--sf-red);
+  border-color: rgba(164, 76, 76, .2);
+  background: var(--sf-red-soft);
+}
+
+@media (max-width: 1180px) {
+  .sf-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sf-profile-grid-selects {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sf-profile-grid {
+    display: block;
+  }
+
+  .sf-select-field {
+    margin-top: 14px;
+  }
+
+  .sf-review-profile-note {
+    margin-top: 12px;
+  }
+
+  .sf-filter-bar {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sf-decision-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sf-decision-actions > span {
+    grid-column: 1 / -1;
+  }
+
+  .sf-history-list article > button:first-child {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .sf-history-list button i {
+    grid-column: 1 / -1;
+  }
+}
