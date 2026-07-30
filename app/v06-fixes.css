@@ -9,12 +9,6 @@
   z-index: 0;
 }
 
-.sf-hero-copy,
-.sf-assurance,
-.sf-steps {
-  z-index: 1;
-}
-
 @media (max-width: 920px) {
   .sf-new-review {
     width: 40px;

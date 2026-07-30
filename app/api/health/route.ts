@@ -9,7 +9,7 @@ export function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'ScholarForge OS',
-    version: '1.3.0',
+    version: '1.3.1',
     ui: 'original-docx-preserving-author-workspace',
     provider: 'Alibaba Cloud Model Studio',
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
@@ -48,6 +48,13 @@ export function GET() {
     localFallback: true,
     workspaceAccess: 'authenticated-session-required',
     guestAccess: true,
+    codeAudit: {
+      unusedLocals: true,
+      unusedParameters: true,
+      obsoleteStyleOverridesRemoved: true,
+      localBackupValidation: true,
+      originalDocxRollback: true,
+    },
     modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
     authProvider: 'Supabase Auth',
     authConfigured,

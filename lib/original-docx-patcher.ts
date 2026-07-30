@@ -29,12 +29,10 @@ type ParagraphMatch = {
   paragraphIndex: number;
   start: number;
   end: number;
-  anchor: 'exact' | 'whitespace';
   edit: AppliedEdit;
 };
 
 type RunRecord = {
-  element: Element;
   text: string;
   start: number;
   end: number;
@@ -55,22 +53,22 @@ function escapeRegExp(value: string) {
 }
 
 function collectMatches(source: string, target: string) {
-  const exact: Array<{ start: number; end: number; anchor: 'exact' }> = [];
+  const exact: Array<{ start: number; end: number }> = [];
   let cursor = 0;
   while (cursor <= source.length) {
     const start = source.indexOf(target, cursor);
     if (start < 0) break;
-    exact.push({ start, end: start + target.length, anchor: 'exact' });
+    exact.push({ start, end: start + target.length });
     cursor = start + Math.max(1, target.length);
   }
   if (exact.length) return exact;
+
   const tokens = target.trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return [];
   const regex = new RegExp(tokens.map(escapeRegExp).join('\\s+'), 'gu');
   return Array.from(source.matchAll(regex)).map((match) => ({
     start: match.index || 0,
     end: (match.index || 0) + match[0].length,
-    anchor: 'whitespace' as const,
   }));
 }
 
@@ -122,7 +120,7 @@ function paragraphRuns(paragraph: Element) {
     if (localName(child) !== 'r') continue;
     const text = runText(child);
     const properties = elementChildren(child).find((node) => localName(node) === 'rPr') || null;
-    records.push({ element: child, text, start: cursor, end: cursor + text.length, properties });
+    records.push({ text, start: cursor, end: cursor + text.length, properties });
     cursor += text.length;
   }
   return records;
@@ -255,7 +253,6 @@ export async function patchOriginalDocx(
         paragraphIndex,
         start: match.start,
         end: match.end,
-        anchor: match.anchor,
         edit,
       }));
     });

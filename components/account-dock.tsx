@@ -27,8 +27,14 @@ export function AccountDock() {
       return;
     }
 
-    const target = document.querySelector<HTMLElement>('.sf-topbar-actions');
-    setPortalTarget(target);
+    const updateTarget = () => {
+      setPortalTarget(document.querySelector<HTMLElement>('.sf-topbar-actions'));
+    };
+    updateTarget();
+
+    const observer = new MutationObserver(updateTarget);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [pathname]);
 
   useEffect(() => {

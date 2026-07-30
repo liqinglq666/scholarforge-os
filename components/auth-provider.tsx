@@ -13,6 +13,8 @@ import type { User } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 const DEMO_SESSION_KEY = 'scholarforge.auth.demo-session.v1';
+const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
+const LEGACY_AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-v1';
 
 export type ScholarForgeUser = {
   id: string;
@@ -58,24 +60,60 @@ function userFromSupabase(user: User): ScholarForgeUser {
   };
 }
 
+function isLocalSession(value: unknown): value is ScholarForgeUser {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ScholarForgeUser>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.email === 'string'
+    && typeof candidate.displayName === 'string'
+    && (candidate.mode === 'demo' || candidate.mode === 'guest');
+}
+
+function removeLocalItem(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Restricted storage should never block the in-memory account session.
+  }
+}
+
+function migrateAuthorEditingSession() {
+  try {
+    const current = window.localStorage.getItem(AUTHOR_EDITING_SESSION_KEY);
+    const legacy = window.localStorage.getItem(LEGACY_AUTHOR_EDITING_SESSION_KEY);
+    if (!current && legacy) window.localStorage.setItem(AUTHOR_EDITING_SESSION_KEY, legacy);
+    if (legacy) window.localStorage.removeItem(LEGACY_AUTHOR_EDITING_SESSION_KEY);
+  } catch {
+    // Session migration is best-effort; restricted browser storage should not block authentication.
+  }
+}
+
 function readDemoSession() {
   try {
     const raw = window.localStorage.getItem(DEMO_SESSION_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ScholarForgeUser;
-    if (!parsed?.id || !parsed?.mode) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isLocalSession(parsed)) {
+      removeLocalItem(DEMO_SESSION_KEY);
+      return null;
+    }
     return parsed;
   } catch {
+    removeLocalItem(DEMO_SESSION_KEY);
     return null;
   }
 }
 
 function writeDemoSession(user: ScholarForgeUser | null) {
-  if (!user) {
-    window.localStorage.removeItem(DEMO_SESSION_KEY);
-    return;
+  try {
+    if (!user || user.mode === 'supabase') {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      return;
+    }
+    window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
+  } catch {
+    // Keep the current in-memory session even when persistence is unavailable.
   }
-  window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -84,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseConfigured = isSupabaseConfigured();
 
   useEffect(() => {
+    migrateAuthorEditingSession();
     let alive = true;
     const supabase = getSupabaseBrowserClient();
 
@@ -93,11 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!alive) return;
-      setUser(data.session?.user ? userFromSupabase(data.session.user) : readDemoSession());
-      setLoading(false);
-    });
+    void supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!alive) return;
+        setUser(data.session?.user ? userFromSupabase(data.session.user) : readDemoSession());
+      })
+      .catch(() => {
+        if (!alive) return;
+        setUser(readDemoSession());
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!alive) return;
@@ -184,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     writeDemoSession(demoUser);
     setUser(demoUser);
-    return { ok: true, message: '本地演示账户已创建。当前设备会记住此会话。' };
+    return { ok: true, message: '本地演示账户已创建。当前页面会保留此会话；浏览器允许存储时可在刷新后恢复。' };
   }, []);
 
   const continueAsGuest = useCallback(async (): Promise<AuthActionResult> => {
@@ -196,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     writeDemoSession(guestUser);
     setUser(guestUser);
-    return { ok: true, message: '已进入访客模式。草稿仅保存在当前浏览器。' };
+    return { ok: true, message: '已进入访客模式。浏览器允许存储时，草稿和会话会保留在当前设备。' };
   }, []);
 
   const requestPasswordReset = useCallback(async (emailInput: string): Promise<AuthActionResult> => {
