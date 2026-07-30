@@ -78,8 +78,10 @@ export function CloudWorkspaceDock() {
   }, [refreshLocalCount]);
 
   useEffect(() => {
-    if (open && cloudEnabled) loadProjects();
-  }, [cloudEnabled, loadProjects, open]);
+    if (!open) return;
+    refreshLocalCount();
+    if (cloudEnabled) loadProjects();
+  }, [cloudEnabled, loadProjects, open, refreshLocalCount]);
 
   async function runSync(kind: 'current' | 'all') {
     if (!client || user?.mode !== 'supabase') return;
@@ -128,9 +130,11 @@ export function CloudWorkspaceDock() {
     }
   }
 
-  const modeLabel = user?.mode === 'supabase'
+  if (!user) return null;
+
+  const modeLabel = user.mode === 'supabase'
     ? 'Supabase 云端账户'
-    : user?.mode === 'guest'
+    : user.mode === 'guest'
       ? '访客模式'
       : '本地演示账户';
 
@@ -160,7 +164,7 @@ export function CloudWorkspaceDock() {
         <a href="https://github.com/liqinglq666/scholarforge-os/blob/main/docs/cloud-workspace.md" rel="noreferrer" target="_blank">查看配置文档 ↗</a>
       </section> : null}
 
-      {supabaseConfigured && user?.mode !== 'supabase' ? <section className="cloud-state-card is-local">
+      {supabaseConfigured && user.mode !== 'supabase' ? <section className="cloud-state-card is-local">
         <span>账户</span>
         <h3>当前会话不属于云端账户</h3>
         <p>访客和本地演示账户继续使用浏览器存储。切换为 Supabase 邮箱账户后，才能访问隔离的云端项目。</p>
