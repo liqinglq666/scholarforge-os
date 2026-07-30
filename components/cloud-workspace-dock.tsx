@@ -54,13 +54,14 @@ export function CloudWorkspaceDock() {
   }, []);
 
   const loadProjects = useCallback(async (clearMessage = true) => {
-    if (!client || user?.mode !== 'supabase') return;
+    if (!client || user?.mode !== 'supabase') return false;
     setState('loading');
     if (clearMessage) setMessage('');
     try {
       const next = await listCloudProjects(client, user.id);
       setProjects(next);
       setState('ready');
+      return true;
     } catch (error) {
       if (isMissingCloudSchema(error)) {
         setState('schema-missing');
@@ -69,6 +70,7 @@ export function CloudWorkspaceDock() {
         setState('error');
         setMessage(error instanceof Error ? error.message : '读取云端项目失败。');
       }
+      return false;
     }
   }, [client, user]);
 
@@ -91,10 +93,12 @@ export function CloudWorkspaceDock() {
         ? [await syncCurrentLocalProject(client, user.id)]
         : await syncAllLocalProjects(client, user.id);
       refreshLocalCount();
-      await loadProjects(false);
-      setMessage(kind === 'current'
-        ? `“${synced[0].title}”已同步到云端。`
-        : `已迁移 ${synced.length} 个本机项目到云端。`);
+      const refreshed = await loadProjects(false);
+      if (refreshed) {
+        setMessage(kind === 'current'
+          ? `“${synced[0].title}”已同步到云端。`
+          : `已迁移 ${synced.length} 个本机项目到云端。`);
+      }
     } catch (error) {
       if (isMissingCloudSchema(error)) {
         setState('schema-missing');
@@ -122,8 +126,8 @@ export function CloudWorkspaceDock() {
     setMessage('');
     try {
       await deleteCloudProject(client, user.id, project.id);
-      await loadProjects(false);
-      setMessage(`云端项目“${project.title}”已删除。`);
+      const refreshed = await loadProjects(false);
+      if (refreshed) setMessage(`云端项目“${project.title}”已删除。`);
     } catch (error) {
       setState('error');
       setMessage(error instanceof Error ? error.message : '删除云端项目失败。');
