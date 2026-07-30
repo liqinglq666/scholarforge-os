@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './v04.css';
 
 export const metadata: Metadata = {
   title: 'ScholarForge OS｜研语工坊',
