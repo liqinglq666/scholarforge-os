@@ -37,11 +37,24 @@ function sanitizeLocks(value: unknown): TerminologyLock[] {
   });
 }
 
+function noStoreJson(payload: unknown, status: number) {
+  return NextResponse.json(payload, {
+    status,
+    headers: { 'Cache-Control': 'no-store' },
+  });
+}
+
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
+  let body: Partial<ReviewRequest>;
 
   try {
-    const body = await request.json() as Partial<ReviewRequest>;
+    body = await request.json() as Partial<ReviewRequest>;
+  } catch {
+    return noStoreJson({ error: 'The request body must be valid JSON.', requestId }, 400);
+  }
+
+  try {
     const taskType = VALID_TASKS.has(body.taskType as WorkspaceTask)
       ? body.taskType as WorkspaceTask
       : 'precheck';
@@ -60,16 +73,16 @@ export async function POST(request: Request) {
     const minimumLength = taskType === 'review-response' ? 20 : 40;
 
     if (text.length < minimumLength) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: `Please provide at least ${minimumLength} characters for this task.`, requestId },
-        { status: 400 },
+        400,
       );
     }
 
     if (text.length > 12_000) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'The current workspace supports up to 12,000 characters in the primary input.', requestId },
-        { status: 400 },
+        400,
       );
     }
 
@@ -100,13 +113,13 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : 'Unknown review error.';
     console.error(`[ScholarForge:${requestId}] review failed:`, message);
 
-    return NextResponse.json(
+    return noStoreJson(
       {
-        error: 'The live multi-agent workflow failed. Check the Model Studio key, endpoint, model, quota, and Vercel function logs.',
+        error: 'The live multi-agent workflow failed. Check the service configuration and deployment logs.',
         detail: process.env.NODE_ENV === 'development' ? message : undefined,
         requestId,
       },
-      { status: 502 },
+      502,
     );
   }
 }
