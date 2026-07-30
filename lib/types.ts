@@ -1,8 +1,26 @@
 export type AgentId = 'terminology' | 'language' | 'logic' | 'method';
 
 export type IssueSeverity = 'major' | 'minor' | 'suggestion';
-
 export type AgentRunStatus = 'completed' | 'failed' | 'demo';
+
+export type ReviewSection =
+  | 'general'
+  | 'abstract'
+  | 'introduction'
+  | 'methods'
+  | 'results'
+  | 'discussion'
+  | 'conclusion';
+
+export type ReviewMode = 'conservative' | 'balanced' | 'deep';
+export type IssueDecision = 'pending' | 'accepted' | 'deferred' | 'dismissed';
+
+export interface ReviewProfile {
+  projectTitle: string;
+  sectionType: ReviewSection;
+  reviewMode: ReviewMode;
+  targetJournal: string;
+}
 
 export interface ReviewIssue {
   id: string;
@@ -42,6 +60,7 @@ export interface ReviewResult {
   mode: 'live' | 'demo';
   executionMode: 'parallel-multi-agent' | 'safe-demo';
   workflowVersion: string;
+  profile: ReviewProfile;
   summary: string;
   revisedText: string;
   scoreBefore: number;
@@ -57,5 +76,8 @@ export interface ReviewResult {
 
 export interface ReviewRequest {
   text: string;
+  projectTitle?: string;
   targetJournal?: string;
+  sectionType?: ReviewSection;
+  reviewMode?: ReviewMode;
 }
