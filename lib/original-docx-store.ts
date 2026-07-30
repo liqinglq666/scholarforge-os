@@ -82,11 +82,13 @@ async function fingerprintSource(value: string) {
 }
 
 async function removeDocument(database: IDBDatabase, documentId: string) {
+  const lookup = database.transaction(BINDING_STORE, 'readonly');
+  const bindingKeys = await requestAsPromise(lookup.objectStore(BINDING_STORE).index('documentId').getAllKeys(IDBKeyRange.only(documentId)));
+  await transactionDone(lookup);
+
   const transaction = database.transaction([DOCUMENT_STORE, BINDING_STORE], 'readwrite');
   transaction.objectStore(DOCUMENT_STORE).delete(documentId);
-  const bindingIndex = transaction.objectStore(BINDING_STORE).index('documentId');
-  const keys = await requestAsPromise(bindingIndex.getAllKeys(IDBKeyRange.only(documentId)));
-  keys.forEach((key) => transaction.objectStore(BINDING_STORE).delete(key));
+  bindingKeys.forEach((key) => transaction.objectStore(BINDING_STORE).delete(key));
   await transactionDone(transaction);
 }
 
