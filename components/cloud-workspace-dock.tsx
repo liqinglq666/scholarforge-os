@@ -6,6 +6,7 @@ import {
   deleteCloudProject,
   isMissingCloudSchema,
   listCloudProjects,
+  projectKeyFromDraft,
   readLocalWorkspace,
   syncAllLocalProjects,
   syncCurrentLocalProject,
@@ -32,10 +33,8 @@ function formatDate(value: string) {
 function localProjectCount() {
   const local = readLocalWorkspace();
   const keys = new Set<string>();
-  if (local.draft) keys.add(`${local.draft.projectTitle || ''}|${local.draft.taskType || ''}|${local.draft.targetJournal || ''}`);
-  for (const snapshot of local.history) {
-    keys.add(`${snapshot.projectTitle}|${snapshot.taskType}|${snapshot.targetJournal}`);
-  }
+  if (local.draft) keys.add(projectKeyFromDraft(local.draft));
+  for (const snapshot of local.history) keys.add(projectKeyFromDraft(snapshot));
   return keys.size;
 }
 
@@ -54,10 +53,10 @@ export function CloudWorkspaceDock() {
     setLocalCount(localProjectCount());
   }, []);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (clearMessage = true) => {
     if (!client || user?.mode !== 'supabase') return;
     setState('loading');
-    setMessage('');
+    if (clearMessage) setMessage('');
     try {
       const next = await listCloudProjects(client, user.id);
       setProjects(next);
@@ -80,7 +79,7 @@ export function CloudWorkspaceDock() {
   useEffect(() => {
     if (!open) return;
     refreshLocalCount();
-    if (cloudEnabled) loadProjects();
+    if (cloudEnabled) void loadProjects();
   }, [cloudEnabled, loadProjects, open, refreshLocalCount]);
 
   async function runSync(kind: 'current' | 'all') {
@@ -91,11 +90,11 @@ export function CloudWorkspaceDock() {
       const synced = kind === 'current'
         ? [await syncCurrentLocalProject(client, user.id)]
         : await syncAllLocalProjects(client, user.id);
+      refreshLocalCount();
+      await loadProjects(false);
       setMessage(kind === 'current'
         ? `“${synced[0].title}”已同步到云端。`
         : `已迁移 ${synced.length} 个本机项目到云端。`);
-      refreshLocalCount();
-      await loadProjects();
     } catch (error) {
       if (isMissingCloudSchema(error)) {
         setState('schema-missing');
@@ -120,10 +119,11 @@ export function CloudWorkspaceDock() {
     const confirmed = window.confirm(`确定删除云端项目“${project.title}”吗？此操作不会删除本机副本，但无法撤销。`);
     if (!confirmed) return;
     setState('loading');
+    setMessage('');
     try {
       await deleteCloudProject(client, user.id, project.id);
+      await loadProjects(false);
       setMessage(`云端项目“${project.title}”已删除。`);
-      await loadProjects();
     } catch (error) {
       setState('error');
       setMessage(error instanceof Error ? error.message : '删除云端项目失败。');
@@ -176,8 +176,8 @@ export function CloudWorkspaceDock() {
           <div><span>Local → Cloud</span><h3>迁移本机工作区</h3><p>同步只会在你点击后发生，不会后台偷偷上传论文文本。</p></div>
           <div className="cloud-sync-metrics"><span><b>{localCount}</b> 本机项目</span><span><b>{projects.length}</b> 云端项目</span></div>
           <div className="cloud-sync-actions">
-            <button disabled={state === 'loading' || localCount === 0} onClick={() => runSync('current')} type="button">同步当前项目</button>
-            <button disabled={state === 'loading' || localCount === 0} onClick={() => runSync('all')} type="button">迁移全部本机项目</button>
+            <button disabled={state === 'loading' || localCount === 0} onClick={() => void runSync('current')} type="button">同步当前项目</button>
+            <button disabled={state === 'loading' || localCount === 0} onClick={() => void runSync('all')} type="button">迁移全部本机项目</button>
           </div>
         </section>
 
@@ -189,14 +189,14 @@ export function CloudWorkspaceDock() {
         </section> : null}
 
         {state !== 'schema-missing' ? <section className="cloud-project-section">
-          <div className="cloud-section-head"><div><span>Private projects</span><h3>你的云端项目</h3></div><button disabled={state === 'loading'} onClick={loadProjects} type="button">刷新</button></div>
+          <div className="cloud-section-head"><div><span>Private projects</span><h3>你的云端项目</h3></div><button disabled={state === 'loading'} onClick={() => void loadProjects()} type="button">刷新</button></div>
           {state === 'loading' && !projects.length ? <div className="cloud-loading"><i />正在读取云端项目…</div> : null}
           {projects.length ? <div className="cloud-project-list">{projects.map((project) => <article key={project.id}>
             <header><span>{project.taskType}</span><time>{formatDate(project.updatedAt)}</time></header>
             <h4>{project.title}</h4>
             <p>{project.targetJournal || '未指定目标期刊'}</p>
             <div><span>{project.latestScore === null ? '—' : project.latestScore}<small>/100</small></span><span>{project.pendingCount}<small>待处理</small></span><span>{project.workspace.history.length}<small>快照</small></span></div>
-            <footer><button onClick={() => restoreProject(project)} type="button">恢复到工作台</button><button aria-label={`删除 ${project.title}`} onClick={() => removeProject(project)} type="button">删除</button></footer>
+            <footer><button onClick={() => restoreProject(project)} type="button">恢复到工作台</button><button aria-label={`删除 ${project.title}`} onClick={() => void removeProject(project)} type="button">删除</button></footer>
           </article>)}</div> : state === 'ready' ? <div className="cloud-empty"><span>☁</span><b>还没有云端项目</b><p>先同步当前草稿，或一次迁移全部本机任务。</p></div> : null}
         </section> : null}
       </> : null}
