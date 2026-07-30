@@ -6,6 +6,7 @@ import './globals.css';
 import './v04.css';
 import './auth.css';
 import './auth-inline.css';
+import './auth-gate.css';
 
 export const metadata: Metadata = {
   title: 'ScholarForge OS｜研语工坊',
