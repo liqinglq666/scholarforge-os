@@ -17,10 +17,13 @@ import type {
 } from '@/lib/types';
 import { PaperLensWorkspace } from '@/components/paperlens-workspace';
 
+const APP_VERSION = '1.3.1';
 const DRAFT_KEY = 'scholarforge-os-paperlens-draft-v1';
 const HISTORY_KEY = 'scholarforge-os-paperlens-history-v1';
 const HUB_VIEW_KEY = 'scholarforge-os-hub-view-v1';
+const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
 const BACKUP_FORMAT = 'scholarforge-workspace-backup';
+const MAX_HISTORY = 8;
 
 interface WorkspaceDraft {
   projectTitle?: string;
@@ -108,14 +111,12 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     sampleTitle: 'Chinese-to-English NMR paragraph',
     sampleText: SAMPLE_CHINESE_MANUSCRIPT,
     targetJournal: 'Construction and Building Materials',
-    lockedTerms: [
-      {
-        id: 'template-lfnmr',
-        source: '低场核磁共振',
-        preferred: 'low-field nuclear magnetic resonance (LF-NMR)',
-        note: '首次出现使用全称和缩写。',
-      },
-    ],
+    lockedTerms: [{
+      id: 'template-lfnmr',
+      source: '低场核磁共振',
+      preferred: 'low-field nuclear magnetic resonance (LF-NMR)',
+      note: '首次出现使用全称和缩写。',
+    }],
     accent: 'copper',
   },
   {
@@ -173,6 +174,41 @@ function safeParse<T>(value: string | null, fallback: T): T {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isReviewSnapshot(value: unknown): value is ReviewSnapshot {
+  if (!isRecord(value) || !isRecord(value.result)) return false;
+  return typeof value.id === 'string'
+    && typeof value.projectTitle === 'string'
+    && typeof value.sourceText === 'string'
+    && typeof value.savedAt === 'string'
+    && Array.isArray(value.result.issues);
+}
+
+function parseBackup(value: unknown): WorkspaceBackup {
+  if (!isRecord(value)
+    || value.format !== BACKUP_FORMAT
+    || value.version !== 1
+    || !Array.isArray(value.history)) {
+    throw new Error('这不是受支持的 ScholarForge 工作区备份。');
+  }
+
+  const history = value.history.filter(isReviewSnapshot).slice(0, MAX_HISTORY);
+  const draft = value.draft === null || isRecord(value.draft)
+    ? value.draft as WorkspaceDraft | null
+    : null;
+
+  return {
+    format: BACKUP_FORMAT,
+    version: 1,
+    exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
+    draft,
+    history,
+  };
+}
+
 function formatDate(value?: string) {
   if (!value) return '尚未保存';
   const date = new Date(value);
@@ -204,7 +240,7 @@ function downloadJson(filename: string, payload: unknown) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 export function WorkspaceHub() {
@@ -214,31 +250,36 @@ export function WorkspaceHub() {
   const [query, setQuery] = useState('');
   const [taskFilter, setTaskFilter] = useState<'all' | WorkspaceTask>('all');
   const [notice, setNotice] = useState('');
-  const [health, setHealth] = useState({ configured: false, model: 'qwen-plus', version: '0.9.0' });
+  const [health, setHealth] = useState({ configured: false, model: 'qwen-plus', version: APP_VERSION });
   const importRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const refreshLocalState = () => {
+  function refreshLocalState() {
     setDraft(safeParse<WorkspaceDraft | null>(window.localStorage.getItem(DRAFT_KEY), null));
-    setHistory(safeParse<ReviewSnapshot[]>(window.localStorage.getItem(HISTORY_KEY), []));
-  };
+    setHistory(safeParse<ReviewSnapshot[]>(window.localStorage.getItem(HISTORY_KEY), []).filter(isReviewSnapshot).slice(0, MAX_HISTORY));
+  }
 
   useEffect(() => {
     refreshLocalState();
-    const savedView = window.sessionStorage.getItem(HUB_VIEW_KEY);
-    if (savedView === 'workspace') setView('workspace');
+    if (window.sessionStorage.getItem(HUB_VIEW_KEY) === 'workspace') setView('workspace');
 
+    let alive = true;
     fetch('/api/health', { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Health check failed');
         return response.json() as Promise<{ model?: string; version?: string; modelStudioConfigured?: boolean }>;
       })
-      .then((payload) => setHealth({
-        configured: Boolean(payload.modelStudioConfigured),
-        model: payload.model || 'qwen-plus',
-        version: payload.version || '0.9.0',
-      }))
-      .catch(() => setHealth((current) => current));
+      .then((payload) => {
+        if (!alive) return;
+        setHealth({
+          configured: Boolean(payload.modelStudioConfigured),
+          model: payload.model || 'qwen-plus',
+          version: payload.version || APP_VERSION,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
@@ -276,25 +317,14 @@ export function WorkspaceHub() {
     const pending = history.reduce((total, snapshot) => total + countPending(snapshot), 0);
     const scores = history.map((snapshot) => snapshot.result.scoreAfter).filter(Number.isFinite);
     const average = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : 0;
-    const storageBytes = new Blob([
-      windowSafeValue(DRAFT_KEY),
-      windowSafeValue(HISTORY_KEY),
+    const storageBytes = typeof window === 'undefined' ? 0 : new Blob([
+      window.localStorage.getItem(DRAFT_KEY) || '',
+      window.localStorage.getItem(HISTORY_KEY) || '',
     ]).size;
-    return {
-      total: history.length,
-      pending,
-      average,
-      storage: humanStorageSize(storageBytes),
-    };
-  }, [history, draft]);
-
-  function windowSafeValue(key: string) {
-    if (typeof window === 'undefined') return '';
-    return window.localStorage.getItem(key) || '';
-  }
+    return { total: history.length, pending, average, storage: humanStorageSize(storageBytes) };
+  }, [draft, history]);
 
   function writeDraft(template: WorkflowTemplate, useSample: boolean) {
-    const savedAt = new Date().toISOString();
     const nextDraft: WorkspaceDraft = {
       projectTitle: useSample ? template.sampleTitle : template.blankTitle,
       taskType: template.id,
@@ -305,7 +335,7 @@ export function WorkspaceHub() {
       sectionType: template.sectionType,
       reviewMode: template.reviewMode,
       lockedTerms: useSample ? template.lockedTerms || [] : [],
-      savedAt,
+      savedAt: new Date().toISOString(),
     };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
     setDraft(nextDraft);
@@ -349,10 +379,10 @@ export function WorkspaceHub() {
       version: 1,
       exportedAt: new Date().toISOString(),
       draft: safeParse<WorkspaceDraft | null>(window.localStorage.getItem(DRAFT_KEY), null),
-      history: safeParse<ReviewSnapshot[]>(window.localStorage.getItem(HISTORY_KEY), []),
+      history: safeParse<ReviewSnapshot[]>(window.localStorage.getItem(HISTORY_KEY), []).filter(isReviewSnapshot).slice(0, MAX_HISTORY),
     };
     downloadJson(`scholarforge-workspace-backup-${new Date().toISOString().slice(0, 10)}.json`, payload);
-    setNotice('本地工作区备份已导出。');
+    setNotice('本地工作区备份已导出。原始 DOCX、账户和云端项目不包含在此 JSON 中。');
   }
 
   async function importBackup(event: ChangeEvent<HTMLInputElement>) {
@@ -360,30 +390,27 @@ export function WorkspaceHub() {
     event.target.value = '';
     if (!file) return;
     try {
-      const payload = JSON.parse(await file.text()) as Partial<WorkspaceBackup>;
-      if (payload.format !== BACKUP_FORMAT || payload.version !== 1 || !Array.isArray(payload.history)) {
-        throw new Error('这不是受支持的 ScholarForge 工作区备份。');
-      }
-      const confirmed = window.confirm('导入会替换当前浏览器中的草稿和任务历史，是否继续？');
-      if (!confirmed) return;
+      const payload = parseBackup(JSON.parse(await file.text()) as unknown);
+      if (!window.confirm('导入会替换当前浏览器中的草稿和任务历史，是否继续？')) return;
       if (payload.draft) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(payload.draft));
       else window.localStorage.removeItem(DRAFT_KEY);
-      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(payload.history.slice(0, 8)));
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(payload.history));
+      window.localStorage.removeItem(AUTHOR_EDITING_SESSION_KEY);
       refreshLocalState();
-      setNotice(`已恢复 ${payload.history.length} 条任务记录。`);
+      setNotice(`已恢复 ${payload.history.length} 条任务记录。原始 DOCX 需要在当前浏览器重新导入。`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '备份导入失败。');
     }
   }
 
   function clearLocalWorkspace() {
-    const confirmed = window.confirm('这会删除当前浏览器中的草稿和全部任务历史，且无法撤销。是否继续？');
-    if (!confirmed) return;
+    if (!window.confirm('这会删除当前浏览器中的草稿、任务历史和作者修改会话，且无法撤销。是否继续？')) return;
     window.localStorage.removeItem(DRAFT_KEY);
     window.localStorage.removeItem(HISTORY_KEY);
+    window.localStorage.removeItem(AUTHOR_EDITING_SESSION_KEY);
     setDraft(null);
     setHistory([]);
-    setNotice('本地草稿与任务历史已清除。');
+    setNotice('本地草稿、任务历史与作者修改会话已清除。云端项目和原始 DOCX 未被删除。');
   }
 
   if (view === 'workspace') {
@@ -395,8 +422,6 @@ export function WorkspaceHub() {
       <PaperLensWorkspace />
     </div>;
   }
-
-  const latest = history[0];
 
   return <main className="hub-shell">
     <header className="hub-topbar">
@@ -424,7 +449,9 @@ export function WorkspaceHub() {
           <h1>从一个科研写作任务开始，<em>把每次修改留在证据链里。</em></h1>
           <p>翻译、润色、投稿预检和审稿回复不再是四个割裂工具，而是围绕同一论文项目持续积累术语、问题、作者决策和交付物。</p>
           <div className="hub-hero-actions">
-            {draft?.sourceText?.trim() ? <button className="hub-primary" onClick={() => openWorkspace()} type="button">继续当前草稿 <span>→</span></button> : <button className="hub-primary" onClick={() => openWorkspace(WORKFLOW_TEMPLATES[2], false)} type="button">新建投稿预检 <span>→</span></button>}
+            {draft?.sourceText?.trim()
+              ? <button className="hub-primary" onClick={() => openWorkspace()} type="button">继续当前草稿 <span>→</span></button>
+              : <button className="hub-primary" onClick={() => openWorkspace(WORKFLOW_TEMPLATES[2], false)} type="button">新建投稿预检 <span>→</span></button>}
             <button className="hub-secondary" onClick={() => openWorkspace(WORKFLOW_TEMPLATES[2], true)} type="button">载入完整演示</button>
           </div>
           <div className="hub-shortcuts"><span><kbd>Ctrl</kbd><kbd>K</kbd> 搜索任务</span><span><kbd>Alt</kbd><kbd>H</kbd> 返回项目中心</span></div>
@@ -433,14 +460,8 @@ export function WorkspaceHub() {
           <span>Current workspace</span>
           <h2>{draft?.projectTitle || '还没有正在编辑的任务'}</h2>
           <p>{draft?.taskType ? `${WORKFLOW_LABELS[draft.taskType]} · ${SECTION_LABELS[draft.sectionType || 'general']}` : '选择一个模板，开始建立第一条科研写作证据链。'}</p>
-          <div>
-            <span>最近保存</span>
-            <b>{formatDate(draft?.savedAt)}</b>
-          </div>
-          <div>
-            <span>模型工作流</span>
-            <b>4 × {health.model}</b>
-          </div>
+          <div><span>最近保存</span><b>{formatDate(draft?.savedAt)}</b></div>
+          <div><span>模型工作流</span><b>4 × {health.model}</b></div>
           <button disabled={!draft} onClick={() => openWorkspace()} type="button">打开当前工作区</button>
         </aside>
       </section>
@@ -449,7 +470,7 @@ export function WorkspaceHub() {
         <article><span>本机任务快照</span><strong>{metrics.total}</strong><small>最多保留最近 8 次</small></article>
         <article><span>待处理证据</span><strong>{metrics.pending}</strong><small>尚未接受、暂缓或忽略</small></article>
         <article><span>平均准备度</span><strong>{metrics.average || '—'}</strong><small>{metrics.average ? '/ 100' : '完成任务后统计'}</small></article>
-        <article><span>本地数据占用</span><strong>{metrics.storage}</strong><small>仅当前浏览器</small></article>
+        <article><span>本地数据占用</span><strong>{metrics.storage}</strong><small>草稿与历史，不含原始 DOCX</small></article>
       </section>
 
       <section className="hub-section" id="hub-workflows">
@@ -466,7 +487,16 @@ export function WorkspaceHub() {
       </section>
 
       <section className="hub-section" id="hub-history">
-        <div className="hub-section-head hub-history-head"><div><span>02 · Recent evidence</span><h2>最近任务与审校快照</h2><p>快速找到曾经的项目配置；完整结果仍可在工作台的“任务历史”标签中恢复。</p></div><div className="hub-history-tools"><label><span aria-hidden="true">⌕</span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目、期刊或章节" ref={searchRef} value={query} /></label><select aria-label="按工作流筛选" onChange={(event) => setTaskFilter(event.target.value as 'all' | WorkspaceTask)} value={taskFilter}><option value="all">全部工作流</option>{WORKFLOW_TEMPLATES.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}</select></div></div>
+        <div className="hub-section-head hub-history-head">
+          <div><span>02 · Recent evidence</span><h2>最近任务与审校快照</h2><p>快速找到曾经的项目配置；完整结果仍可在工作台的“任务历史”标签中恢复。</p></div>
+          <div className="hub-history-tools">
+            <label><span aria-hidden="true">⌕</span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目、期刊或章节" ref={searchRef} value={query} /></label>
+            <select aria-label="按工作流筛选" onChange={(event) => setTaskFilter(event.target.value as 'all' | WorkspaceTask)} value={taskFilter}>
+              <option value="all">全部工作流</option>
+              {WORKFLOW_TEMPLATES.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}
+            </select>
+          </div>
+        </div>
 
         {filteredHistory.length ? <div className="hub-history-grid">{filteredHistory.map((snapshot) => {
           const pending = countPending(snapshot);
@@ -483,10 +513,10 @@ export function WorkspaceHub() {
       <section className="hub-section hub-data-section" id="hub-data">
         <div className="hub-section-head"><div><span>03 · Data control</span><h2>本地数据与隐私控制</h2><p>当前草稿和任务历史默认保存在浏览器中。你可以随时备份、迁移或彻底删除。</p></div></div>
         <div className="hub-data-grid">
-          <article><span className="hub-data-icon">↓</span><div><h3>导出工作区备份</h3><p>将当前草稿、术语锁、任务历史、Agent 结果和作者决策导出为一个 JSON 文件。</p></div><button onClick={exportBackup} type="button">导出备份</button></article>
+          <article><span className="hub-data-icon">↓</span><div><h3>导出工作区备份</h3><p>导出当前草稿、术语锁、任务历史、Agent 结果和作者决策；不包含原始 DOCX。</p></div><button onClick={exportBackup} type="button">导出备份</button></article>
           <article><span className="hub-data-icon">↑</span><div><h3>恢复工作区备份</h3><p>从另一台设备或另一个浏览器恢复本地工作区。导入前会要求确认覆盖。</p></div><button onClick={() => importRef.current?.click()} type="button">选择备份</button><input accept="application/json,.json" hidden onChange={importBackup} ref={importRef} type="file" /></article>
-          <article className="is-danger"><span className="hub-data-icon">×</span><div><h3>清除本地工作区</h3><p>删除当前浏览器中的草稿和所有任务快照。登录账户本身不会被删除。</p></div><button onClick={clearLocalWorkspace} type="button">清除数据</button></article>
-          <aside><span>Privacy boundary</span><h3>你当前的数据存在哪里？</h3><ul><li>账户身份：Supabase Auth 或本地访客会话</li><li>论文草稿与历史：当前浏览器 localStorage</li><li>模型处理：提交任务时发送到服务端与阿里云百炼</li><li>尚未实现：按账户隔离的云端论文数据库</li></ul></aside>
+          <article className="is-danger"><span className="hub-data-icon">×</span><div><h3>清除本地工作区</h3><p>删除草稿、任务快照和作者修改会话；账户、云端项目与原始 DOCX 不受影响。</p></div><button onClick={clearLocalWorkspace} type="button">清除数据</button></article>
+          <aside><span>Privacy boundary</span><h3>你当前的数据存在哪里？</h3><ul><li>账户身份：Supabase Auth 或本地访客会话</li><li>论文草稿与历史：当前浏览器 localStorage</li><li>原始 DOCX：当前浏览器 IndexedDB</li><li>云端项目：仅在用户主动同步后进入 Supabase，并由 RLS 隔离</li><li>模型处理：提交任务时发送到服务端与阿里云百炼</li></ul></aside>
         </div>
         {notice ? <div className="hub-notice" role="status"><span>✓</span>{notice}<button onClick={() => setNotice('')} type="button">关闭</button></div> : null}
       </section>
