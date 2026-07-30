@@ -17,7 +17,6 @@ export interface AppliedEdit {
   end: number;
   original: string;
   revised: string;
-  anchor: 'exact' | 'whitespace';
   appliedAt: string;
 }
 
@@ -129,7 +128,6 @@ export function createAppliedEdit(issue: ReviewIssue, analysis: AnchorAnalysis):
     end: analysis.end,
     original: analysis.matchedText || issue.original,
     revised: issue.revised.trim(),
-    anchor: analysis.state === 'safe-exact' ? 'exact' : 'whitespace',
     appliedAt: new Date().toISOString(),
   };
 }
@@ -141,11 +139,4 @@ export function composeWorkingText(source: string, edits: AppliedEdit[]) {
     output = `${output.slice(0, edit.start)}${edit.revised}${output.slice(edit.end)}`;
   }
   return output;
-}
-
-export function countManualIssues(source: string, issues: ReviewIssue[], edits: AppliedEdit[]) {
-  return issues.filter((issue) => {
-    const state = analyseIssueAnchor(source, issue, edits).state;
-    return state === 'manual' || state === 'missing' || state === 'ambiguous' || state === 'conflict';
-  }).length;
 }
