@@ -3,6 +3,8 @@ export type AgentId = 'terminology' | 'language' | 'logic' | 'method';
 export type IssueSeverity = 'major' | 'minor' | 'suggestion';
 export type AgentRunStatus = 'completed' | 'failed' | 'demo';
 
+export type WorkspaceTask = 'translate' | 'polish' | 'precheck' | 'review-response';
+
 export type ReviewSection =
   | 'general'
   | 'abstract'
@@ -14,12 +16,24 @@ export type ReviewSection =
 
 export type ReviewMode = 'conservative' | 'balanced' | 'deep';
 export type IssueDecision = 'pending' | 'accepted' | 'deferred' | 'dismissed';
+export type ReviewOutputKind = 'translation' | 'revision' | 'precheck' | 'reviewer-response';
+
+export interface TerminologyLock {
+  id: string;
+  source: string;
+  preferred: string;
+  note?: string;
+}
 
 export interface ReviewProfile {
   projectTitle: string;
+  taskType: WorkspaceTask;
   sectionType: ReviewSection;
   reviewMode: ReviewMode;
   targetJournal: string;
+  responseLocation: string;
+  supportingContextProvided: boolean;
+  lockedTerms: TerminologyLock[];
 }
 
 export interface ReviewIssue {
@@ -60,6 +74,7 @@ export interface ReviewResult {
   mode: 'live' | 'demo';
   executionMode: 'parallel-multi-agent' | 'safe-demo';
   workflowVersion: string;
+  outputKind: ReviewOutputKind;
   profile: ReviewProfile;
   summary: string;
   revisedText: string;
@@ -77,7 +92,11 @@ export interface ReviewResult {
 export interface ReviewRequest {
   text: string;
   projectTitle?: string;
+  taskType?: WorkspaceTask;
   targetJournal?: string;
   sectionType?: ReviewSection;
   reviewMode?: ReviewMode;
+  supportingContext?: string;
+  responseLocation?: string;
+  lockedTerms?: TerminologyLock[];
 }
