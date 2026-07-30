@@ -9,6 +9,7 @@ import {
   type IngestedDocument,
   type IngestedSection,
 } from '@/lib/document-ingestion';
+import { bindOriginalDocxSource, saveOriginalDocx } from '@/lib/original-docx-store';
 import type { ReviewMode, WorkspaceTask } from '@/lib/types';
 
 const DRAFT_KEY = 'scholarforge-os-paperlens-draft-v1';
@@ -67,6 +68,8 @@ export function DocumentImportDock() {
   const [open, setOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [document, setDocument] = useState<IngestedDocument | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [taskType, setTaskType] = useState<WorkspaceTask>('precheck');
@@ -95,9 +98,11 @@ export function DocumentImportDock() {
 
   function reset() {
     setDocument(null);
+    setSourceFile(null);
     setSelectedId('');
     setError('');
     setProcessing(false);
+    setImporting(false);
     setDragging(false);
   }
 
@@ -106,10 +111,12 @@ export function DocumentImportDock() {
     setProcessing(true);
     setError('');
     setDocument(null);
+    setSourceFile(null);
     try {
       const next = await ingestResearchDocument(file);
       if (!next.fullText.trim()) throw new Error('没有提取到可用文字。扫描版 PDF 暂不支持 OCR。');
       if (!next.sections.length) throw new Error('没有识别到可导入的正文段落。');
+      setSourceFile(file);
       setDocument(next);
       setSelectedId(next.sections[0].id);
       setTaskType(next.suggestedTask);
@@ -133,34 +140,62 @@ export function DocumentImportDock() {
     void processFile(event.dataTransfer.files?.[0]);
   }
 
-  function importSelection(section: IngestedSection) {
-    const existing = safeParseDraft();
-    const savedAt = new Date().toISOString();
-    const nextDraft = {
-      projectTitle: `${document?.title || 'Imported manuscript'} · ${section.title}`,
-      taskType,
-      sourceText: section.text,
-      supportingContext: '',
-      responseLocation: '',
-      targetJournal: typeof existing.targetJournal === 'string' ? existing.targetJournal : '',
-      sectionType: section.sectionType,
-      reviewMode,
-      lockedTerms: Array.isArray(existing.lockedTerms) ? existing.lockedTerms : [],
-      savedAt,
-      importedDocument: {
-        fileName: document?.fileName,
-        fileType: document?.fileType,
-        sectionTitle: section.title,
-        sourceLabel: section.sourceLabel,
-        importedAt: savedAt,
-      },
-    };
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
-    window.localStorage.setItem(LAST_IMPORT_KEY, JSON.stringify(nextDraft.importedDocument));
-    window.sessionStorage.setItem(HUB_VIEW_KEY, 'workspace');
-    setOpen(false);
-    if (window.location.pathname === '/') window.location.reload();
-    else window.location.assign('/');
+  async function importSelection(section: IngestedSection) {
+    if (!document) return;
+    setImporting(true);
+    setError('');
+    try {
+      const existing = safeParseDraft();
+      const savedAt = new Date().toISOString();
+      let originalPackage: Record<string, unknown> = { stored: false };
+      if (document.fileType === 'docx' && sourceFile) {
+        try {
+          const stored = await saveOriginalDocx(sourceFile);
+          const binding = await bindOriginalDocxSource(stored, section.text, section.title, section.sourceLabel);
+          originalPackage = {
+            stored: true,
+            documentId: stored.id,
+            fingerprint: binding.fingerprint,
+            storage: 'browser-indexeddb',
+          };
+        } catch (storageError) {
+          originalPackage = {
+            stored: false,
+            error: storageError instanceof Error ? storageError.message : '浏览器无法保留原始 DOCX。',
+          };
+        }
+      }
+      const nextDraft = {
+        projectTitle: `${document.title || 'Imported manuscript'} · ${section.title}`,
+        taskType,
+        sourceText: section.text,
+        supportingContext: '',
+        responseLocation: '',
+        targetJournal: typeof existing.targetJournal === 'string' ? existing.targetJournal : '',
+        sectionType: section.sectionType,
+        reviewMode,
+        lockedTerms: Array.isArray(existing.lockedTerms) ? existing.lockedTerms : [],
+        savedAt,
+        importedDocument: {
+          fileName: document.fileName,
+          fileType: document.fileType,
+          sectionTitle: section.title,
+          sourceLabel: section.sourceLabel,
+          importedAt: savedAt,
+          originalPackage,
+        },
+      };
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+      window.localStorage.setItem(LAST_IMPORT_KEY, JSON.stringify(nextDraft.importedDocument));
+      window.sessionStorage.setItem(HUB_VIEW_KEY, 'workspace');
+      setOpen(false);
+      if (window.location.pathname === '/') window.location.reload();
+      else window.location.assign('/');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '导入失败，请重新选择章节。');
+    } finally {
+      setImporting(false);
+    }
   }
 
   return <div className={`document-import-dock ${open ? 'is-open' : ''}`}>
@@ -174,7 +209,7 @@ export function DocumentImportDock() {
     }}>
       <section aria-label="导入科研文档" aria-modal="true" className="document-import-modal" role="dialog">
         <header className="document-import-head">
-          <div><span>Document ingestion · v1.1</span><h2>导入论文并选择审校章节</h2><p>原始文件在浏览器中解析，不会作为文件保存到 ScholarForge 服务器。</p></div>
+          <div><span>Document ingestion · v1.3</span><h2>导入论文并选择审校章节</h2><p>DOCX 原始压缩包会保存在当前浏览器，用于后续原文件修订补丁；不会自动上传到 ScholarForge 服务器。</p></div>
           <button aria-label="关闭文档导入" onClick={() => setOpen(false)} type="button"><ImportIcon name="close" /></button>
         </header>
 
@@ -195,7 +230,7 @@ export function DocumentImportDock() {
             </>}
           </div>
           <div className="document-import-boundaries">
-            <article><span><ImportIcon name="shield" /></span><div><b>本地解析</b><p>文件内容不会在选择文件后自动提交给百炼；只有导入工作台并启动任务后，所选文本才会进入现有审校请求。</p></div></article>
+            <article><span><ImportIcon name="shield" /></span><div><b>本地解析与原包保存</b><p>DOCX 文件保存在当前浏览器 IndexedDB；只有你选中的文本在启动任务后进入百炼。PDF 仍只提取文字，不保留原文件。</p></div></article>
             <article><span><ImportIcon name="file" /></span><div><b>结构边界</b><p>DOCX 可读取语义标题；PDF 按页面文字抽取。公式、表格、双栏顺序和扫描图像需要作者核对。</p></div></article>
           </div>
           {error ? <div className="document-import-error" role="alert">{error}<button onClick={reset} type="button">重新选择</button></div> : null}
@@ -227,10 +262,11 @@ export function DocumentImportDock() {
           </div>
 
           {document.warnings.length ? <section className="document-warning-list"><div><span>Extraction notes</span><h3>导入前请核对</h3></div><ul>{document.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></section> : null}
+          {error ? <div className="document-import-error" role="alert">{error}</div> : null}
 
           <footer className="document-import-actions">
-            <div><b>{selected ? `${TASK_LABELS[taskType]} · ${SECTION_LABELS[selected.sectionType]} · ${MODE_LABELS[reviewMode]}` : '请选择章节'}</b><span>导入后仍可在 PaperLens 中编辑文本、期刊、术语锁和模式。</span></div>
-            <button disabled={!selected || selected.charCount > WORKSPACE_TEXT_LIMIT} onClick={() => selected && importSelection(selected)} type="button">导入所选章节 <span>→</span></button>
+            <div><b>{selected ? `${TASK_LABELS[taskType]} · ${SECTION_LABELS[selected.sectionType]} · ${MODE_LABELS[reviewMode]}` : '请选择章节'}</b><span>{document.fileType === 'docx' ? '导入时会在本机保留原 DOCX 包，后续可生成原文件修订版。' : '导入后仍可在 PaperLens 中编辑文本、期刊、术语锁和模式。'}</span></div>
+            <button disabled={!selected || selected.charCount > WORKSPACE_TEXT_LIMIT || importing} onClick={() => selected && void importSelection(selected)} type="button">{importing ? '正在保留原包…' : '导入所选章节'} <span>→</span></button>
           </footer>
         </div>}
       </section>
