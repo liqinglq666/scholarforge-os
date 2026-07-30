@@ -1,5 +1,5 @@
-import { ProWorkspace } from '@/components/pro-workspace';
+import { PaperLensWorkspace } from '@/components/paperlens-workspace';
 
 export default function Home() {
-  return <ProWorkspace />;
+  return <PaperLensWorkspace />;
 }
