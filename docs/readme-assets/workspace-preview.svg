@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">ScholarForge OS workspace preview</title>
+  <desc id="desc">A schematic preview of the three-column academic review workspace.</desc>
+  <rect width="1400" height="820" rx="28" fill="#F7F4ED"/>
+  <rect x="30" y="26" width="1340" height="64" rx="18" fill="#FFFDF8" stroke="#D8D4CB"/>
+  <rect x="54" y="40" width="38" height="38" rx="12" fill="#17233D"/>
+  <text x="68" y="67" font-family="Georgia, serif" font-size="22" fill="#FFF">S</text>
+  <text x="108" y="57" font-family="Arial, PingFang SC, sans-serif" font-size="18" font-weight="700" fill="#17233D">ScholarForge OS｜研语工坊</text>
+  <text x="108" y="75" font-family="Arial, PingFang SC, sans-serif" font-size="10" fill="#68728A">EVIDENCE-AWARE ACADEMIC WRITING WORKSPACE</text>
+  <rect x="1190" y="44" width="145" height="28" rx="14" fill="#DAF1E7"/><text x="1213" y="63" font-family="Arial, sans-serif" font-size="10" fill="#2F8C6B">Model Studio connected</text>
+
+  <rect x="30" y="112" width="265" height="678" rx="24" fill="#FFFDF8" stroke="#D8D4CB"/>
+  <text x="56" y="150" font-family="Arial, PingFang SC, sans-serif" font-size="11" font-weight="700" fill="#EF8058">AGENT TEAM</text>
+  <rect x="56" y="172" width="213" height="70" rx="16" fill="#17233D"/><text x="74" y="202" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#FFF">Active manuscript</text><text x="74" y="225" font-family="Arial, sans-serif" font-size="11" fill="#CBD3E3">Construction and Building Materials</text>
+  <g font-family="Arial, PingFang SC, sans-serif">
+    <g transform="translate(56 275)"><rect width="32" height="32" rx="10" fill="#DAF1E7"/><text x="11" y="22" font-size="14" fill="#2F8C6B">✓</text><text x="45" y="14" font-size="12" font-weight="700" fill="#17233D">Terminology</text><text x="45" y="29" font-size="10" fill="#68728A">术语与缩写</text></g>
+    <g transform="translate(56 330)"><rect width="32" height="32" rx="10" fill="#DAF1E7"/><text x="11" y="22" font-size="14" fill="#2F8C6B">✓</text><text x="45" y="14" font-size="12" font-weight="700" fill="#17233D">Language</text><text x="45" y="29" font-size="10" fill="#68728A">学术英语表达</text></g>
+    <g transform="translate(56 385)"><rect width="32" height="32" rx="10" fill="#DAF1E7"/><text x="11" y="22" font-size="14" fill="#2F8C6B">✓</text><text x="45" y="14" font-size="12" font-weight="700" fill="#17233D">Logic</text><text x="45" y="29" font-size="10" fill="#68728A">证据与因果边界</text></g>
+    <g transform="translate(56 440)"><rect width="32" height="32" rx="10" fill="#DAF1E7"/><text x="11" y="22" font-size="14" fill="#2F8C6B">✓</text><text x="45" y="14" font-size="12" font-weight="700" fill="#17233D">Method</text><text x="45" y="29" font-size="10" fill="#68728A">复现与报告完整性</text></g>
+  </g>
+
+  <rect x="315" y="112" width="720" height="678" rx="24" fill="#FFFDF8" stroke="#D8D4CB"/>
+  <text x="350" y="160" font-family="Georgia, PingFang SC, serif" font-size="34" font-weight="700" fill="#17233D">让每一次科研英语修改都有依据。</text>
+  <text x="350" y="194" font-family="Arial, PingFang SC, sans-serif" font-size="13" fill="#68728A">四个独立 Agent 并行完成审校，代码统一校准评分与决策。</text>
+  <rect x="350" y="225" width="650" height="150" rx="18" fill="#FFF" stroke="#D8D4CB"/>
+  <line x1="370" y1="265" x2="980" y2="265" stroke="#ECE8DF"/><line x1="370" y1="305" x2="980" y2="305" stroke="#ECE8DF"/><line x1="370" y1="345" x2="980" y2="345" stroke="#ECE8DF"/>
+  <rect x="795" y="397" width="205" height="48" rx="14" fill="#17233D"/><text x="842" y="427" font-family="Arial, PingFang SC, sans-serif" font-size="14" font-weight="700" fill="#FFF">启动全面审校 →</text>
+  <rect x="350" y="480" width="312" height="265" rx="18" fill="#FFF" stroke="#D8D4CB"/><text x="372" y="512" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#68728A">ORIGINAL MANUSCRIPT</text><text x="372" y="550" font-family="Georgia, serif" font-size="13" fill="#35405A">Original academic passage</text><text x="372" y="576" font-family="Georgia, serif" font-size="13" fill="#35405A">with language, logic, and</text><text x="372" y="602" font-family="Georgia, serif" font-size="13" fill="#35405A">reproducibility risks...</text>
+  <rect x="680" y="480" width="320" height="265" rx="18" fill="#F0F8F4" stroke="#B9DCCF"/><text x="702" y="512" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#68728A">SCHOLARFORGE REVISION</text><text x="702" y="550" font-family="Georgia, serif" font-size="13" fill="#35405A">Conservative revision with</text><text x="702" y="576" font-family="Georgia, serif" font-size="13" fill="#35405A">scientific meaning protected</text><text x="702" y="602" font-family="Georgia, serif" font-size="13" fill="#35405A">and author actions retained...</text>
+
+  <rect x="1055" y="112" width="315" height="678" rx="24" fill="#FFFDF8" stroke="#D8D4CB"/>
+  <text x="1082" y="150" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#EF8058">SUBMISSION READINESS</text>
+  <text x="1082" y="190" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#17233D">Major Revision</text>
+  <circle cx="1285" cy="188" r="48" fill="none" stroke="#E7E4DC" stroke-width="10"/><path d="M1285 140a48 48 0 1 1-39 76" fill="none" stroke="#2F8C6B" stroke-width="10" stroke-linecap="round"/><text x="1265" y="196" font-family="Georgia, serif" font-size="25" font-weight="700" fill="#17233D">78</text>
+  <rect x="1082" y="255" width="260" height="115" rx="16" fill="#F1EEE6"/><text x="1102" y="285" font-family="Arial, sans-serif" font-size="11" fill="#68728A">Deterministic score and</text><text x="1102" y="307" font-family="Arial, sans-serif" font-size="11" fill="#68728A">decision rationale keep</text><text x="1102" y="329" font-family="Arial, sans-serif" font-size="11" fill="#68728A">review outcomes consistent.</text>
+  <text x="1082" y="420" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#EF8058">DELIVERABLES</text>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#17233D"><rect x="1082" y="442" width="260" height="54" rx="13" fill="#FFF" stroke="#D8D4CB"/><text x="1102" y="475">Revised_Manuscript.txt</text><rect x="1082" y="510" width="260" height="54" rx="13" fill="#FFF" stroke="#D8D4CB"/><text x="1102" y="543">Audit_Report.md</text><rect x="1082" y="578" width="260" height="54" rx="13" fill="#FFF" stroke="#D8D4CB"/><text x="1102" y="611">Review_Result.json</text></g>
+</svg>
