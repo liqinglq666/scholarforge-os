@@ -26,6 +26,10 @@ function getDestination() {
   return requested;
 }
 
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const {
@@ -71,6 +75,8 @@ export default function LoginPage() {
       if (result.ok && !result.needsConfirmation) {
         window.setTimeout(() => router.replace(getDestination()), 520);
       }
+    } catch (error) {
+      setNotice({ tone: 'error', message: errorMessage(error, '账户请求失败，请检查网络后重试。') });
     } finally {
       setSubmitting(false);
     }
@@ -78,16 +84,29 @@ export default function LoginPage() {
 
   async function handleGuest() {
     setSubmitting(true);
-    const result = await continueAsGuest();
-    setNotice({ tone: 'success', message: result.message });
-    window.setTimeout(() => router.replace(getDestination()), 360);
+    setNotice(null);
+    try {
+      const result = await continueAsGuest();
+      setNotice({ tone: result.ok ? 'success' : 'error', message: result.message });
+      if (result.ok) window.setTimeout(() => router.replace(getDestination()), 360);
+    } catch (error) {
+      setNotice({ tone: 'error', message: errorMessage(error, '无法创建访客会话，请检查浏览器存储权限。') });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleReset() {
     setSubmitting(true);
-    const result = await requestPasswordReset(email);
-    setNotice({ tone: result.ok ? 'success' : 'error', message: result.message });
-    setSubmitting(false);
+    setNotice(null);
+    try {
+      const result = await requestPasswordReset(email);
+      setNotice({ tone: result.ok ? 'success' : 'error', message: result.message });
+    } catch (error) {
+      setNotice({ tone: 'error', message: errorMessage(error, '密码重置请求失败，请稍后重试。') });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -127,7 +146,7 @@ export default function LoginPage() {
         <div className="auth-trust-grid">
           <div><strong>4×</strong><span>独立百炼请求</span></div>
           <div><strong>0</strong><span>客户端暴露密钥</span></div>
-          <div><strong>3</strong><span>真实下载格式</span></div>
+          <div><strong>4</strong><span>真实下载格式</span></div>
         </div>
 
         <p className="auth-story-foot">Powered by Alibaba Cloud Model Studio · qwen-plus</p>
@@ -159,7 +178,7 @@ export default function LoginPage() {
               <div className="auth-panel-heading">
                 <div className="auth-eyebrow">Account access</div>
                 <h2>{tab === 'signin' ? '登录论文工作台' : '创建 ScholarForge 账户'}</h2>
-                <p>{tab === 'signin' ? '完成身份确认后进入论文审校、作者待办与结果交付页面。' : '创建账户，为后续云端项目、版本历史和文档交付做好准备。'}</p>
+                <p>{tab === 'signin' ? '完成身份确认后进入论文审校、作者待办与结果交付页面。' : '创建云端账户后，可主动同步按用户隔离的论文项目与任务历史。'}</p>
               </div>
 
               <div className="auth-tabs" role="tablist" aria-label="登录或注册">
@@ -201,7 +220,7 @@ export default function LoginPage() {
                 </label>
 
                 <label>
-                  <span className="auth-label-row"><b>密码</b>{tab === 'signin' ? <button disabled={submitting} onClick={handleReset} type="button">忘记密码？</button> : <small>至少 8 个字符</small>}</span>
+                  <span className="auth-label-row"><b>密码</b>{tab === 'signin' ? <button disabled={submitting} onClick={() => void handleReset()} type="button">忘记密码？</button> : <small>至少 8 个字符</small>}</span>
                   <div className="auth-input-shell">
                     <span aria-hidden="true">密</span>
                     <input
@@ -227,7 +246,7 @@ export default function LoginPage() {
 
               <div className="auth-divider"><span>或者</span></div>
 
-              <button className="auth-guest-button" disabled={submitting} onClick={handleGuest} type="button">
+              <button className="auth-guest-button" disabled={submitting} onClick={() => void handleGuest()} type="button">
                 <span className="auth-guest-icon">游</span>
                 <span><b>以访客身份进入</b><small>先创建访客会话，草稿只保存在当前浏览器</small></span>
                 <i>→</i>
