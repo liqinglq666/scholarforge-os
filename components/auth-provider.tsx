@@ -13,6 +13,8 @@ import type { User } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 const DEMO_SESSION_KEY = 'scholarforge.auth.demo-session.v1';
+const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
+const LEGACY_AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-v1';
 
 export type ScholarForgeUser = {
   id: string;
@@ -67,6 +69,17 @@ function isLocalSession(value: unknown): value is ScholarForgeUser {
     && (candidate.mode === 'demo' || candidate.mode === 'guest');
 }
 
+function migrateAuthorEditingSession() {
+  try {
+    const current = window.localStorage.getItem(AUTHOR_EDITING_SESSION_KEY);
+    const legacy = window.localStorage.getItem(LEGACY_AUTHOR_EDITING_SESSION_KEY);
+    if (!current && legacy) window.localStorage.setItem(AUTHOR_EDITING_SESSION_KEY, legacy);
+    if (legacy) window.localStorage.removeItem(LEGACY_AUTHOR_EDITING_SESSION_KEY);
+  } catch {
+    // Session migration is best-effort; restricted browser storage should not block authentication.
+  }
+}
+
 function readDemoSession() {
   try {
     const raw = window.localStorage.getItem(DEMO_SESSION_KEY);
@@ -97,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseConfigured = isSupabaseConfigured();
 
   useEffect(() => {
+    migrateAuthorEditingSession();
     let alive = true;
     const supabase = getSupabaseBrowserClient();
 
