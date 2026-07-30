@@ -8,6 +8,7 @@ import './auth.css';
 import './auth-inline.css';
 import './auth-gate.css';
 import './v06.css';
+import './v06-fixes.css';
 
 export const metadata: Metadata = {
   title: {
