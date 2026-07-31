@@ -14,16 +14,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Package git review snapshot
-        run: tar -czf /tmp/scholarforge-git-source.tgz .
-
-      - name: Upload git review snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: scholarforge-git-source-${{ github.sha }}
-          path: /tmp/scholarforge-git-source.tgz
-          retention-days: 1
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -35,6 +25,9 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Unit tests
+        run: npm run test
 
       - name: Type check
         run: npm run typecheck

@@ -1,0 +1,33 @@
+:root {
+  --sf-canvas: #f5f7fa;
+  --sf-canvas-strong: #eef1f5;
+  --sf-surface: #ffffff;
+  --sf-surface-subtle: #fafbfc;
+  --sf-surface-muted: #f3f5f7;
+  --sf-ink: #172033;
+  --sf-ink-soft: #39445a;
+  --sf-muted: #667085;
+  --sf-faint: #98a2b3;
+  --sf-line: #dfe3e8;
+  --sf-line-strong: #cbd1d9;
+  --sf-primary: #2456a6;
+  --sf-primary-hover: #1d478a;
+  --sf-primary-soft: #eaf0fb;
+  --sf-evidence: #176b63;
+  --sf-evidence-soft: #e8f4f1;
+  --sf-warning: #9a6517;
+  --sf-warning-soft: #fff6df;
+  --sf-danger: #a63f45;
+  --sf-danger-soft: #fcebed;
+  --sf-success: #2f6c4f;
+  --sf-success-soft: #e9f4ed;
+  --sf-shadow-sm: 0 1px 2px rgb(23 32 51 / 0.04), 0 8px 24px rgb(23 32 51 / 0.05);
+  --sf-shadow-md: 0 18px 48px rgb(23 32 51 / 0.12);
+  --sf-radius-sm: 8px;
+  --sf-radius-md: 12px;
+  --sf-radius-lg: 18px;
+  --sf-control: 42px;
+  --sf-transition: 160ms ease;
+  --sf-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --sf-font-reading: Georgia, "Times New Roman", "Noto Serif SC", serif;
+}
