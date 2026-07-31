@@ -49,7 +49,10 @@ const OUTPUT_KIND: Record<WorkspaceTask, ReviewOutputKind> = {
 };
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    message?: { content?: string };
+    finish_reason?: string | null;
+  }>;
   error?: { message?: string };
 }
 
@@ -181,8 +184,12 @@ async function runSpecialist(
       throw new Error(`${agent} returned a non-JSON response.`);
     }
     if (!response.ok) throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
-    const content = body.choices?.[0]?.message?.content;
+    const choice = body.choices?.[0];
+    const content = choice?.message?.content;
     if (!content) throw new Error(`${agent} returned an empty response.`);
+    if (choice?.finish_reason === 'length') {
+      throw new Error(`${agent} output was truncated before completion.`);
+    }
 
     return {
       agent,

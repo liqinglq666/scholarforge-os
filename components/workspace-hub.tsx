@@ -61,7 +61,17 @@ export function WorkspaceHub() {
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
-    setState(readWorkspaceState(window.localStorage));
+    try {
+      setState(readWorkspaceState(window.localStorage));
+    } catch {
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([
+          ...current.warnings,
+          '浏览器阻止了本地数据读取，当前页面仍可临时使用。',
+        ])),
+      }));
+    }
   }, []);
 
   useEffect(() => {

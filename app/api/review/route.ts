@@ -49,13 +49,18 @@ function noStoreJson(payload: unknown, status: number) {
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
-  let body: Partial<ReviewRequest>;
+  let parsed: unknown;
 
   try {
-    body = await request.json() as Partial<ReviewRequest>;
+    parsed = await request.json() as unknown;
   } catch {
     return noStoreJson({ error: '请求内容必须是有效的 JSON。', requestId }, 400);
   }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return noStoreJson({ error: '请求内容必须是 JSON 对象。', requestId }, 400);
+  }
+  const body = parsed as Partial<ReviewRequest>;
 
   try {
     if (body.taskType !== undefined && !VALID_TASKS.has(body.taskType as WorkspaceTask)) {

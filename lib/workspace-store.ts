@@ -38,6 +38,24 @@ function boundedString(value: unknown, fallback = '', max = 12_000) {
   return typeof value === 'string' ? value.slice(0, max) : fallback;
 }
 
+function nonEmptyString(value: unknown, fallback: string, max: number) {
+  return boundedString(value, '', max).trim() || fallback;
+}
+
+function validTimestamp(value: unknown, fallback: string) {
+  const candidate = boundedString(value, '', 80);
+  return candidate && !Number.isNaN(Date.parse(candidate)) ? candidate : fallback;
+}
+
+function uniqueSnapshots(values: ReviewSnapshot[]) {
+  const seen = new Set<string>();
+  return values.filter((snapshot) => {
+    if (seen.has(snapshot.id)) return false;
+    seen.add(snapshot.id);
+    return true;
+  });
+}
+
 function normalizeLocks(value: unknown): TerminologyLock[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -119,14 +137,15 @@ function normalizeDraft(value: WorkspaceDraft): WorkspaceDraft {
     }
     : undefined;
 
+  const now = new Date().toISOString();
   return {
-    projectTitle: boundedString(value.projectTitle, '', 120),
+    projectTitle: nonEmptyString(value.projectTitle, '未命名科研写作任务', 120),
     taskType,
     sourceText: boundedString(value.sourceText, '', 12_000),
     targetJournal: boundedString(value.targetJournal, '', 160),
     sectionType,
     lockedTerms: normalizeLocks(value.lockedTerms),
-    savedAt: boundedString(value.savedAt, new Date().toISOString(), 80),
+    savedAt: validTimestamp(value.savedAt, now),
     importedDocument,
   };
 }
@@ -164,20 +183,22 @@ function normalizeResult(result: ReviewResult, snapshot: ReviewSnapshot): Review
     ? snapshot.sectionType as ReviewSection
     : 'general';
   const lockedTerms = normalizeLocks(snapshot.lockedTerms);
+  const revisedCandidate = boundedString(current.revisedText, '', 48_000);
+  const generatedFallback = validTimestamp(snapshot.savedAt, new Date().toISOString());
 
   return {
     outputKind: OUTPUT_KIND[taskType],
     profile: {
-      projectTitle: boundedString(snapshot.projectTitle, '未命名科研写作任务', 120),
+      projectTitle: nonEmptyString(snapshot.projectTitle, '未命名科研写作任务', 120),
       taskType,
       sectionType,
       targetJournal: boundedString(snapshot.targetJournal, '', 160),
       lockedTerms,
     },
-    summary: boundedString(current.summary, '历史分析结果已恢复，请作者继续逐条核对。', 2_000),
-    revisedText: boundedString(current.revisedText, snapshot.sourceText, 48_000),
+    summary: nonEmptyString(current.summary, '历史分析结果已恢复，请作者继续逐条核对。', 2_000),
+    revisedText: revisedCandidate.trim() ? revisedCandidate : snapshot.sourceText,
     issues: normalizeIssues(current.issues),
-    generatedAt: boundedString(current.generatedAt, snapshot.savedAt || new Date().toISOString(), 80),
+    generatedAt: validTimestamp(current.generatedAt, generatedFallback),
   };
 }
 
@@ -190,26 +211,28 @@ function normalizeSnapshot(value: ReviewSnapshot): ReviewSnapshot {
     : 'general';
   const sourceText = boundedString(value.sourceText, '', 12_000);
   const lockedTerms = normalizeLocks(value.lockedTerms);
+  const now = new Date().toISOString();
   const base = {
     ...value,
-    projectTitle: boundedString(value.projectTitle, '未命名科研写作任务', 120),
+    projectTitle: nonEmptyString(value.projectTitle, '未命名科研写作任务', 120),
     taskType,
     sourceText,
     targetJournal: boundedString(value.targetJournal, '', 160),
     sectionType,
     lockedTerms,
     requestId: boundedString(value.requestId, '', 120),
-    savedAt: boundedString(value.savedAt, new Date().toISOString(), 80),
+    savedAt: validTimestamp(value.savedAt, now),
   } as ReviewSnapshot;
   const result = normalizeResult(value.result, base);
   const decisions = normalizeDecisions(value.decisions, result.issues);
+  const issueIds = new Set(result.issues.map((issue) => issue.id));
   const edits = normalizeAppliedEdits(
     sourceText,
     Array.isArray(value.appliedEdits) ? value.appliedEdits : [],
-  ).valid;
+  ).valid.filter((edit) => issueIds.has(edit.issueId));
 
   return {
-    id: boundedString(value.id, crypto.randomUUID(), 120),
+    id: nonEmptyString(value.id, crypto.randomUUID(), 120),
     projectTitle: base.projectTitle,
     taskType,
     sourceText,
@@ -246,7 +269,7 @@ export function readWorkspaceState(storage: StorageLike): WorkspaceState {
   try {
     const parsed = parseValue(storage.getItem(STORAGE_KEYS.history));
     if (Array.isArray(parsed)) {
-      history = parsed.filter(supportedSnapshot).map(normalizeSnapshot).slice(0, MAX_HISTORY);
+      history = uniqueSnapshots(parsed.filter(supportedSnapshot).map(normalizeSnapshot)).slice(0, MAX_HISTORY);
 
       if (parsed.some((item) => isReviewSnapshot(item) && !SUPPORTED_TASKS.has(item.taskType as WorkspaceTask))) {
         warnings.push('旧版审稿回复记录已隐藏，不会修改原始浏览器数据。');
@@ -270,9 +293,9 @@ export function writeWorkspaceDraft(storage: StorageLike, draft: WorkspaceDraft 
 }
 
 export function writeWorkspaceHistory(storage: StorageLike, history: ReviewSnapshot[]) {
-  const normalized = history
+  const normalized = uniqueSnapshots(history
     .filter(supportedSnapshot)
-    .map(normalizeSnapshot)
+    .map(normalizeSnapshot))
     .slice(0, MAX_HISTORY);
   storage.setItem(STORAGE_KEYS.history, JSON.stringify(normalized));
 }
@@ -303,9 +326,9 @@ export function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     draft: value.draft === null || isWorkspaceDraft(value.draft)
       ? (value.draft ? normalizeDraft(value.draft) : null)
       : null,
-    history: value.history
+    history: uniqueSnapshots(value.history
       .filter(supportedSnapshot)
-      .map(normalizeSnapshot)
+      .map(normalizeSnapshot))
       .slice(0, MAX_HISTORY),
   };
 }

@@ -160,4 +160,37 @@ describe('workspace store', () => {
     expect(new Set(restored?.result.issues.map((item) => item.id)).size).toBe(2);
   });
 
+
+  it('deduplicates restored snapshot IDs and repairs empty identifiers', () => {
+    const first = snapshot({ id: 'duplicate' });
+    const second = snapshot({ id: 'duplicate', projectTitle: 'Second copy' });
+    const empty = snapshot({ id: '', projectTitle: '' });
+    const state = readWorkspaceState(memoryStorage({
+      [STORAGE_KEYS.history]: JSON.stringify([first, second, empty]),
+    }));
+    expect(state.history).toHaveLength(2);
+    expect(state.history[0]?.id).toBe('duplicate');
+    expect(state.history[1]?.id).not.toBe('');
+    expect(state.history[1]?.projectTitle).toBe('未命名科研写作任务');
+  });
+
+  it('drops valid-looking edits that do not belong to a restored issue', () => {
+    const sourceText = 'The tests was conducted.';
+    const stored = snapshot({
+      sourceText,
+      result: {
+        ...snapshot().result as Record<string, unknown>,
+        issues: [],
+      },
+      appliedEdits: [{
+        issueId: 'ghost', start: 0, end: sourceText.length, original: sourceText,
+        revised: 'The tests were conducted.', appliedAt: '2026-07-31T00:00:00.000Z',
+      }],
+    });
+    const restored = readWorkspaceState(memoryStorage({
+      [STORAGE_KEYS.history]: JSON.stringify([stored]),
+    })).history[0];
+    expect(restored?.appliedEdits).toEqual([]);
+  });
+
 });
