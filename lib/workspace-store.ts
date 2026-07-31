@@ -8,7 +8,7 @@ import {
   type WorkspaceDraft,
   type WorkspaceState,
 } from '@/lib/workspace-schema';
-import type { WorkspaceTask } from '@/lib/types';
+import type { ReviewResult, WorkspaceTask } from '@/lib/types';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -20,8 +20,13 @@ function parseValue(value: string | null): unknown {
 }
 
 function normalizeDraft(value: WorkspaceDraft): WorkspaceDraft {
-  const taskType = SUPPORTED_TASKS.has(value.taskType as WorkspaceTask) ? value.taskType as WorkspaceTask : 'precheck';
-  const importedDocument = value.importedDocument?.fileType === 'docx' ? value.importedDocument : undefined;
+  const taskType = SUPPORTED_TASKS.has(value.taskType as WorkspaceTask)
+    ? value.taskType as WorkspaceTask
+    : 'precheck';
+  const importedDocument = value.importedDocument?.fileType === 'docx'
+    ? value.importedDocument
+    : undefined;
+
   return {
     projectTitle: value.projectTitle,
     taskType,
@@ -34,8 +39,46 @@ function normalizeDraft(value: WorkspaceDraft): WorkspaceDraft {
   };
 }
 
+function isLegacyDemoSnapshot(value: ReviewSnapshot) {
+  const result = value.result as unknown as Record<string, unknown>;
+  return result.mode === 'demo'
+    || result.executionMode === 'safe-demo'
+    || (typeof result.workflowVersion === 'string' && result.workflowVersion.toLowerCase().includes('demo'));
+}
+
 function supportedSnapshot(value: unknown): value is ReviewSnapshot {
-  return isReviewSnapshot(value) && SUPPORTED_TASKS.has(value.taskType as WorkspaceTask);
+  return isReviewSnapshot(value)
+    && SUPPORTED_TASKS.has(value.taskType as WorkspaceTask)
+    && !isLegacyDemoSnapshot(value);
+}
+
+function normalizeResult(result: ReviewResult): ReviewResult {
+  const current = { ...result } as Record<string, unknown>;
+  delete current.mode;
+  delete current.executionMode;
+  delete current.workflowVersion;
+  delete current.agentRuns;
+  delete current.scoreBefore;
+  delete current.scoreAfter;
+  delete current.decisionReason;
+  return current as unknown as ReviewResult;
+}
+
+function normalizeSnapshot(value: ReviewSnapshot): ReviewSnapshot {
+  return {
+    id: value.id,
+    projectTitle: value.projectTitle,
+    taskType: value.taskType,
+    sourceText: value.sourceText,
+    targetJournal: value.targetJournal,
+    sectionType: value.sectionType,
+    lockedTerms: Array.isArray(value.lockedTerms) ? value.lockedTerms : [],
+    requestId: value.requestId || '',
+    result: normalizeResult(value.result),
+    decisions: isRecord(value.decisions) ? value.decisions : {},
+    appliedEdits: Array.isArray(value.appliedEdits) ? value.appliedEdits : [],
+    savedAt: value.savedAt,
+  };
 }
 
 export function readWorkspaceState(storage: StorageLike): WorkspaceState {
@@ -50,7 +93,9 @@ export function readWorkspaceState(storage: StorageLike): WorkspaceState {
       if (parsed.taskType && !SUPPORTED_TASKS.has(parsed.taskType as WorkspaceTask)) {
         warnings.push('旧版审稿回复草稿已转换为投稿前预检，原文仍保留。');
       }
-    } else if (parsed !== null) warnings.push('当前草稿格式无法识别，原始浏览器数据已保留。');
+    } else if (parsed !== null) {
+      warnings.push('当前草稿格式无法识别，原始浏览器数据已保留。');
+    }
   } catch {
     warnings.push('当前草稿无法解析，原始浏览器数据已保留。');
   }
@@ -58,11 +103,17 @@ export function readWorkspaceState(storage: StorageLike): WorkspaceState {
   try {
     const parsed = parseValue(storage.getItem(STORAGE_KEYS.history));
     if (Array.isArray(parsed)) {
-      history = parsed.filter(supportedSnapshot).slice(0, MAX_HISTORY);
+      history = parsed.filter(supportedSnapshot).map(normalizeSnapshot).slice(0, MAX_HISTORY);
+
       if (parsed.some((item) => isReviewSnapshot(item) && !SUPPORTED_TASKS.has(item.taskType as WorkspaceTask))) {
         warnings.push('旧版审稿回复记录已隐藏，不会修改原始浏览器数据。');
       }
-    } else if (parsed !== null) warnings.push('任务历史格式无法识别，原始浏览器数据已保留。');
+      if (parsed.some((item) => isReviewSnapshot(item) && isLegacyDemoSnapshot(item))) {
+        warnings.push('旧版演示分析记录已隐藏，不会修改原始浏览器数据。');
+      }
+    } else if (parsed !== null) {
+      warnings.push('任务历史格式无法识别，原始浏览器数据已保留。');
+    }
   } catch {
     warnings.push('任务历史无法解析，原始浏览器数据已保留。');
   }
@@ -76,12 +127,20 @@ export function writeWorkspaceDraft(storage: StorageLike, draft: WorkspaceDraft 
 }
 
 export function writeWorkspaceHistory(storage: StorageLike, history: ReviewSnapshot[]) {
-  storage.setItem(STORAGE_KEYS.history, JSON.stringify(history.filter(supportedSnapshot).slice(0, MAX_HISTORY)));
+  const normalized = history
+    .filter(supportedSnapshot)
+    .map(normalizeSnapshot)
+    .slice(0, MAX_HISTORY);
+  storage.setItem(STORAGE_KEYS.history, JSON.stringify(normalized));
 }
 
 export function upsertSnapshot(storage: StorageLike, snapshot: ReviewSnapshot) {
+  const normalizedSnapshot = normalizeSnapshot(snapshot);
   const state = readWorkspaceState(storage);
-  const next = [snapshot, ...state.history.filter((item) => item.id !== snapshot.id)].slice(0, MAX_HISTORY);
+  const next = [
+    normalizedSnapshot,
+    ...state.history.filter((item) => item.id !== normalizedSnapshot.id),
+  ].slice(0, MAX_HISTORY);
   writeWorkspaceHistory(storage, next);
   return next;
 }
@@ -98,8 +157,13 @@ export function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     format: 'scholarforge-workspace-backup',
     version: 1,
     exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
-    draft: value.draft === null || isWorkspaceDraft(value.draft) ? (value.draft ? normalizeDraft(value.draft) : null) : null,
-    history: value.history.filter(supportedSnapshot).slice(0, MAX_HISTORY),
+    draft: value.draft === null || isWorkspaceDraft(value.draft)
+      ? (value.draft ? normalizeDraft(value.draft) : null)
+      : null,
+    history: value.history
+      .filter(supportedSnapshot)
+      .map(normalizeSnapshot)
+      .slice(0, MAX_HISTORY),
   };
 }
 
