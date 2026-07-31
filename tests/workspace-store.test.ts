@@ -11,6 +11,37 @@ function memoryStorage(seed: Record<string, string> = {}) {
   };
 }
 
+function snapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'snapshot-1',
+    projectTitle: 'ECC paper',
+    taskType: 'precheck',
+    sourceText: 'A valid manuscript paragraph with enough source text for review.',
+    targetJournal: '',
+    sectionType: 'methods',
+    lockedTerms: [],
+    requestId: 'request-1',
+    result: {
+      outputKind: 'precheck',
+      profile: {
+        projectTitle: 'ECC paper',
+        taskType: 'precheck',
+        sectionType: 'methods',
+        targetJournal: '',
+        lockedTerms: [],
+      },
+      summary: 'Review complete.',
+      revisedText: 'A valid manuscript paragraph with enough source text for review.',
+      issues: [],
+      generatedAt: '2026-07-31T00:00:00.000Z',
+    },
+    decisions: {},
+    appliedEdits: [],
+    savedAt: '2026-07-31T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 describe('workspace store', () => {
   it('keeps valid legacy draft data readable', () => {
     const draft = { projectTitle: 'ECC paper', taskType: 'precheck', sourceText: 'A valid manuscript paragraph.', savedAt: '2026-07-31T00:00:00.000Z' };
@@ -40,6 +71,49 @@ describe('workspace store', () => {
     expect(state.draft?.taskType).toBe('precheck');
     expect(state.draft?.sourceText).toContain('reviewer requested');
     expect(state.warnings).toContain('旧版审稿回复草稿已转换为投稿前预检，原文仍保留。');
+  });
+
+  it('hides legacy demo results without deleting raw browser data', () => {
+    const legacyDemo = snapshot({
+      result: {
+        ...snapshot().result as Record<string, unknown>,
+        mode: 'demo',
+        executionMode: 'safe-demo',
+        workflowVersion: '0.9.0-demo',
+      },
+    });
+    const rawHistory = JSON.stringify([legacyDemo]);
+    const storage = memoryStorage({ [STORAGE_KEYS.history]: rawHistory });
+    const state = readWorkspaceState(storage);
+
+    expect(state.history).toEqual([]);
+    expect(state.warnings).toContain('旧版演示分析记录已隐藏，不会修改原始浏览器数据。');
+    expect(storage.getItem(STORAGE_KEYS.history)).toBe(rawHistory);
+  });
+
+  it('removes retired execution metadata from retained snapshots', () => {
+    const legacyLive = snapshot({
+      result: {
+        ...snapshot().result as Record<string, unknown>,
+        mode: 'live',
+        executionMode: 'parallel-multi-agent',
+        workflowVersion: '0.9.0',
+        agentRuns: [{ status: 'completed' }],
+        scoreBefore: 70,
+        scoreAfter: 88,
+      },
+    });
+    const state = readWorkspaceState(memoryStorage({
+      [STORAGE_KEYS.history]: JSON.stringify([legacyLive]),
+    }));
+    const result = state.history[0]?.result as unknown as Record<string, unknown>;
+
+    expect(state.history).toHaveLength(1);
+    expect(result.mode).toBeUndefined();
+    expect(result.executionMode).toBeUndefined();
+    expect(result.workflowVersion).toBeUndefined();
+    expect(result.agentRuns).toBeUndefined();
+    expect(result.scoreBefore).toBeUndefined();
   });
 
   it('rejects unsupported backup envelopes', () => {
