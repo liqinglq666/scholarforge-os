@@ -9,7 +9,7 @@ export function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'ScholarForge OS',
-    version: '1.3.4',
+    version: '1.3.5',
     ui: 'focused-research-writing-workspace',
     provider: 'Alibaba Cloud Model Studio',
     model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
@@ -53,6 +53,11 @@ export function GET() {
     accountModes: ['supabase', 'guest'],
     guestAccess: true,
     localDemoAccounts: false,
+    productionDependencyAudit: 'blocking-high-severity',
+    dependencyOverrides: {
+      postcss: '^8.5.22',
+      sharp: '^0.35.3',
+    },
     codeAudit: {
       unusedLocals: true,
       unusedParameters: true,
