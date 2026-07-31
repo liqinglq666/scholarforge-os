@@ -1,0 +1,47 @@
+name: Cleanup stale branches
+
+on:
+  push:
+    branches: [agent/scholarforge-v1-5-redesign]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged and obsolete branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branches=(
+            "agent/refresh-feishu-readme"
+            "chore/actions-v6"
+            "chore/v0.5.1-protected-workspace-docs"
+            "chore/v0.8-remove-legacy-workspace"
+            "chore/v1.3-code-audit"
+            "chore/v1.3.2-remove-demo-auth"
+            "chore/v1.3.5-dependency-audit"
+            "chore/v1.3.5-version-sync"
+            "chore/validate-initial-build"
+            "feat/v0.2-multi-agent-docs"
+            "feat/v0.3-ui-ux-overhaul"
+            "feat/v0.4-review-workflow-ux"
+            "feat/v0.5-auth-workspace"
+            "feat/v0.6-professional-ui"
+            "feat/v0.7-project-decisions"
+            "feat/v0.8-paperlens-workflows"
+            "feat/v0.9-project-hub"
+            "feat/v1.0-cloud-workspace"
+            "feat/v1.1-document-ingestion"
+            "feat/v1.2-author-editing"
+            "feat/v1.3-original-docx-patching"
+            "feat/v1.4-ui-ux-overhaul"
+            "refactor/v1.3.3-unified-history"
+            "refactor/v1.3.4-final-cleanup"
+          )
+          for branch in "${branches[@]}"; do
+            echo "Deleting ${branch}"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" || true
+          done
