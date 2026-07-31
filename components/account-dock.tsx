@@ -56,15 +56,11 @@ export function AccountDock() {
     content = (
       <Link className={`account-login-entry${inlineClass}`} href="/login">
         <span className="account-entry-icon">人</span>
-        <span><b>登录 / 注册</b><small>保存你的论文工作区</small></span>
+        <span><b>登录 / 访客</b><small>进入论文工作区</small></span>
       </Link>
     );
   } else {
-    const modeLabel = user.mode === 'supabase'
-      ? '云端账户'
-      : user.mode === 'guest'
-        ? '访客模式'
-        : '本地演示账户';
+    const modeLabel = user.mode === 'supabase' ? '云端账户' : '访客模式';
 
     content = (
       <div className={`account-dock${inlineClass}`} ref={rootRef}>
@@ -93,13 +89,13 @@ export function AccountDock() {
                 <small>{user.mode === 'supabase'
                   ? '账户会话由 Supabase Auth 管理。'
                   : supabaseConfigured
-                    ? '当前未使用云端账户，草稿仍只保存在本机。'
-                    : '配置 Supabase 后可启用真实云端注册与登录。'}</small>
+                    ? '草稿仍只保存在本机；登录云端账户后可主动同步项目。'
+                    : '当前部署未配置云端账户，访客数据只保存在此浏览器。'}</small>
               </div>
             </div>
-            {user.mode !== 'supabase' && supabaseConfigured ? (
+            {user.mode === 'guest' && supabaseConfigured ? (
               <Link className="account-menu-link" href="/login" onClick={() => setOpen(false)} role="menuitem">
-                升级为云端账户 <span>→</span>
+                登录云端账户 <span>→</span>
               </Link>
             ) : null}
             <button
