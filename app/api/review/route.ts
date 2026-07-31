@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { reviewWithBailian } from '@/lib/bailian';
-import { createDemoReview } from '@/lib/demo-review';
 import type {
   ReviewRequest,
   ReviewSection,
@@ -31,7 +30,12 @@ function sanitizeLocks(value: unknown): TerminologyLock[] {
     const preferred = typeof record.preferred === 'string' ? record.preferred.trim().slice(0, 160) : '';
     const note = typeof record.note === 'string' ? record.note.trim().slice(0, 240) : '';
     if (!source || !preferred) return [];
-    return [{ id: typeof record.id === 'string' ? record.id.slice(0, 80) : `lock-${index + 1}`, source, preferred, note }];
+    return [{
+      id: typeof record.id === 'string' ? record.id.slice(0, 80) : `lock-${index + 1}`,
+      source,
+      preferred,
+      note,
+    }];
   });
 }
 
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json() as Partial<ReviewRequest>;
   } catch {
-    return noStoreJson({ error: 'The request body must be valid JSON.', requestId }, 400);
+    return noStoreJson({ error: '请求内容必须是有效的 JSON。', requestId }, 400);
   }
 
   try {
@@ -65,28 +69,33 @@ export async function POST(request: Request) {
       : 'general';
 
     if (text.length < 40) {
-      return noStoreJson({ error: 'Please provide at least 40 characters for this task.', requestId }, 400);
+      return noStoreJson({ error: '请至少提供 40 个字符后再开始分析。', requestId }, 400);
     }
 
     if (text.length > 12_000) {
-      return noStoreJson({ error: 'The current workspace supports up to 12,000 characters.', requestId }, 400);
+      return noStoreJson({ error: '当前工作台单次最多处理 12,000 个字符。', requestId }, 400);
     }
 
-    const options: Partial<ReviewRequest> = {
+    if (!process.env.DASHSCOPE_API_KEY?.trim()) {
+      return noStoreJson({
+        error: '分析服务尚未配置。请在部署环境中设置 DASHSCOPE_API_KEY 后重试。',
+        code: 'SERVICE_NOT_CONFIGURED',
+        requestId,
+      }, 503);
+    }
+
+    const result = await reviewWithBailian(text, {
       projectTitle,
       taskType,
       targetJournal,
       sectionType,
       lockedTerms,
-    };
-    const result = process.env.DASHSCOPE_API_KEY
-      ? await reviewWithBailian(text, options)
-      : createDemoReview(text, options);
+    });
 
     return NextResponse.json({ ...result, requestId }, {
       headers: {
         'Cache-Control': 'no-store',
-        'X-ScholarForge-Workflow': result.workflowVersion,
+        'X-ScholarForge-Request-Id': requestId,
         'X-ScholarForge-Task': taskType,
         'X-ScholarForge-Section': sectionType,
       },
@@ -95,13 +104,10 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : 'Unknown review error.';
     console.error(`[ScholarForge:${requestId}] review failed:`, message);
 
-    return noStoreJson(
-      {
-        error: 'The live review workflow failed. Check the service configuration and deployment logs.',
-        detail: process.env.NODE_ENV === 'development' ? message : undefined,
-        requestId,
-      },
-      502,
-    );
+    return noStoreJson({
+      error: '分析服务调用失败，请稍后重试或检查部署配置。',
+      detail: process.env.NODE_ENV === 'development' ? message : undefined,
+      requestId,
+    }, 502);
   }
 }
