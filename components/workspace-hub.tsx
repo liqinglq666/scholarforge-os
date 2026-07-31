@@ -24,15 +24,11 @@ function defaultDraft(task: WorkspaceTask): WorkspaceDraft {
     projectTitle: '未命名科研写作任务',
     taskType: task,
     sourceText: '',
-    supportingContext: '',
-    responseLocation: '',
     targetJournal: '',
     sectionType: task === 'translate' ? 'abstract' : 'methods',
-    reviewMode: task === 'precheck' ? 'deep' : 'balanced',
     lockedTerms: [],
     savedAt: new Date().toISOString(),
   };
-  if (task === 'review-response') return { ...base, projectTitle: 'Reviewer response task', sourceText: '', supportingContext: '', responseLocation: '' };
   return base;
 }
 
@@ -115,11 +111,8 @@ export function WorkspaceHub() {
       projectTitle: snapshot.projectTitle,
       taskType: snapshot.taskType,
       sourceText: snapshot.sourceText,
-      supportingContext: snapshot.supportingContext,
-      responseLocation: snapshot.responseLocation,
       targetJournal: snapshot.targetJournal,
       sectionType: snapshot.sectionType,
-      reviewMode: snapshot.reviewMode,
       lockedTerms: snapshot.lockedTerms,
       savedAt: new Date().toISOString(),
     };

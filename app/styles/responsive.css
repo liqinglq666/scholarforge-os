@@ -97,7 +97,7 @@
   .sf-document-tabs { width: 100%; }
   .sf-document-tabs button { flex: 1; padding: 0 5px; }
   .sf-reading-area { padding: 28px 20px 52px; }
-  .sf-document-text, .sf-diff-text { font-size: 15px; line-height: 1.82; }
+  .sf-document-text { font-size: 15px; line-height: 1.82; }
   .sf-review-inspector { overflow: auto; }
 }
 

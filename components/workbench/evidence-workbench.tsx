@@ -6,20 +6,18 @@ import {
   AGENT_LABELS,
   APP_VERSION,
   DECISION_LABELS,
-  MODE_LABELS,
   SECTION_LABELS,
   WORKFLOW_DESCRIPTIONS,
   WORKFLOW_LABELS,
   WORKSPACE_TEXT_LIMIT,
 } from '@/lib/app-config';
 import { analyseIssueAnchor, composeWorkingText, createAppliedEdit, type AppliedEdit } from '@/lib/author-editing';
-import { canBatchApplyIssue, createEvidenceItems, evidenceRisk } from '@/lib/evidence-model';
+import { createEvidenceItems, evidenceRisk } from '@/lib/evidence-model';
 import { exportAuthorDocx } from '@/lib/docx-export';
 import type { ReviewSnapshot, WorkspaceDraft } from '@/lib/workspace-schema';
 import type {
   IssueDecision,
   ReviewIssue,
-  ReviewMode,
   ReviewResult,
   ReviewSection,
   TerminologyLock,
@@ -35,54 +33,18 @@ interface EvidenceWorkbenchProps {
   onSnapshotChanged(snapshot: ReviewSnapshot): void;
 }
 
-type CanvasView = 'original' | 'suggested' | 'working' | 'diff';
+type CanvasView = 'original' | 'suggested' | 'working';
 type MobilePanel = 'structure' | 'manuscript' | 'evidence';
 type ReviewPayload = ReviewResult & { error?: string; detail?: string; requestId?: string };
-type DiffSegment = { kind: 'same' | 'added' | 'removed'; text: string };
 
 const SECTION_OPTIONS = Object.entries(SECTION_LABELS) as Array<[ReviewSection, string]>;
-const MODE_OPTIONS = Object.entries(MODE_LABELS) as Array<[ReviewMode, string]>;
 const WORKFLOW_OPTIONS = Object.entries(WORKFLOW_LABELS) as Array<[WorkspaceTask, string]>;
 
-function taskMinimum(task: WorkspaceTask) {
-  return task === 'review-response' ? 20 : 40;
-}
 
 function safeFileStem(value: string) {
   return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').slice(0, 80) || 'scholarforge-output';
 }
 
-function tokenize(value: string) {
-  return value.match(/\S+|\s+/g) || [];
-}
-
-function buildDiff(original: string, revised: string): DiffSegment[] {
-  const a = tokenize(original);
-  const b = tokenize(revised);
-  if (a.length > 700 || b.length > 700) return [{ kind: 'removed', text: original }, { kind: 'added', text: revised }];
-  const dp = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
-  for (let i = a.length - 1; i >= 0; i -= 1) {
-    for (let j = b.length - 1; j >= 0; j -= 1) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-  const segments: DiffSegment[] = [];
-  const push = (kind: DiffSegment['kind'], text: string) => {
-    const last = segments[segments.length - 1];
-    if (last?.kind === kind) last.text += text;
-    else segments.push({ kind, text });
-  };
-  let i = 0;
-  let j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) { push('same', a[i]); i += 1; j += 1; }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) { push('removed', a[i]); i += 1; }
-    else { push('added', b[j]); j += 1; }
-  }
-  while (i < a.length) push('removed', a[i++]);
-  while (j < b.length) push('added', b[j++]);
-  return segments;
-}
 
 function formatDuration(value: number) {
   return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`;
@@ -100,7 +62,7 @@ function downloadText(filename: string, content: string, type: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function buildReport(result: ReviewResult, source: string, decisions: Record<string, IssueDecision>, requestId: string) {
+function buildReport(result: ReviewResult, source: string, decisions: Record<string, IssueDecision>) {
   const issues = result.issues.map((issue, index) => [
     `### ${index + 1}. ${issue.category}`,
     `- Agent: ${AGENT_LABELS[issue.agent]}`,
@@ -112,8 +74,8 @@ function buildReport(result: ReviewResult, source: string, decisions: Record<str
     `- Reason: ${issue.reason}`,
   ].join('\n')).join('\n\n');
   return `# ScholarForge OS Evidence Report\n\n`
-    + `- Version: ${APP_VERSION}\n- Project: ${result.profile.projectTitle}\n- Workflow: ${WORKFLOW_LABELS[result.profile.taskType]}\n- Section: ${SECTION_LABELS[result.profile.sectionType]}\n- Mode: ${MODE_LABELS[result.profile.reviewMode]}\n- Request ID: ${requestId || 'Not available'}\n- Score: ${result.scoreBefore} → ${result.scoreAfter}\n\n`
-    + `## Summary\n\n${result.summary}\n\n## Decision rationale\n\n${result.decisionReason}\n\n## Evidence and author decisions\n\n${issues}\n\n## Source\n\n${source}\n\n## Suggested output\n\n${result.revisedText}\n`;
+    + `- Version: ${APP_VERSION}\n- Project: ${result.profile.projectTitle}\n- Workflow: ${WORKFLOW_LABELS[result.profile.taskType]}\n- Section: ${SECTION_LABELS[result.profile.sectionType]}\n\n`
+    + `## Summary\n\n${result.summary}\n\n## Evidence and author decisions\n\n${issues}\n\n## Source\n\n${source}\n\n## Suggested output\n\n${result.revisedText}\n`;
 }
 
 function riskLabel(issue: ReviewIssue) {
@@ -125,11 +87,8 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   const [projectTitle, setProjectTitle] = useState(initialSnapshot?.projectTitle || initialDraft.projectTitle || '未命名科研写作任务');
   const [taskType, setTaskType] = useState<WorkspaceTask>(initialSnapshot?.taskType || initialDraft.taskType || 'precheck');
   const [sourceText, setSourceText] = useState(initialSnapshot?.sourceText || initialDraft.sourceText || '');
-  const [supportingContext, setSupportingContext] = useState(initialSnapshot?.supportingContext || initialDraft.supportingContext || '');
-  const [responseLocation, setResponseLocation] = useState(initialSnapshot?.responseLocation || initialDraft.responseLocation || '');
   const [targetJournal, setTargetJournal] = useState(initialSnapshot?.targetJournal || initialDraft.targetJournal || '');
   const [sectionType, setSectionType] = useState<ReviewSection>(initialSnapshot?.sectionType || initialDraft.sectionType || 'general');
-  const [reviewMode, setReviewMode] = useState<ReviewMode>(initialSnapshot?.reviewMode || initialDraft.reviewMode || 'balanced');
   const [lockedTerms, setLockedTerms] = useState<TerminologyLock[]>(initialSnapshot?.lockedTerms || initialDraft.lockedTerms || []);
   const [lockSource, setLockSource] = useState('');
   const [lockPreferred, setLockPreferred] = useState('');
@@ -151,10 +110,9 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   const [issueQuery, setIssueQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'all' | ReviewIssue['severity']>('all');
 
-  const minimum = taskMinimum(taskType);
+  const minimum = 40;
   const inputValid = sourceText.trim().length >= minimum && sourceText.length <= WORKSPACE_TEXT_LIMIT;
   const workingText = useMemo(() => composeWorkingText(sourceText, appliedEdits), [appliedEdits, sourceText]);
-  const diff = useMemo(() => result ? buildDiff(sourceText, result.revisedText) : [], [result, sourceText]);
   const evidenceItems = useMemo(() => result ? createEvidenceItems(result, decisions, appliedEdits) : [], [appliedEdits, decisions, result]);
   const filteredItems = useMemo(() => {
     const query = issueQuery.trim().toLowerCase();
@@ -172,11 +130,8 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
         projectTitle,
         taskType,
         sourceText,
-        supportingContext,
-        responseLocation,
         targetJournal,
         sectionType,
-        reviewMode,
         lockedTerms,
         savedAt,
       };
@@ -184,7 +139,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
       setSaveTime(savedAt);
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [initialDraft.importedDocument, lockedTerms, onDraftSaved, projectTitle, responseLocation, reviewMode, sectionType, sourceText, supportingContext, targetJournal, taskType]);
+  }, [initialDraft.importedDocument, lockedTerms, onDraftSaved, projectTitle, sectionType, sourceText, targetJournal, taskType]);
 
   useEffect(() => {
     if (!loading) return;
@@ -200,11 +155,8 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
       projectTitle: projectTitle.trim() || '未命名科研写作任务',
       taskType,
       sourceText,
-      supportingContext,
-      responseLocation,
       targetJournal,
       sectionType,
-      reviewMode,
       lockedTerms,
       requestId,
       result: nextResult,
@@ -229,11 +181,11 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
       const response = await fetch('/api/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectTitle, taskType, text: sourceText, supportingContext, responseLocation, targetJournal, sectionType, reviewMode, lockedTerms }),
+        body: JSON.stringify({ projectTitle, taskType, text: sourceText, targetJournal, sectionType, lockedTerms }),
       });
       const payload = await response.json() as ReviewPayload;
       if (!response.ok) throw new Error(payload.detail || payload.error || '工作流请求失败。');
-      if (!Array.isArray(payload.issues) || !Array.isArray(payload.agentRuns)) throw new Error('工作流返回的数据结构不完整。');
+      if (!Array.isArray(payload.issues) || typeof payload.revisedText !== 'string') throw new Error('工作流返回的数据结构不完整。');
       const nextId = crypto.randomUUID();
       const nextDecisions = Object.fromEntries(payload.issues.map((issue) => [issue.id, 'pending'])) as Record<string, IssueDecision>;
       const nextRequestId = payload.requestId || '';
@@ -242,11 +194,8 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
         projectTitle: projectTitle.trim() || '未命名科研写作任务',
         taskType,
         sourceText,
-        supportingContext,
-        responseLocation,
         targetJournal,
         sectionType,
-        reviewMode,
         lockedTerms,
         requestId: nextRequestId,
         result: payload,
@@ -301,25 +250,6 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
     setNotice('建议已应用到工作稿，可随时撤销。');
   }
 
-  function applyAllEligible() {
-    if (!result) return;
-    let next = [...appliedEdits];
-    let appliedCount = 0;
-    for (const item of evidenceItems) {
-      if (item.decision !== 'accepted' || !canBatchApplyIssue(sourceText, item.issue, next)) continue;
-      const analysis = analyseIssueAnchor(sourceText, item.issue, next);
-      const edit = createAppliedEdit(item.issue, analysis);
-      if (edit) { next.push(edit); appliedCount += 1; }
-    }
-    if (!appliedCount) {
-      setNotice('没有可批量应用的已接受低风险语言建议。');
-      return;
-    }
-    commitEdits(next);
-    setCanvasView('working');
-    setNotice(`已应用 ${appliedCount} 条低风险语言建议；高风险内容仍需逐条确认。`);
-  }
-
   function undo() {
     const previous = undoStack[undoStack.length - 1];
     if (!previous) return;
@@ -351,22 +281,18 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
     setSelectedIssueId(evidenceItems[index].issue.id);
   }
 
-  function exportArtifact(kind: 'text' | 'report' | 'json' | 'clean-docx' | 'tracked-docx') {
+  function exportArtifact(kind: 'text' | 'report' | 'docx') {
     if (!result) return;
     const stem = safeFileStem(projectTitle);
     if (kind === 'text') downloadText(`${stem}-suggested-output.txt`, result.revisedText, 'text/plain;charset=utf-8');
-    if (kind === 'report') downloadText(`${stem}-evidence-report.md`, buildReport(result, sourceText, decisions, requestId), 'text/markdown;charset=utf-8');
-    if (kind === 'json') downloadText(`${stem}-review-result.json`, JSON.stringify({ sourceText, decisions, appliedEdits, requestId, ...result }, null, 2), 'application/json;charset=utf-8');
-    if (kind === 'clean-docx' || kind === 'tracked-docx') {
+    if (kind === 'report') downloadText(`${stem}-evidence-report.md`, buildReport(result, sourceText, decisions), 'text/markdown;charset=utf-8');
+    if (kind === 'docx') {
       void exportAuthorDocx({
-        mode: kind === 'clean-docx' ? 'clean' : 'tracked',
         projectTitle,
         targetJournal,
         sectionLabel: SECTION_LABELS[sectionType],
         sourceText,
         edits: appliedEdits,
-        issues: result.issues,
-        decisions,
       }).catch(() => setError('DOCX 导出失败，当前项目状态已保留。'));
     }
   }
@@ -374,7 +300,6 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   const canvasText = canvasView === 'original' ? sourceText : canvasView === 'suggested' ? result?.revisedText || sourceText : workingText;
   const selectedAnalysis = selectedItem ? analyseIssueAnchor(sourceText, selectedItem.issue, appliedEdits) : null;
   const decidedCount = evidenceItems.length - pendingCount;
-  const safeBatchCount = evidenceItems.filter((item) => item.decision === 'accepted' && canBatchApplyIssue(sourceText, item.issue, appliedEdits)).length;
   const selectedAnchorReady = selectedAnalysis?.state === 'applied' || selectedAnalysis?.state.startsWith('safe');
 
   return (
@@ -411,12 +336,10 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
             <details className="sf-export-menu">
               <summary className="sf-button is-primary"><Icon name="download" />导出</summary>
               <div>
-                <button onClick={() => exportArtifact('clean-docx')} type="button"><span>作者工作稿</span><small>DOCX</small></button>
-                <button disabled={!appliedEdits.length} onClick={() => exportArtifact('tracked-docx')} type="button"><span>修订痕迹稿</span><small>DOCX</small></button>
+                <button onClick={() => exportArtifact('docx')} type="button"><span>作者工作稿</span><small>DOCX</small></button>
                 <hr />
                 <button onClick={() => exportArtifact('text')} type="button"><span>建议文本</span><small>TXT</small></button>
                 <button onClick={() => exportArtifact('report')} type="button"><span>证据报告</span><small>MD</small></button>
-                <button onClick={() => exportArtifact('json')} type="button"><span>结构化结果</span><small>JSON</small></button>
               </div>
             </details>
           ) : null}
@@ -445,7 +368,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
               aria-label="科研文本"
               maxLength={WORKSPACE_TEXT_LIMIT}
               onChange={(event) => setSourceText(event.target.value)}
-              placeholder={taskType === 'translate' ? '粘贴需要翻译的中文科研内容……' : taskType === 'review-response' ? '粘贴审稿人的完整意见……' : '粘贴英文论文段落，或使用右上角菜单导入文档……'}
+              placeholder={taskType === 'translate' ? '粘贴需要翻译的中文科研内容……' : '粘贴英文论文段落，或使用右上角菜单导入 DOCX……'}
               value={sourceText}
             />
 
@@ -471,20 +394,11 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
               ))}
             </div>
 
-            {taskType === 'review-response' ? (
-              <div className="sf-response-fields">
-                <label><span>作者依据或拟修改内容</span><textarea onChange={(event) => setSupportingContext(event.target.value)} placeholder="只填写已有实验、数据或实际修改计划" rows={4} value={supportingContext} /></label>
-                <label><span>正文修改位置</span><input onChange={(event) => setResponseLocation(event.target.value)} placeholder="例如：Methods, Section 2.3" value={responseLocation} /></label>
-              </div>
-            ) : null}
 
             <details className="sf-advanced-settings">
-              <summary>章节、强度与术语设置 <Icon name="chevron-down" size={16} /></summary>
+              <summary>章节与术语设置 <Icon name="chevron-down" size={16} /></summary>
               <div>
-                <div className="sf-form-grid is-two">
-                  <label><span>论文章节</span><select onChange={(event) => setSectionType(event.target.value as ReviewSection)} value={sectionType}>{SECTION_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                  <label><span>处理强度</span><select onChange={(event) => setReviewMode(event.target.value as ReviewMode)} value={reviewMode}>{MODE_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                </div>
+                <label><span>论文章节</span><select onChange={(event) => setSectionType(event.target.value as ReviewSection)} value={sectionType}>{SECTION_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
                 <label><span>目标期刊（可选）</span><input maxLength={160} onChange={(event) => setTargetJournal(event.target.value)} placeholder="例如 Construction and Building Materials" value={targetJournal} /></label>
 
                 <div className="sf-term-settings">
@@ -535,25 +449,22 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
                 ))}
               </div>
 
-              <footer className="sf-queue-footer">
-                <button disabled={!safeBatchCount} onClick={applyAllEligible} type="button"><Icon name="check" size={15} />应用 {safeBatchCount || 0} 条已接受的低风险建议</button>
-                <p>术语、数值、逻辑与方法问题始终需要逐条处理。</p>
-              </footer>
+              <p className="sf-queue-note">所有建议均需逐条确认后才能应用。</p>
             </aside>
 
             <section className={`sf-review-document ${mobilePanel === 'manuscript' ? 'is-mobile-active' : ''}`}>
               <header className="sf-document-toolbar">
                 <div>
                   <span className="sf-section-label">文稿</span>
-                  <p>{WORKFLOW_LABELS[taskType]} · {SECTION_LABELS[sectionType]} · 准备度 {result.scoreAfter}/100</p>
+                  <p>{WORKFLOW_LABELS[taskType]} · {SECTION_LABELS[sectionType]} · {evidenceItems.length} 条建议</p>
                 </div>
                 <div className="sf-document-tabs" role="tablist" aria-label="文稿视图">
-                  {(['working', 'original', 'suggested', 'diff'] as CanvasView[]).map((view) => <button aria-selected={canvasView === view} key={view} onClick={() => setCanvasView(view)} role="tab" type="button">{{ working: '工作稿', original: '原文', suggested: '建议稿', diff: '对比' }[view]}</button>)}
+                  {(['working', 'original', 'suggested'] as CanvasView[]).map((view) => <button aria-selected={canvasView === view} key={view} onClick={() => setCanvasView(view)} role="tab" type="button">{{ working: '工作稿', original: '原文', suggested: '建议稿' }[view]}</button>)}
                 </div>
               </header>
 
               <div className="sf-reading-area">
-                {canvasView === 'diff' ? <div className="sf-diff-text">{diff.map((segment, index) => <span className={`is-${segment.kind}`} key={`${segment.kind}-${index}`}>{segment.text}</span>)}</div> : <article className="sf-document-text">{canvasText || '暂无文本'}</article>}
+                <article className="sf-document-text">{canvasText || '暂无文本'}</article>
               </div>
 
               <footer className="sf-document-footer"><Icon name="shield" size={15} /><span>{canvasView === 'working' ? `工作稿已应用 ${appliedEdits.length} 条修改，可撤销或导出。` : '切换到工作稿查看作者已确认并安全应用的内容。'}</span></footer>
@@ -589,10 +500,6 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
                   <div><b>{selectedAnalysis?.state === 'applied' ? '已经应用' : selectedAnchorReady ? '可以安全定位' : '需要人工处理'}</b><p>{selectedAnalysis?.message}</p></div>
                 </section>
 
-                <details className="sf-inspector-details">
-                  <summary>查看分析来源</summary>
-                  <div>{result.agentRuns.map((run) => <p key={run.agent}><b>{AGENT_LABELS[run.agent]}</b><span>{run.status} · {formatDuration(run.durationMs)} · {run.issueCount} 条</span></p>)}</div>
-                </details>
 
                 <footer className="sf-inspector-actions">
                   <span>作者决定</span>

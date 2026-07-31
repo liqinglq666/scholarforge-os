@@ -95,12 +95,12 @@ export function ProjectHub(props: ProjectHubProps) {
           <div className="sf-start-actions">
             <button className="sf-start-primary" onClick={props.onImport} type="button">
               <span><Icon name="import" size={22} /></span>
-              <div><b>打开论文文件</b><small>DOCX 或文字型 PDF</small></div>
+              <div><b>打开论文文件</b><small>支持 DOCX</small></div>
               <Icon name="arrow-right" />
             </button>
             <button className="sf-start-secondary" onClick={() => props.onCreate('precheck')} type="button">
               <span><Icon name="edit" size={20} /></span>
-              <div><b>直接粘贴文本</b><small>适合处理单个段落或审稿意见</small></div>
+              <div><b>直接粘贴文本</b><small>适合处理单个论文段落</small></div>
               <Icon name="arrow-right" />
             </button>
           </div>

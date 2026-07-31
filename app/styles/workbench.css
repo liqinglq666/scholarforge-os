@@ -350,16 +350,6 @@
   color: var(--sf-faint);
 }
 
-.sf-response-fields {
-  margin-top: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.sf-response-fields textarea {
-  min-height: 110px;
-}
-
 .sf-advanced-settings {
   margin-top: 15px;
   border-top: 1px solid var(--sf-line);
@@ -712,26 +702,14 @@
   font-style: normal;
 }
 
-.sf-queue-footer {
-  padding: 11px;
+.sf-queue-note {
+  margin: 0;
+  padding: 11px 12px;
   border-top: 1px solid var(--sf-line);
+  color: var(--sf-muted);
   background: var(--sf-bg-soft);
-}
-
-.sf-queue-footer button {
-  width: 100%;
-  min-height: 36px;
-  padding: 0 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--sf-line);
-  border-radius: 8px;
-  color: var(--sf-ink-soft);
-  background: var(--sf-surface);
   font-size: 9px;
-  font-weight: 700;
+  line-height: 1.55;
 }
 
 .sf-queue-footer p {
@@ -795,8 +773,7 @@
   padding: 36px clamp(26px, 5vw, 72px) 64px;
 }
 
-.sf-document-text,
-.sf-diff-text {
+.sf-document-text {
   width: min(760px, 100%);
   min-height: 100%;
   margin: 0 auto;
@@ -806,20 +783,6 @@
   line-height: 1.92;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.sf-diff-text .is-added {
-  padding: 1px 2px;
-  color: #155b43;
-  background: #daf3e6;
-  text-decoration: none;
-}
-
-.sf-diff-text .is-removed {
-  padding: 1px 2px;
-  color: #8f3a42;
-  background: #ffe1e4;
-  text-decoration: line-through;
 }
 
 .sf-document-footer {
@@ -969,43 +932,6 @@
   color: var(--sf-ink-soft);
   font-size: 9px;
   line-height: 1.5;
-}
-
-.sf-inspector-details {
-  margin-top: 14px;
-  border-top: 1px solid var(--sf-line);
-  border-bottom: 1px solid var(--sf-line);
-}
-
-.sf-inspector-details summary {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  color: var(--sf-muted);
-  font-size: 10px;
-  font-weight: 700;
-  list-style: none;
-}
-
-.sf-inspector-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.sf-inspector-details > div {
-  padding: 0 0 10px;
-}
-
-.sf-inspector-details p {
-  margin: 6px 0 0;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 9px;
-}
-
-.sf-inspector-details p span {
-  color: var(--sf-muted);
-  text-align: right;
 }
 
 .sf-inspector-actions {

@@ -3,7 +3,7 @@ export type AgentId = 'terminology' | 'language' | 'logic' | 'method';
 export type IssueSeverity = 'major' | 'minor' | 'suggestion';
 export type AgentRunStatus = 'completed' | 'failed' | 'demo';
 
-export type WorkspaceTask = 'translate' | 'polish' | 'precheck' | 'review-response';
+export type WorkspaceTask = 'translate' | 'polish' | 'precheck';
 
 export type ReviewSection =
   | 'general'
@@ -14,9 +14,8 @@ export type ReviewSection =
   | 'discussion'
   | 'conclusion';
 
-export type ReviewMode = 'conservative' | 'balanced' | 'deep';
 export type IssueDecision = 'pending' | 'accepted' | 'deferred' | 'dismissed';
-export type ReviewOutputKind = 'translation' | 'revision' | 'precheck' | 'reviewer-response';
+export type ReviewOutputKind = 'translation' | 'revision' | 'precheck';
 
 export interface TerminologyLock {
   id: string;
@@ -29,10 +28,7 @@ export interface ReviewProfile {
   projectTitle: string;
   taskType: WorkspaceTask;
   sectionType: ReviewSection;
-  reviewMode: ReviewMode;
   targetJournal: string;
-  responseLocation: string;
-  supportingContextProvided: boolean;
   lockedTerms: TerminologyLock[];
 }
 
@@ -48,12 +44,6 @@ export interface ReviewIssue {
   meaningChanged: boolean;
 }
 
-export interface TerminologyItem {
-  preferred: string;
-  avoid: string[];
-  note: string;
-}
-
 export interface AgentRun {
   agent: AgentId;
   status: AgentRunStatus;
@@ -64,12 +54,6 @@ export interface AgentRun {
   error?: string;
 }
 
-export interface ReviewGuardrail {
-  id: string;
-  label: string;
-  passed: boolean;
-}
-
 export interface ReviewResult {
   mode: 'live' | 'demo';
   executionMode: 'parallel-multi-agent' | 'safe-demo';
@@ -78,14 +62,7 @@ export interface ReviewResult {
   profile: ReviewProfile;
   summary: string;
   revisedText: string;
-  scoreBefore: number;
-  scoreAfter: number;
-  decision: 'major_revision' | 'minor_revision' | 'ready';
-  decisionReason: string;
   issues: ReviewIssue[];
-  terminology: TerminologyItem[];
-  agentRuns: AgentRun[];
-  guardrails: ReviewGuardrail[];
   generatedAt: string;
 }
 
@@ -95,8 +72,5 @@ export interface ReviewRequest {
   taskType?: WorkspaceTask;
   targetJournal?: string;
   sectionType?: ReviewSection;
-  reviewMode?: ReviewMode;
-  supportingContext?: string;
-  responseLocation?: string;
   lockedTerms?: TerminologyLock[];
 }

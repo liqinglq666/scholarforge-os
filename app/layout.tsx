@@ -10,9 +10,9 @@ export const metadata: Metadata = {
     default: 'ScholarForge OS｜研语工坊',
     template: '%s · ScholarForge OS',
   },
-  description: '面向科研论文翻译、保守润色、投稿预检与审稿回复的证据驱动写作工作台。',
+  description: '面向科研论文翻译、保守润色与投稿前检查的作者可控写作工作台。',
   applicationName: 'ScholarForge OS',
-  keywords: ['科研英语', '学术翻译', '英文润色', '投稿预检', '审稿回复', '作者决策', '多智能体', '阿里云百炼'],
+  keywords: ['科研英语', '学术翻译', '英文润色', '投稿预检', '作者决策', '多智能体', '阿里云百炼'],
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',

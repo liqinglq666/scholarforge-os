@@ -41,7 +41,7 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
         sectionType: 'general',
         text: document.fullText,
         charCount: document.fullText.length,
-        sourceLabel: document.pageCount ? `${document.pageCount} 页` : '完整文档',
+        sourceLabel: '完整文档',
       });
     }
     return sections;
@@ -85,12 +85,12 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
     setDocument(null);
     try {
       const next = await ingestResearchDocument(file);
-      if (!next.fullText.trim()) throw new Error('没有提取到可用文字。扫描型 PDF 暂不支持 OCR。');
+      if (!next.fullText.trim()) throw new Error('没有提取到可用文字。请检查 DOCX 是否包含正文。');
       if (!next.sections.length) throw new Error('没有识别到可导入的正文段落。');
       setDocument(next);
       setSelectedId(next.sections[0].id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '文档解析失败，请改用可复制文本的 PDF 或 DOCX。');
+      setError(caught instanceof Error ? caught.message : 'DOCX 解析失败，请检查文件后重试。');
     } finally {
       setProcessing(false);
     }
@@ -116,11 +116,8 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
       projectTitle: document.title || document.fileName.replace(/\.[^.]+$/, ''),
       taskType: document.suggestedTask,
       sourceText: section.text,
-      supportingContext: '',
-      responseLocation: '',
       targetJournal: typeof existingDraft?.targetJournal === 'string' ? existingDraft.targetJournal : '',
       sectionType: section.sectionType,
-      reviewMode: document.suggestedMode,
       lockedTerms: Array.isArray(existingDraft?.lockedTerms) ? existingDraft.lockedTerms : [],
       savedAt,
       importedDocument: {
@@ -164,10 +161,10 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
               ) : (
                 <>
                   <span className="sf-dropzone-icon"><Icon name="document" size={26} /></span>
-                  <h3>拖入 DOCX 或文字型 PDF</h3>
-                  <p>最大 {readableSize(DOCUMENT_MAX_BYTES)}。扫描型 PDF 暂不支持，复杂表格和公式导入后请人工核对。</p>
+                  <h3>拖入 DOCX 论文</h3>
+                  <p>最大 {readableSize(DOCUMENT_MAX_BYTES)}。复杂表格、公式、图片和修订痕迹不会完整保留。</p>
                   <button className="sf-button is-primary" onClick={() => inputRef.current?.click()} type="button">选择文件</button>
-                  <input accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf" hidden onChange={onFileChange} ref={inputRef} type="file" />
+                  <input accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={onFileChange} ref={inputRef} type="file" />
                 </>
               )}
             </div>

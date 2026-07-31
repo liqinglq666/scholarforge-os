@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_VERSION, DECISION_LABELS, STORAGE_KEYS } from '@/lib/app-config';
+import { APP_VERSION, DECISION_LABELS, STORAGE_KEYS, WORKFLOW_LABELS } from '@/lib/app-config';
 
 describe('app configuration', () => {
   it('uses one release version and preserves browser storage keys', () => {
@@ -8,6 +8,10 @@ describe('app configuration', () => {
     expect(STORAGE_KEYS.history).toBe('scholarforge-os-paperlens-history-v1');
     expect(STORAGE_KEYS.hubView).toBe('scholarforge-os-hub-view-v1');
     expect(STORAGE_KEYS.authorEditingSession).toBe('scholarforge-os-author-editing-session-v1');
+  });
+
+  it('exposes only the three stable writing workflows', () => {
+    expect(Object.keys(WORKFLOW_LABELS)).toEqual(['translate', 'polish', 'precheck']);
   });
 
   it('uses author-facing decision labels without changing serialized values', () => {

@@ -2,75 +2,70 @@
 
 ## Product boundary
 
-ScholarForge OS is a local-first, evidence-oriented scientific writing workspace. The supported path is:
+ScholarForge OS is a local-first scientific writing workspace with one supported path:
 
 ```text
-project setup / document import
-→ review API
+DOCX import or pasted text
+→ translation, polishing, or pre-submission review
 → four specialist agents
 → deterministic aggregation
-→ evidence queue
-→ author decision
+→ issue queue
+→ individual author decision
 → safe manuscript edit
-→ local history and export
+→ local history and simple export
 ```
 
-The current release intentionally excludes account management, cloud synchronization, team collaboration, OCR, and original-OOXML package patching. Those capabilities added disproportionate state, security, and maintenance cost without improving the central evidence-review workflow.
+The release intentionally excludes accounts, cloud synchronization, collaboration, reviewer-response drafting, PDF parsing, OCR, batch auto-application, native Word tracked changes, developer result exports, and original-OOXML package patching. These capabilities add substantial state, format-fidelity, or misuse risk without strengthening the stable core workflow.
 
 ## Runtime modules
 
 ### Application shell
 
-- `components/workspace-hub.tsx`: hub/workbench routing and local persistence orchestration.
-- `components/project-hub/project-hub.tsx`: compact project center, workflows, recent tasks, backup, and data controls.
-- `components/workbench/evidence-workbench.tsx`: review controller plus three-column author workspace.
-- `components/document-import-dialog.tsx`: controlled DOCX/PDF parsing and section selection.
+- `components/workspace-hub.tsx`: home/workspace routing and local persistence orchestration.
+- `components/project-hub/project-hub.tsx`: start, resume, recent work, and compact data controls.
+- `components/workbench/evidence-workbench.tsx`: task preparation, issue review, individual decisions, and working manuscript.
+- `components/document-import-dialog.tsx`: controlled DOCX parsing and section selection.
 
 ### Shared contracts
 
-- `lib/app-config.ts`: application version, storage keys, limits, and user-facing labels.
+- `lib/app-config.ts`: version, storage keys, limits, and labels.
 - `lib/workspace-schema.ts`: draft, snapshot, backup, and runtime guards.
-- `lib/workspace-store.ts`: non-destructive local reads and versioned backup operations.
-- `lib/evidence-model.ts`: risk classification and restricted batch-apply policy.
+- `lib/workspace-store.ts`: non-destructive local reads, legacy filtering, and backup operations.
+- `lib/evidence-model.ts`: evidence risk classification.
 
 ### Review engine
 
-- `app/api/review/route.ts`: validates the request and chooses live or demo execution.
-- `lib/bailian.ts`: runs terminology, language, logic, and method agents independently and aggregates completed results.
+- `app/api/review/route.ts`: validates supported requests and selects live or demo execution.
+- `lib/bailian.ts`: independently runs terminology, language, logic, and method agents, then aggregates completed results.
 - `lib/demo-review.ts`: deterministic public-safe demonstration data.
 - `lib/types.ts`: review-domain contracts.
 
-### Author editing and delivery
+### Editing and delivery
 
-- `lib/author-editing.ts`: exact/whitespace anchoring, ambiguity and overlap protection, edit composition.
-- `lib/docx-export.ts`: clean and tracked author-working-document export.
-- `lib/document-ingestion.ts`: local DOCX/PDF extraction, section detection, and chunking.
+- `lib/author-editing.ts`: exact and whitespace-normalized anchoring, ambiguity checks, overlap protection, undo/redo composition.
+- `lib/docx-export.ts`: clean author-working-document export only.
+- `lib/document-ingestion.ts`: local DOCX extraction, section detection, and chunking.
 
-## Data model
+## Data model and compatibility
 
-The project uses the existing v1 storage keys to avoid destructive migration:
+Existing storage keys remain unchanged to avoid destructive migration. Reads never silently delete malformed or unsupported legacy values.
 
-- `scholarforge-os-paperlens-draft-v1`
-- `scholarforge-os-paperlens-history-v1`
-- `scholarforge-os-hub-view-v1`
-- `scholarforge-os-author-editing-session-v1`
-
-Reads never silently delete malformed values. The UI falls back to an empty in-memory state and reports a recoverable warning while preserving raw browser data.
+Old reviewer-response drafts are converted to pre-submission review while preserving their source text. Old reviewer-response history is hidden from the current interface but is not deleted from raw browser storage. Old PDF import metadata is ignored.
 
 Issue decisions remain serialized as `pending`, `accepted`, `deferred`, and `dismissed`.
 
 ## Safety policy
 
-A suggestion can enter the working manuscript only when:
+A suggestion enters the working manuscript only when:
 
-1. the author has accepted it;
+1. the author explicitly accepted it;
 2. both original and revised text are present and differ;
-3. the original has one unique exact or whitespace-normalized anchor;
+3. the source has one unique exact or whitespace-normalized anchor;
 4. the edit stays within one paragraph;
 5. it does not contain an author placeholder;
 6. it does not overlap an applied edit.
 
-Batch application is narrower: only accepted, low-risk language suggestions with safe anchors are eligible. Major, logic, method, terminology, numerical, citation, conclusion, and meaning-changing findings require individual review.
+There is no batch application. Every suggestion is reviewed individually. High-risk scientific findings remain author decisions rather than automated text operations.
 
 ## Styling
 
@@ -82,16 +77,10 @@ The UI uses five semantic style layers:
 - `workbench.css`
 - `responsive.css`
 
-Version-numbered override sheets and global floating docks were removed. The desktop workspace uses three columns; tablet and mobile switch to explicit single-panel navigation instead of squeezing the desktop layout.
+Desktop uses a focused issue/manuscript/suggestion layout. Tablet and mobile switch to explicit single-panel navigation instead of compressing desktop columns.
 
 ## Verification gates
 
-CI runs:
+CI runs dependency installation, production dependency audit, Vitest tests, strict TypeScript checking, and a Next.js production build.
 
-1. dependency installation;
-2. production dependency audit;
-3. Vitest unit tests;
-4. TypeScript checking with unused-code diagnostics;
-5. Next.js production build.
-
-Core tests cover version/storage contracts, non-destructive storage reads, evidence risk and batch policy, and safe anchor behavior.
+Core tests cover version/storage contracts, legacy scope filtering, evidence risk, and safe anchor behavior.

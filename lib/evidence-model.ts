@@ -1,5 +1,5 @@
 import { DECISION_LABELS } from '@/lib/app-config';
-import { analyseIssueAnchor, type AppliedEdit } from '@/lib/author-editing';
+import type { AppliedEdit } from '@/lib/author-editing';
 import type { IssueDecision, ReviewIssue, ReviewResult } from '@/lib/types';
 
 export type EvidenceRisk = 'high' | 'medium' | 'low';
@@ -27,12 +27,6 @@ export function evidenceRisk(issue: ReviewIssue): EvidenceRisk {
   if (requiresIndividualDecision(issue)) return 'high';
   if (issue.severity === 'minor') return 'medium';
   return 'low';
-}
-
-export function canBatchApplyIssue(source: string, issue: ReviewIssue, applied: AppliedEdit[]) {
-  if (requiresIndividualDecision(issue) || issue.agent !== 'language') return false;
-  const anchor = analyseIssueAnchor(source, issue, applied);
-  return anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
 }
 
 export function createEvidenceItems(

@@ -1,7 +1,6 @@
 import type { AppliedEdit } from '@/lib/author-editing';
 import type {
   IssueDecision,
-  ReviewMode,
   ReviewResult,
   ReviewSection,
   TerminologyLock,
@@ -10,7 +9,7 @@ import type {
 
 export interface ImportedDocumentMeta {
   fileName: string;
-  fileType: 'docx' | 'pdf';
+  fileType: 'docx';
   sectionTitle: string;
   sourceLabel: string;
   importedAt: string;
@@ -20,11 +19,8 @@ export interface WorkspaceDraft {
   projectTitle?: string;
   taskType?: WorkspaceTask;
   sourceText?: string;
-  supportingContext?: string;
-  responseLocation?: string;
   targetJournal?: string;
   sectionType?: ReviewSection;
-  reviewMode?: ReviewMode;
   lockedTerms?: TerminologyLock[];
   savedAt?: string;
   importedDocument?: ImportedDocumentMeta;
@@ -36,11 +32,8 @@ export interface ReviewSnapshot {
   projectTitle: string;
   taskType: WorkspaceTask;
   sourceText: string;
-  supportingContext: string;
-  responseLocation: string;
   targetJournal: string;
   sectionType: ReviewSection;
-  reviewMode: ReviewMode;
   lockedTerms: TerminologyLock[];
   requestId: string;
   result: ReviewResult;
@@ -79,6 +72,5 @@ export function isReviewSnapshot(value: unknown): value is ReviewSnapshot {
     && typeof value.projectTitle === 'string'
     && typeof value.sourceText === 'string'
     && typeof value.savedAt === 'string'
-    && Array.isArray(value.result.issues)
-    && Array.isArray(value.result.agentRuns);
+    && Array.isArray(value.result.issues);
 }

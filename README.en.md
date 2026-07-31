@@ -6,77 +6,45 @@
   <img src="public/scholarforge-lockup.svg" alt="ScholarForge OS" width="420" />
 </p>
 
-<p align="center"><strong>An evidence-first workspace for scientific English and author-controlled revision</strong></p>
+<p align="center"><strong>An author-controlled workflow for scientific English revision</strong></p>
 
-ScholarForge OS supports scientific translation, conservative polishing, pre-submission review, and reviewer-response drafting. Model suggestions are never written into the manuscript automatically. Each finding becomes a traceable evidence item that the author can inspect, accept, defer, or reject before applying a safely anchored edit.
+ScholarForge OS focuses on three reliable tasks: scientific Chinese-to-English translation, conservative English polishing, and pre-submission review. Suggestions never overwrite the source automatically. Authors inspect and decide on every finding before a safely anchored edit can enter the working manuscript.
 
-<p align="center">
-  <a href="https://scholarforge-os.vercel.app">Live application</a> ·
-  <a href="https://scholarforge-os.vercel.app/api/health">Health endpoint</a> ·
-  <a href="docs/ARCHITECTURE.md">Architecture</a>
-</p>
-
-## Core flow
+## Supported flow
 
 ```text
-Import DOCX / text-based PDF / paste text
-→ select workflow and manuscript section
-→ run four specialist agents in parallel
-→ normalize findings into evidence items
-→ author accepts, defers, or rejects
-→ safely anchored edits enter the working manuscript
-→ export TXT / Markdown / JSON / DOCX
+Import DOCX or paste text
+→ choose translation, polishing, or pre-submission review
+→ run four specialist agents
+→ normalize findings and suggestions
+→ accept, defer, or reject each item
+→ safely apply selected edits
+→ export TXT, Markdown evidence report, or clean DOCX
 ```
 
-| Workflow | Purpose | Boundary |
-| --- | --- | --- |
-| Scientific translation | Chinese scientific text to academic English | preserves terminology, numbers, and claim strength |
-| Conservative polishing | grammar, collocation, and academic tone | does not invent facts or strengthen conclusions |
-| Pre-submission review | terminology, language, logic, and methods audit | assists authors; does not replace peer review |
-| Reviewer response | evidence-bounded response drafting | missing evidence and locations remain explicit author actions |
+The current release deliberately excludes reviewer-response drafting, PDF parsing, OCR, batch application, native Word tracked changes, and developer-oriented result export. These features either create misleading fidelity expectations or add disproportionate complexity to the core author workflow.
 
-## Evidence Desk
+## Safe editing
 
-The interface is organized around a project center and a three-column review workbench:
+An edit may be applied only when the author accepted it, the original and suggestion are complete, the source anchor is unique, the edit remains inside one paragraph, and it does not overlap another applied edit.
 
-- **Structure and issue queue** for setup, terminology locks, risk, and pending findings.
-- **Manuscript canvas** for original, suggested, working, and diff views.
-- **Evidence inspector** for source agent, risk, location, rationale, comparison, and author decision.
-- **Contextual decision bar** for navigation, progress, and restricted low-risk batch application.
-
-Agents are evidence producers, not the primary interface. The product centers on manuscript, evidence, and author decision.
-
-## Safe author editing
-
-Persisted issue decisions remain compatible: `pending`, `accepted`, `deferred`, and `dismissed`.
-
-An edit may be applied only when the source anchor is unique, complete, within one paragraph, and conflict-free. Terminology, numerical, citation, conclusion, major, logic/method, or meaning-changing findings cannot be batch-applied. Unsafe findings remain manual author tasks.
-
-The working manuscript supports undo and redo.
+There is no batch auto-apply. Terminology, numerical, citation, conclusion, logic, method, and meaning-changing findings must be reviewed individually. Undo and redo remain available for applied edits.
 
 ## Import and export
 
-Browser-side import supports semantic DOCX text, text-based PDF extraction, common manuscript-section detection, section preview, and paragraph-aware splitting to the current 12,000-character task limit.
+Browser-side import supports semantic DOCX text, common manuscript-section detection, section preview, paragraph-aware chunking to the 12,000-character task limit, and direct text paste.
 
-Scanned-PDF OCR and full-fidelity Word page reconstruction are outside the current scope.
+PDF and OCR are not supported. Copy the relevant text from a PDF and paste it into the workspace. Complex formulas, tables, floating objects, and original Word page layout are not reconstructed.
 
-Exports include suggested text, an evidence report, structured JSON, a clean editable DOCX, and a tracked-changes DOCX for safely applied edits.
+Exports include suggested text, a Markdown evidence report, and a clean editable DOCX generated from author-applied edits.
 
-## Data and privacy
+## Data boundary
 
-The current release is explicitly local-first:
-
-- the draft and eight most recent review snapshots are stored in browser `localStorage`;
-- versioned JSON backup and restore are available;
-- source DOCX/PDF files are not uploaded automatically;
-- only author-selected text is sent when a workflow is deliberately run;
-- the Model Studio API key is read only from server environment variables.
-
-Browser data does not automatically follow the user across devices.
+Drafts and the eight most recent review snapshots are stored in browser `localStorage`. Versioned workspace backup and restore remain available. Original DOCX files are not uploaded automatically, and only text deliberately submitted by the author enters the review workflow.
 
 ## Stack
 
-Next.js 16, React 19, TypeScript 5.8, Alibaba Cloud Model Studio, Mammoth, Mozilla PDF.js, docx.js, Vitest, and GitHub Actions.
+Next.js 16, React 19, TypeScript 5.8, Alibaba Cloud Model Studio, Mammoth, docx.js, Vitest, and GitHub Actions.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -109,15 +77,6 @@ npm run typecheck
 npm run build
 ```
 
-## Current limitations
-
-- 12,000 characters per primary task input;
-- no OCR for scanned PDFs;
-- complex Word/PDF layouts may affect extraction order;
-- no automatic cross-device project synchronization;
-- authors remain responsible for facts, statistics, citations, and journal compliance;
-- readiness scores are internal assistance, not journal decisions.
-
 ## License
 
-Copyright © ScholarForge OS contributors. No default permission to copy, modify, or redistribute is granted until a license is explicitly declared.
+Copyright © ScholarForge OS contributors. No default rights to copy, modify, or redistribute are granted without an explicit license.

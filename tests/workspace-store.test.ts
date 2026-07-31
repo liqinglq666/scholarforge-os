@@ -26,6 +26,22 @@ describe('workspace store', () => {
     expect(storage.getItem(STORAGE_KEYS.history)).toBe('{broken-json');
   });
 
+  it('converts removed reviewer-response drafts without deleting the source text', () => {
+    const storage = memoryStorage({
+      [STORAGE_KEYS.draft]: JSON.stringify({
+        projectTitle: 'Reviewer reply',
+        taskType: 'review-response',
+        sourceText: 'The reviewer requested additional evidence and clarification.',
+        savedAt: '2026-07-31T00:00:00.000Z',
+      }),
+      [STORAGE_KEYS.history]: '[]',
+    });
+    const state = readWorkspaceState(storage);
+    expect(state.draft?.taskType).toBe('precheck');
+    expect(state.draft?.sourceText).toContain('reviewer requested');
+    expect(state.warnings).toContain('旧版审稿回复草稿已转换为投稿前预检，原文仍保留。');
+  });
+
   it('rejects unsupported backup envelopes', () => {
     expect(() => parseWorkspaceBackup({ format: 'other', version: 1, history: [] })).toThrow('这不是受支持的 ScholarForge 工作区备份。');
   });

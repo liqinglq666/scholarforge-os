@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canBatchApplyIssue, createEvidenceItems, requiresIndividualDecision } from '@/lib/evidence-model';
+import { createEvidenceItems, evidenceRisk, requiresIndividualDecision } from '@/lib/evidence-model';
 import type { ReviewIssue, ReviewResult } from '@/lib/types';
 
 const languageIssue: ReviewIssue = {
@@ -29,9 +29,11 @@ describe('evidence decision model', () => {
     expect(requiresIndividualDecision({ ...languageIssue, meaningChanged: true })).toBe(true);
   });
 
-  it('allows batch apply only for uniquely anchored low-risk language edits', () => {
-    expect(canBatchApplyIssue('The tests was conducted.', languageIssue, [])).toBe(true);
-    expect(canBatchApplyIssue('The tests was conducted. The tests was conducted.', languageIssue, [])).toBe(false);
-    expect(canBatchApplyIssue('The tests was conducted.', { ...languageIssue, agent: 'logic' }, [])).toBe(false);
+  it('keeps even low-risk suggestions in the explicit author decision flow', () => {
+    expect(evidenceRisk({ ...languageIssue, severity: 'suggestion' })).toBe('low');
+    const result = { issues: [{ ...languageIssue, severity: 'suggestion' }] } as ReviewResult;
+    const [item] = createEvidenceItems(result, {}, []);
+    expect(item.decision).toBe('pending');
+    expect(item.applied).toBe(false);
   });
 });
