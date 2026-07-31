@@ -1,11 +1,4 @@
-/* v1.3.3 — canonical project history surface */
-
-/* The project hub now owns all user-facing history access. */
-.sf-history-rail,
-.sf-desktop-nav .sf-nav-button,
-.sf-tabs > button:nth-child(7) {
-  display: none !important;
-}
+/* Canonical project-history preview */
 
 .hub-history-actions {
   align-items: center;
