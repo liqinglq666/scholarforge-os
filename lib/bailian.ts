@@ -1,6 +1,5 @@
 import type {
   AgentId,
-  AgentRun,
   IssueSeverity,
   ReviewIssue,
   ReviewOutputKind,
@@ -13,7 +12,6 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DEFAULT_MODEL = 'qwen-plus';
-const WORKFLOW_VERSION = '0.9.0';
 const AGENT_IDS: AgentId[] = ['terminology', 'language', 'logic', 'method'];
 
 const SHARED_RULES = `
@@ -60,8 +58,9 @@ interface AgentPayload {
 }
 
 interface AgentExecution {
+  agent: AgentId;
+  status: 'completed' | 'failed';
   payload: AgentPayload;
-  run: AgentRun;
 }
 
 function basePrompt(agent: AgentId, taskType: WorkspaceTask) {
@@ -80,7 +79,7 @@ function basePrompt(agent: AgentId, taskType: WorkspaceTask) {
     ? 'the complete primary output for the selected task'
     : '';
 
-  return `You are the ${agent} specialist in ScholarForge OS / PaperLens.\n${taskSpecific[agent]}\nTask: ${TASK_GUIDANCE[taskType]}\n${SHARED_RULES}\nReturn this exact JSON shape:\n{\n  "summary": "string",\n  "revisedText": "${revisedInstruction}",\n  "issues": [{\n    "severity": "major | minor | suggestion",\n    "location": "string",\n    "original": "string",\n    "revised": "string",\n    "reason": "string",\n    "category": "string",\n    "meaningChanged": false\n  }]\n}`;
+  return `You are the ${agent} specialist in ScholarForge OS.\n${taskSpecific[agent]}\nTask: ${TASK_GUIDANCE[taskType]}\n${SHARED_RULES}\nReturn this exact JSON shape:\n{\n  "summary": "string",\n  "revisedText": "${revisedInstruction}",\n  "issues": [{\n    "severity": "major | minor | suggestion",\n    "location": "string",\n    "original": "string",\n    "revised": "string",\n    "reason": "string",\n    "category": "string",\n    "meaningChanged": false\n  }]\n}`;
 }
 
 function stripJsonFence(value: string) {
@@ -122,7 +121,9 @@ function normalizeAgentPayload(raw: unknown, agent: AgentId): AgentPayload {
 
 function lockText(lockedTerms: TerminologyLock[]) {
   if (!lockedTerms.length) return 'No user-locked terminology rules.';
-  return lockedTerms.map((lock, index) => `${index + 1}. Source/trigger: ${lock.source}; required output: ${lock.preferred}${lock.note ? `; note: ${lock.note}` : ''}`).join('\n');
+  return lockedTerms
+    .map((lock, index) => `${index + 1}. Source/trigger: ${lock.source}; required output: ${lock.preferred}${lock.note ? `; note: ${lock.note}` : ''}`)
+    .join('\n');
 }
 
 async function runSpecialist(
@@ -132,7 +133,6 @@ async function runSpecialist(
   baseUrl: string,
   model: string,
 ): Promise<AgentExecution> {
-  const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 46_000);
 
@@ -170,32 +170,17 @@ async function runSpecialist(
     if (!response.ok) throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
     const content = body.choices?.[0]?.message?.content;
     if (!content) throw new Error(`${agent} returned an empty response.`);
-    const payload = normalizeAgentPayload(JSON.parse(stripJsonFence(content)) as unknown, agent);
 
     return {
-      payload,
-      run: {
-        agent,
-        status: 'completed',
-        durationMs: Date.now() - startedAt,
-        issueCount: payload.issues.length,
-        summary: payload.summary,
-        model,
-      },
+      agent,
+      status: 'completed',
+      payload: normalizeAgentPayload(JSON.parse(stripJsonFence(content)) as unknown, agent),
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+  } catch {
     return {
+      agent,
+      status: 'failed',
       payload: { summary: '', revisedText: '', issues: [] },
-      run: {
-        agent,
-        status: 'failed',
-        durationMs: Date.now() - startedAt,
-        issueCount: 0,
-        summary: `${agent} did not complete.`,
-        model,
-        error: message,
-      },
     };
   } finally {
     clearTimeout(timeout);
@@ -212,13 +197,22 @@ function uniqueIssues(items: ReviewIssue[]) {
   }).slice(0, 40);
 }
 
-function numericTokens(value: string) {
-  return new Set(value.match(/\b\d+(?:\.\d+)?\b/g) || []);
+function numericSignature(value: string) {
+  return (value.match(/[-+]?\d+(?:,\d{3})*(?:\.\d+)?/g) || [])
+    .map((token) => token.replace(/,/g, ''))
+    .sort((a, b) => a.localeCompare(b))
+    .join('|');
 }
 
-function hasNewNumericToken(source: string, revised: string) {
-  const sourceTokens = numericTokens(source);
-  return [...numericTokens(revised)].some((token) => !sourceTokens.has(token));
+function summaryForTask(taskType: WorkspaceTask, issueCount: number, complete: boolean, numericMismatch: boolean) {
+  const primary = taskType === 'translate'
+    ? `已生成科研英语译文，并识别 ${issueCount} 条需要作者核对的事项。`
+    : taskType === 'polish'
+      ? `已生成保守润色稿，并识别 ${issueCount} 条需要作者核对的事项。`
+      : `已完成投稿前检查，共识别 ${issueCount} 条需要作者处理的事项。`;
+  const incomplete = complete ? '' : ' 部分检查未完成，本次结果可能不完整，建议稍后重新分析。';
+  const guarded = numericMismatch ? ' 完整建议稿因数值变化被安全拦截，当前保留原文。' : '';
+  return `${primary}${incomplete}${guarded}`;
 }
 
 export async function reviewWithBailian(text: string, options: Partial<ReviewRequest> = {}): Promise<ReviewResult> {
@@ -241,20 +235,36 @@ export async function reviewWithBailian(text: string, options: Partial<ReviewReq
   const executions = await Promise.all(
     AGENT_IDS.map((agent) => runSpecialist(agent, normalizedRequest, apiKey, baseUrl, model)),
   );
-  const completed = executions.filter((execution) => execution.run.status === 'completed');
-  if (completed.length === 0) throw new Error('All specialist agents failed. Check the Model Studio model, quota, and endpoint.');
+  const completed = executions.filter((execution) => execution.status === 'completed');
+  const languageExecution = completed.find((execution) => execution.agent === 'language');
 
-  const issues = uniqueIssues(completed.flatMap((execution) => execution.payload.issues));
-  const languageExecution = executions.find((execution) => execution.run.agent === 'language');
+  if ((taskType === 'translate' || taskType === 'polish') && !languageExecution?.payload.revisedText) {
+    throw new Error('The primary language output did not complete.');
+  }
+  if (taskType === 'precheck' && completed.length < 2) {
+    throw new Error('Too few specialist checks completed to return a reliable result.');
+  }
+
   const candidateOutput = languageExecution?.payload.revisedText || text;
-  const allowedSource = text;
-  const revisedText = hasNewNumericToken(allowedSource, candidateOutput) ? text : candidateOutput;
-  const failedCount = executions.length - completed.length;
+  const numericMismatch = numericSignature(candidateOutput) !== numericSignature(text);
+  const revisedText = numericMismatch ? text : candidateOutput;
+  const safetyIssue: ReviewIssue[] = numericMismatch ? [{
+    id: 'system-numeric-safety',
+    agent: 'terminology',
+    severity: 'major',
+    location: 'Generated manuscript',
+    original: '',
+    revised: '',
+    reason: 'The generated full-text output changed one or more numeric values. ScholarForge withheld the generated manuscript and kept the source text unchanged.',
+    category: 'Numeric consistency',
+    meaningChanged: true,
+  }] : [];
+  const issues = uniqueIssues([
+    ...completed.flatMap((execution) => execution.payload.issues),
+    ...safetyIssue,
+  ]);
 
   return {
-    mode: 'live',
-    executionMode: 'parallel-multi-agent',
-    workflowVersion: WORKFLOW_VERSION,
     outputKind: OUTPUT_KIND[taskType],
     profile: {
       projectTitle: options.projectTitle?.trim() || 'Untitled research writing task',
@@ -263,7 +273,7 @@ export async function reviewWithBailian(text: string, options: Partial<ReviewReq
       sectionType,
       lockedTerms,
     },
-    summary: `${completed.length} independent Model Studio specialists completed the ${taskType} workflow${failedCount ? `; ${failedCount} agent failed and was excluded from aggregation` : ''}. Every finding remains subject to author review.`,
+    summary: summaryForTask(taskType, issues.length, completed.length === AGENT_IDS.length, numericMismatch),
     revisedText,
     issues,
     generatedAt: new Date().toISOString(),
