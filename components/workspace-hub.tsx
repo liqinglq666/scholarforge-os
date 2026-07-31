@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { PaperLensWorkspace } from '@/components/paperlens-workspace';
 import {
   SAMPLE_CHINESE_MANUSCRIPT,
   SAMPLE_MANUSCRIPT,
@@ -15,15 +16,16 @@ import type {
   TerminologyLock,
   WorkspaceTask,
 } from '@/lib/types';
-import { PaperLensWorkspace } from '@/components/paperlens-workspace';
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.3';
 const DRAFT_KEY = 'scholarforge-os-paperlens-draft-v1';
 const HISTORY_KEY = 'scholarforge-os-paperlens-history-v1';
 const HUB_VIEW_KEY = 'scholarforge-os-hub-view-v1';
 const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
 const BACKUP_FORMAT = 'scholarforge-workspace-backup';
 const MAX_HISTORY = 8;
+
+type PreviewTab = 'output' | 'issues' | 'trace';
 
 interface WorkspaceDraft {
   projectTitle?: string;
@@ -96,6 +98,13 @@ const SECTION_LABELS: Record<ReviewSection, string> = {
   results: '结果',
   discussion: '讨论',
   conclusion: '结论',
+};
+
+const DECISION_LABELS: Record<IssueDecision, string> = {
+  pending: '待处理',
+  accepted: '已接受',
+  deferred: '暂缓',
+  dismissed: '忽略',
 };
 
 const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
@@ -184,28 +193,21 @@ function isReviewSnapshot(value: unknown): value is ReviewSnapshot {
     && typeof value.projectTitle === 'string'
     && typeof value.sourceText === 'string'
     && typeof value.savedAt === 'string'
-    && Array.isArray(value.result.issues);
+    && Array.isArray(value.result.issues)
+    && Array.isArray(value.result.agentRuns);
 }
 
 function parseBackup(value: unknown): WorkspaceBackup {
-  if (!isRecord(value)
-    || value.format !== BACKUP_FORMAT
-    || value.version !== 1
-    || !Array.isArray(value.history)) {
+  if (!isRecord(value) || value.format !== BACKUP_FORMAT || value.version !== 1 || !Array.isArray(value.history)) {
     throw new Error('这不是受支持的 ScholarForge 工作区备份。');
   }
-
-  const history = value.history.filter(isReviewSnapshot).slice(0, MAX_HISTORY);
-  const draft = value.draft === null || isRecord(value.draft)
-    ? value.draft as WorkspaceDraft | null
-    : null;
 
   return {
     format: BACKUP_FORMAT,
     version: 1,
     exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
-    draft,
-    history,
+    draft: value.draft === null || isRecord(value.draft) ? value.draft as WorkspaceDraft | null : null,
+    history: value.history.filter(isReviewSnapshot).slice(0, MAX_HISTORY),
   };
 }
 
@@ -213,12 +215,7 @@ function formatDate(value?: string) {
   if (!value) return '尚未保存';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间未知';
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 function humanStorageSize(bytes: number) {
@@ -243,6 +240,21 @@ function downloadJson(filename: string, payload: unknown) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
+function draftFromSnapshot(snapshot: ReviewSnapshot): WorkspaceDraft {
+  return {
+    projectTitle: snapshot.projectTitle,
+    taskType: snapshot.taskType,
+    sourceText: snapshot.sourceText,
+    supportingContext: snapshot.supportingContext,
+    responseLocation: snapshot.responseLocation,
+    targetJournal: snapshot.targetJournal,
+    sectionType: snapshot.sectionType,
+    reviewMode: snapshot.reviewMode,
+    lockedTerms: snapshot.lockedTerms,
+    savedAt: new Date().toISOString(),
+  };
+}
+
 export function WorkspaceHub() {
   const [view, setView] = useState<'hub' | 'workspace'>('hub');
   const [draft, setDraft] = useState<WorkspaceDraft | null>(null);
@@ -250,6 +262,8 @@ export function WorkspaceHub() {
   const [query, setQuery] = useState('');
   const [taskFilter, setTaskFilter] = useState<'all' | WorkspaceTask>('all');
   const [notice, setNotice] = useState('');
+  const [preview, setPreview] = useState<ReviewSnapshot | null>(null);
+  const [previewTab, setPreviewTab] = useState<PreviewTab>('output');
   const [health, setHealth] = useState({ configured: false, model: 'qwen-plus', version: APP_VERSION });
   const importRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -291,9 +305,12 @@ export function WorkspaceHub() {
       if (event.altKey && event.key.toLowerCase() === 'h') {
         event.preventDefault();
         window.sessionStorage.setItem(HUB_VIEW_KEY, 'hub');
+        refreshLocalState();
         setView('hub');
+        setPreview(null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      if (event.key === 'Escape') setPreview(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -304,12 +321,10 @@ export function WorkspaceHub() {
     return history.filter((snapshot) => {
       if (taskFilter !== 'all' && snapshot.taskType !== taskFilter) return false;
       if (!normalized) return true;
-      return [
-        snapshot.projectTitle,
-        snapshot.targetJournal,
-        WORKFLOW_LABELS[snapshot.taskType],
-        SECTION_LABELS[snapshot.sectionType],
-      ].join(' ').toLowerCase().includes(normalized);
+      return [snapshot.projectTitle, snapshot.targetJournal, WORKFLOW_LABELS[snapshot.taskType], SECTION_LABELS[snapshot.sectionType]]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalized);
     });
   }, [history, query, taskFilter]);
 
@@ -345,6 +360,7 @@ export function WorkspaceHub() {
     if (template) writeDraft(template, useSample);
     window.sessionStorage.setItem(HUB_VIEW_KEY, 'workspace');
     setView('workspace');
+    setPreview(null);
     window.scrollTo({ top: 0 });
   }
 
@@ -355,22 +371,25 @@ export function WorkspaceHub() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function resumeSnapshot(snapshot: ReviewSnapshot) {
-    const nextDraft: WorkspaceDraft = {
-      projectTitle: snapshot.projectTitle,
-      taskType: snapshot.taskType,
-      sourceText: snapshot.sourceText,
-      supportingContext: snapshot.supportingContext,
-      responseLocation: snapshot.responseLocation,
-      targetJournal: snapshot.targetJournal,
-      sectionType: snapshot.sectionType,
-      reviewMode: snapshot.reviewMode,
-      lockedTerms: snapshot.lockedTerms,
-      savedAt: new Date().toISOString(),
-    };
+  function continueSnapshot(snapshot: ReviewSnapshot) {
+    const nextDraft = draftFromSnapshot(snapshot);
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
     setDraft(nextDraft);
     openWorkspace();
+  }
+
+  function showSnapshot(snapshot: ReviewSnapshot) {
+    setPreview(snapshot);
+    setPreviewTab('output');
+  }
+
+  function deleteSnapshot(snapshot: ReviewSnapshot) {
+    if (!window.confirm(`确定删除“${snapshot.projectTitle}”的本机审校快照吗？`)) return;
+    const next = history.filter((item) => item.id !== snapshot.id);
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    setHistory(next);
+    if (preview?.id === snapshot.id) setPreview(null);
+    setNotice('本机审校快照已删除。');
   }
 
   function exportBackup() {
@@ -410,6 +429,7 @@ export function WorkspaceHub() {
     window.localStorage.removeItem(AUTHOR_EDITING_SESSION_KEY);
     setDraft(null);
     setHistory([]);
+    setPreview(null);
     setNotice('本地草稿、任务历史与作者修改会话已清除。云端项目和原始 DOCX 未被删除。');
   }
 
@@ -431,7 +451,7 @@ export function WorkspaceHub() {
       </a>
       <nav aria-label="项目中心导航">
         <a href="#hub-workflows">新建任务</a>
-        <a href="#hub-history">最近记录</a>
+        <a href="#hub-history">任务历史</a>
         <a href="#hub-data">数据与隐私</a>
         <a href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">GitHub ↗</a>
       </nav>
@@ -447,7 +467,7 @@ export function WorkspaceHub() {
         <div className="hub-hero-copy">
           <span className="hub-eyebrow">Evidence-aware research writing system</span>
           <h1>从一个科研写作任务开始，<em>把每次修改留在证据链里。</em></h1>
-          <p>翻译、润色、投稿预检和审稿回复不再是四个割裂工具，而是围绕同一论文项目持续积累术语、问题、作者决策和交付物。</p>
+          <p>翻译、润色、投稿预检和审稿回复围绕同一论文项目积累术语、问题、作者决策和交付物。</p>
           <div className="hub-hero-actions">
             {draft?.sourceText?.trim()
               ? <button className="hub-primary" onClick={() => openWorkspace()} type="button">继续当前草稿 <span>→</span></button>
@@ -467,7 +487,7 @@ export function WorkspaceHub() {
       </section>
 
       <section className="hub-metrics" aria-label="工作区概览">
-        <article><span>本机任务快照</span><strong>{metrics.total}</strong><small>最多保留最近 8 次</small></article>
+        <article><span>本机任务快照</span><strong>{metrics.total}</strong><small>项目中心统一管理</small></article>
         <article><span>待处理证据</span><strong>{metrics.pending}</strong><small>尚未接受、暂缓或忽略</small></article>
         <article><span>平均准备度</span><strong>{metrics.average || '—'}</strong><small>{metrics.average ? '/ 100' : '完成任务后统计'}</small></article>
         <article><span>本地数据占用</span><strong>{metrics.storage}</strong><small>草稿与历史，不含原始 DOCX</small></article>
@@ -488,7 +508,7 @@ export function WorkspaceHub() {
 
       <section className="hub-section" id="hub-history">
         <div className="hub-section-head hub-history-head">
-          <div><span>02 · Recent evidence</span><h2>最近任务与审校快照</h2><p>快速找到曾经的项目配置；完整结果仍可在工作台的“任务历史”标签中恢复。</p></div>
+          <div><span>02 · Review history</span><h2>任务历史与完整结果</h2><p>项目中心是唯一历史入口：查看主输出、问题证据和 Agent 轨迹，或恢复配置继续处理。</p></div>
           <div className="hub-history-tools">
             <label><span aria-hidden="true">⌕</span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目、期刊或章节" ref={searchRef} value={query} /></label>
             <select aria-label="按工作流筛选" onChange={(event) => setTaskFilter(event.target.value as 'all' | WorkspaceTask)} value={taskFilter}>
@@ -505,9 +525,12 @@ export function WorkspaceHub() {
             <h3>{snapshot.projectTitle}</h3>
             <p>{snapshot.targetJournal || '未指定目标期刊'}</p>
             <div className="hub-history-stats"><span><b>{snapshot.result.scoreAfter}</b>/100</span><span><b>{snapshot.result.issues.length}</b> 个问题</span><span><b>{pending}</b> 待处理</span></div>
-            <footer><span>{SECTION_LABELS[snapshot.sectionType]} · {snapshot.reviewMode}</span><button onClick={() => resumeSnapshot(snapshot)} type="button">继续配置 →</button></footer>
+            <footer className="hub-history-actions">
+              <span>{SECTION_LABELS[snapshot.sectionType]} · {snapshot.reviewMode}</span>
+              <div><button onClick={() => showSnapshot(snapshot)} type="button">查看完整结果</button><button onClick={() => continueSnapshot(snapshot)} type="button">继续配置 →</button></div>
+            </footer>
           </article>;
-        })}</div> : <div className="hub-empty-history"><span>⌁</span><h3>{history.length ? '没有匹配的任务' : '还没有任务快照'}</h3><p>{history.length ? '调整搜索词或工作流筛选。' : '完成第一次翻译、润色、预检或返修信任务后，记录会出现在这里。'}</p></div>}
+        })}</div> : <div className="hub-empty-history"><span>⌁</span><h3>{history.length ? '没有匹配的任务' : '还没有任务快照'}</h3><p>{history.length ? '调整搜索词或工作流筛选。' : '完成第一次任务后，完整结果会统一保存在这里。'}</p></div>}
       </section>
 
       <section className="hub-section hub-data-section" id="hub-data">
@@ -523,5 +546,31 @@ export function WorkspaceHub() {
     </section>
 
     <footer className="hub-footer"><span>ScholarForge OS · Research writing project hub</span><span>Powered by Alibaba Cloud Model Studio · {health.model}</span><a href="https://github.com/liqinglq666/scholarforge-os/blob/main/docs/PRD.md" rel="noreferrer" target="_blank">查看产品路线 ↗</a></footer>
+
+    {preview ? <div className="hub-history-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
+      <section aria-label="任务历史完整结果" aria-modal="true" className="hub-history-preview" role="dialog">
+        <header>
+          <div><span>{WORKFLOW_LABELS[preview.taskType]} · {SECTION_LABELS[preview.sectionType]}</span><h2>{preview.projectTitle}</h2><p>{preview.targetJournal || '未指定目标期刊'} · {formatDate(preview.savedAt)}</p></div>
+          <button aria-label="关闭历史结果" onClick={() => setPreview(null)} type="button">×</button>
+        </header>
+        <div className="hub-preview-metrics">
+          <span><b>{preview.result.scoreAfter}</b>/100</span>
+          <span><b>{preview.result.issues.length}</b> 个问题</span>
+          <span><b>{countPending(preview)}</b> 待处理</span>
+          <span><b>{preview.result.agentRuns.length}</b> Agent</span>
+        </div>
+        <nav aria-label="历史结果视图">
+          <button aria-selected={previewTab === 'output'} onClick={() => setPreviewTab('output')} type="button">主输出</button>
+          <button aria-selected={previewTab === 'issues'} onClick={() => setPreviewTab('issues')} type="button">问题证据</button>
+          <button aria-selected={previewTab === 'trace'} onClick={() => setPreviewTab('trace')} type="button">运行轨迹</button>
+        </nav>
+        <div className="hub-preview-body">
+          {previewTab === 'output' ? <div className="hub-preview-output"><section><span>Executive summary</span><p>{preview.result.summary}</p></section><section><span>Primary output</span><p>{preview.result.revisedText}</p></section></div> : null}
+          {previewTab === 'issues' ? <div className="hub-preview-issues">{preview.result.issues.map((issue, index) => <article key={issue.id}><header><span>{String(index + 1).padStart(2, '0')}</span><div><b>{issue.category}</b><small>{issue.agent} · {issue.severity} · {DECISION_LABELS[preview.decisions[issue.id] || 'pending']}</small></div></header><p>{issue.reason}</p><div><span>原文</span><p>{issue.original || '未提供原文片段'}</p></div><div><span>建议</span><p>{issue.revised || '需要作者人工处理'}</p></div></article>)}</div> : null}
+          {previewTab === 'trace' ? <div className="hub-preview-trace">{preview.result.agentRuns.map((run) => <article key={run.agent}><header><b>{run.agent}</b><span>{run.status}</span></header><p>{run.summary}</p><footer><span>{run.durationMs} ms</span><span>{run.issueCount} 个问题</span><span>{run.model}</span></footer></article>)}</div> : null}
+        </div>
+        <footer><button className="is-danger" onClick={() => deleteSnapshot(preview)} type="button">删除本机快照</button><div><button onClick={() => setPreview(null)} type="button">关闭</button><button onClick={() => continueSnapshot(preview)} type="button">恢复配置并继续 →</button></div></footer>
+      </section>
+    </div> : null}
   </main>;
 }
