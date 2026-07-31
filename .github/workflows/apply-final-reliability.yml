@@ -57,3 +57,5 @@ jobs:
           git add -A
           git commit -m "fix: close remaining workflow edge cases"
           git push origin HEAD:agent/scholarforge-v1-5-redesign
+
+# This workflow is temporary and deletes itself after a successful audited run.
