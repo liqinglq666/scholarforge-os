@@ -34,3 +34,15 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Create source snapshot
+        if: always()
+        run: tar --exclude=.git --exclude=node_modules --exclude=.next -czf scholarforge-current-source.tgz .
+
+      - name: Upload source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scholarforge-current-source
+          path: scholarforge-current-source.tgz
+          retention-days: 1
