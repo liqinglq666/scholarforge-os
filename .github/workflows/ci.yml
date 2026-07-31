@@ -26,6 +26,9 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Unit tests
+        run: npm run test
+
       - name: Type check
         run: npm run typecheck
 
