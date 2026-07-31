@@ -8,7 +8,7 @@ import {
   type WorkspaceDraft,
   type WorkspaceState,
 } from '@/lib/workspace-schema';
-import type { ReviewResult, WorkspaceTask } from '@/lib/types';
+import type { IssueDecision, ReviewResult, WorkspaceTask } from '@/lib/types';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -75,7 +75,9 @@ function normalizeSnapshot(value: ReviewSnapshot): ReviewSnapshot {
     lockedTerms: Array.isArray(value.lockedTerms) ? value.lockedTerms : [],
     requestId: value.requestId || '',
     result: normalizeResult(value.result),
-    decisions: isRecord(value.decisions) ? value.decisions : {},
+    decisions: isRecord(value.decisions)
+      ? value.decisions as Record<string, IssueDecision>
+      : {},
     appliedEdits: Array.isArray(value.appliedEdits) ? value.appliedEdits : [],
     savedAt: value.savedAt,
   };
