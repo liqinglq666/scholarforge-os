@@ -14,6 +14,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Package review snapshot
+        run: tar --exclude=.git -czf scholarforge-source.tgz .
+
+      - name: Upload review snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: scholarforge-source-${{ github.sha }}
+          path: scholarforge-source.tgz
+          retention-days: 1
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
