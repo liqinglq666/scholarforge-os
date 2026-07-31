@@ -9,8 +9,7 @@ interface ProjectHubProps {
   draft: WorkspaceDraft | null;
   history: ReviewSnapshot[];
   warnings: string[];
-  serviceState: 'checking' | 'live' | 'demo' | 'offline';
-  model: string;
+  serviceState: 'checking' | 'ready' | 'unconfigured' | 'offline';
   onCreate(task: WorkspaceTask): void;
   onImport(): void;
   onOpenDraft(): void;
@@ -40,11 +39,17 @@ function pendingCount(snapshot: ReviewSnapshot) {
   }).length;
 }
 
-function serviceLabel(state: ProjectHubProps['serviceState'], model: string) {
-  if (state === 'live') return `${model} 已连接`;
-  if (state === 'demo') return '安全演示模式';
-  if (state === 'offline') return '服务暂不可用';
-  return '正在检查服务';
+function serviceLabel(state: ProjectHubProps['serviceState']) {
+  if (state === 'ready') return '分析服务已就绪';
+  if (state === 'unconfigured') return '分析服务未配置';
+  if (state === 'offline') return '分析服务暂不可用';
+  return '正在检查分析服务';
+}
+
+function serviceDotClass(state: ProjectHubProps['serviceState']) {
+  if (state === 'ready') return 'is-live';
+  if (state === 'offline') return 'is-offline';
+  return '';
 }
 
 export function ProjectHub(props: ProjectHubProps) {
@@ -66,8 +71,8 @@ export function ProjectHub(props: ProjectHubProps) {
           <summary aria-label="打开工作区菜单"><Icon name="more" /></summary>
           <div>
             <div className="sf-home-menu-status">
-              <span className={`sf-service-dot is-${props.serviceState}`} />
-              <span>{serviceLabel(props.serviceState, props.model)}</span>
+              <span className={`sf-service-dot ${serviceDotClass(props.serviceState)}`} />
+              <span>{serviceLabel(props.serviceState)}</span>
             </div>
             <hr />
             <button onClick={props.onExportBackup} type="button"><Icon name="download" />导出本地备份</button>
