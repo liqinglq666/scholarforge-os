@@ -27,6 +27,7 @@ jobs:
           cat .github/ux-patch-*.b64 | base64 --decode > /tmp/scholarforge-ux-rebuild.tgz
           tar -xzf /tmp/scholarforge-ux-rebuild.tgz -C .
           rm -f .github/ux-patch-*.b64
+          git checkout HEAD -- .github/workflows/ci.yml
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -49,7 +50,7 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Commit validated rebuild
+      - name: Commit validated frontend
         shell: bash
         run: |
           set -euo pipefail
