@@ -13,6 +13,8 @@ import type {
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DEFAULT_MODEL = 'qwen-plus';
 const AGENT_IDS: AgentId[] = ['terminology', 'language', 'logic', 'method'];
+const MAX_REVISED_TEXT = 48_000;
+const MAX_ISSUE_TEXT = 4_000;
 
 const SHARED_RULES = `
 Hard rules:
@@ -83,11 +85,14 @@ function basePrompt(agent: AgentId, taskType: WorkspaceTask) {
 }
 
 function stripJsonFence(value: string) {
-  return value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const stripped = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const start = stripped.indexOf('{');
+  const end = stripped.lastIndexOf('}');
+  return start >= 0 && end > start ? stripped.slice(start, end + 1) : stripped;
 }
 
-function asString(value: unknown, fallback = '') {
-  return typeof value === 'string' ? value.trim() : fallback;
+function asString(value: unknown, fallback = '', max = 2_000) {
+  return typeof value === 'string' ? value.trim().slice(0, max) : fallback;
 }
 
 function normalizeSeverity(value: unknown): IssueSeverity {
@@ -100,19 +105,19 @@ function normalizeAgentPayload(raw: unknown, agent: AgentId): AgentPayload {
   const rawIssues = Array.isArray(data.issues) ? data.issues : [];
 
   return {
-    summary: asString(data.summary, `${agent} completed its audit.`),
-    revisedText: asString(data.revisedText),
+    summary: asString(data.summary, `${agent} completed its audit.`, 2_000),
+    revisedText: asString(data.revisedText, '', MAX_REVISED_TEXT),
     issues: rawIssues.slice(0, 16).map((item, index) => {
       const issue = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       return {
         id: `${agent}-${index + 1}`,
         agent,
         severity: normalizeSeverity(issue.severity),
-        location: asString(issue.location, 'Location not specified'),
-        original: asString(issue.original),
-        revised: asString(issue.revised),
-        reason: asString(issue.reason, 'Specialist review recommended an author check.'),
-        category: asString(issue.category, 'Academic writing'),
+        location: asString(issue.location, 'Location not specified', 240),
+        original: asString(issue.original, '', MAX_ISSUE_TEXT),
+        revised: asString(issue.revised, '', MAX_ISSUE_TEXT),
+        reason: asString(issue.reason, 'Specialist review recommended an author check.', 2_000),
+        category: asString(issue.category, 'Academic writing', 240),
         meaningChanged: issue.meaningChanged === true,
       };
     }),
@@ -143,6 +148,7 @@ async function runSpecialist(
       body: JSON.stringify({
         model,
         temperature: agent === 'language' ? 0.15 : 0.1,
+        max_tokens: 8192,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: basePrompt(agent, request.taskType) },
@@ -166,7 +172,14 @@ async function runSpecialist(
       cache: 'no-store',
     });
 
-    const body = await response.json() as ChatCompletionResponse;
+    const rawBody = await response.text();
+    let body: ChatCompletionResponse = {};
+    try {
+      body = JSON.parse(rawBody) as ChatCompletionResponse;
+    } catch {
+      if (!response.ok) throw new Error(`${agent} failed with status ${response.status}.`);
+      throw new Error(`${agent} returned a non-JSON response.`);
+    }
     if (!response.ok) throw new Error(body.error?.message || `${agent} failed with status ${response.status}.`);
     const content = body.choices?.[0]?.message?.content;
     if (!content) throw new Error(`${agent} returned an empty response.`);
@@ -176,7 +189,9 @@ async function runSpecialist(
       status: 'completed',
       payload: normalizeAgentPayload(JSON.parse(stripJsonFence(content)) as unknown, agent),
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown specialist error.';
+    console.warn(`[ScholarForge:${agent}] ${message}`);
     return {
       agent,
       status: 'failed',
@@ -198,7 +213,7 @@ function uniqueIssues(items: ReviewIssue[]) {
 }
 
 function numericSignature(value: string) {
-  return (value.match(/[-+]?\d+(?:,\d{3})*(?:\.\d+)?/g) || [])
+  return (value.match(/[-+]?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)(?:[eE][-+]?\d+)?/g) || [])
     .map((token) => token.replace(/,/g, ''))
     .sort((a, b) => a.localeCompare(b))
     .join('|');
@@ -216,11 +231,11 @@ function summaryForTask(taskType: WorkspaceTask, issueCount: number, complete: b
 }
 
 export async function reviewWithBailian(text: string, options: Partial<ReviewRequest> = {}): Promise<ReviewResult> {
-  const apiKey = process.env.DASHSCOPE_API_KEY;
+  const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) throw new Error('DASHSCOPE_API_KEY is not configured.');
 
-  const baseUrl = (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
-  const model = process.env.DASHSCOPE_MODEL || DEFAULT_MODEL;
+  const baseUrl = (process.env.DASHSCOPE_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/$/, '');
+  const model = process.env.DASHSCOPE_MODEL?.trim() || DEFAULT_MODEL;
   const taskType = options.taskType || 'precheck';
   const sectionType = options.sectionType || 'general';
   const lockedTerms = options.lockedTerms || [];
@@ -238,7 +253,7 @@ export async function reviewWithBailian(text: string, options: Partial<ReviewReq
   const completed = executions.filter((execution) => execution.status === 'completed');
   const languageExecution = completed.find((execution) => execution.agent === 'language');
 
-  if ((taskType === 'translate' || taskType === 'polish') && !languageExecution?.payload.revisedText) {
+  if (!languageExecution?.payload.revisedText) {
     throw new Error('The primary language output did not complete.');
   }
   if (taskType === 'precheck' && completed.length < 2) {

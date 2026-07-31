@@ -1,6 +1,6 @@
 import { APP_VERSION } from '@/lib/app-config';
 import type { AppliedEdit } from '@/lib/author-editing';
-import { composeWorkingText } from '@/lib/author-editing';
+import { composeWorkingText, normalizeAppliedEdits } from '@/lib/author-editing';
 
 export interface AuthorDocxExportOptions {
   projectTitle: string;
@@ -19,7 +19,11 @@ function safeFileStem(value: string) {
 }
 
 function paragraphs(value: string) {
-  return value.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  return value
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map((item) => item.replace(/\n+/g, ' ').trim())
+    .filter(Boolean);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -35,7 +39,8 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export async function exportAuthorDocx(options: AuthorDocxExportOptions) {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
-  const workingText = composeWorkingText(options.sourceText, [...options.edits].sort((a, b) => a.start - b.start));
+  const normalizedEdits = normalizeAppliedEdits(options.sourceText, options.edits).valid;
+  const workingText = composeWorkingText(options.sourceText, normalizedEdits);
 
   const doc = new Document({
     creator: 'ScholarForge OS',
@@ -62,7 +67,7 @@ export async function exportAuthorDocx(options: AuthorDocxExportOptions) {
           ],
         }),
         ...(options.targetJournal ? [new Paragraph({ text: `Target journal: ${options.targetJournal}` })] : []),
-        new Paragraph({ text: `Applied suggestions: ${options.edits.length}` }),
+        new Paragraph({ text: `Applied suggestions: ${normalizedEdits.length}` }),
         ...paragraphs(workingText).map((text) => new Paragraph({
           children: [new TextRun({ text })],
           spacing: { before: 160, after: 180, line: 360 },

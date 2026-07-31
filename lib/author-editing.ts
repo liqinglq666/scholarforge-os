@@ -56,6 +56,10 @@ function collectWhitespaceMatches(source: string, target: string) {
   }));
 }
 
+function containsAuthorPlaceholder(value: string) {
+  return /\[(?:please\s+provide|author(?:\s+to)?\s+(?:provide|confirm|complete)|todo|to\s+be\s+(?:added|confirmed|completed)|待补|作者(?:补充|确认|填写))[^\]]*\]/i.test(value);
+}
+
 export function rangesOverlap(a: Pick<AppliedEdit, 'start' | 'end'>, b: Pick<AppliedEdit, 'start' | 'end'>) {
   return a.start < b.end && b.start < a.end;
 }
@@ -74,7 +78,7 @@ export function analyseIssueAnchor(source: string, issue: ReviewIssue, applied: 
   if (original === revised) {
     return { state: 'manual', message: '建议文本与原文相同，不需要自动替换。' };
   }
-  if (/\[Please provide[^\]]*\]/i.test(revised)) {
+  if (containsAuthorPlaceholder(revised)) {
     return { state: 'manual', message: '该建议包含作者待补信息，不能自动写入正文。' };
   }
   if (original.length < 4) {
@@ -98,8 +102,8 @@ export function analyseIssueAnchor(source: string, issue: ReviewIssue, applied: 
   }
 
   const match = matches[0];
-  if (match.text.includes('\n\n')) {
-    return { state: 'manual', message: '该建议跨越多个段落，当前版本要求作者手动确认。' };
+  if (/\r|\n/.test(match.text)) {
+    return { state: 'manual', message: '该建议跨越段落或换行，当前版本要求作者手动确认。' };
   }
 
   const candidate = { start: match.start, end: match.end };
@@ -132,8 +136,47 @@ export function createAppliedEdit(issue: ReviewIssue, analysis: AnchorAnalysis):
   };
 }
 
+export interface NormalizedAppliedEdits {
+  valid: AppliedEdit[];
+  droppedIssueIds: string[];
+}
+
+export function normalizeAppliedEdits(source: string, edits: AppliedEdit[]): NormalizedAppliedEdits {
+  const valid: AppliedEdit[] = [];
+  const droppedIssueIds: string[] = [];
+  const seenIssueIds = new Set<string>();
+  const candidates = Array.isArray(edits) ? [...edits].sort((a, b) => a.start - b.start) : [];
+
+  for (const edit of candidates) {
+    const issueId = typeof edit?.issueId === 'string' ? edit.issueId : '';
+    const rangeValid = Number.isInteger(edit?.start)
+      && Number.isInteger(edit?.end)
+      && edit.start >= 0
+      && edit.end > edit.start
+      && edit.end <= source.length;
+    const textValid = typeof edit?.original === 'string'
+      && typeof edit?.revised === 'string'
+      && edit.revised.trim().length > 0;
+    const sourceMatches = rangeValid && textValid
+      ? source.slice(edit.start, edit.end) === edit.original
+      : false;
+    const duplicate = !issueId || seenIssueIds.has(issueId);
+    const overlaps = rangeValid && valid.some((current) => rangesOverlap(edit, current));
+
+    if (!rangeValid || !textValid || !sourceMatches || duplicate || overlaps) {
+      if (issueId) droppedIssueIds.push(issueId);
+      continue;
+    }
+
+    seenIssueIds.add(issueId);
+    valid.push({ ...edit });
+  }
+
+  return { valid, droppedIssueIds };
+}
+
 export function composeWorkingText(source: string, edits: AppliedEdit[]) {
-  const ordered = [...edits].sort((a, b) => b.start - a.start);
+  const ordered = normalizeAppliedEdits(source, edits).valid.sort((a, b) => b.start - a.start);
   let output = source;
   for (const edit of ordered) {
     output = `${output.slice(0, edit.start)}${edit.revised}${output.slice(edit.end)}`;

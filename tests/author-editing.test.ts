@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyseIssueAnchor, composeWorkingText, createAppliedEdit } from '@/lib/author-editing';
+import { analyseIssueAnchor, composeWorkingText, createAppliedEdit, normalizeAppliedEdits } from '@/lib/author-editing';
 import type { ReviewIssue } from '@/lib/types';
 
 const issue: ReviewIssue = {
@@ -27,4 +27,27 @@ describe('author editing anchors', () => {
     expect(analyseIssueAnchor(`${issue.original} ${issue.original}`, issue, []).state).toBe('ambiguous');
     expect(analyseIssueAnchor(issue.original, { ...issue, revised: '[Please provide sample count]' }, []).state).toBe('manual');
   });
+
+  it('rejects cross-line and broader author placeholders', () => {
+    const crossLine = { ...issue, original: 'The tests was\nconducted.', revised: 'The tests were conducted.' };
+    expect(analyseIssueAnchor(crossLine.original, crossLine, []).state).toBe('manual');
+    expect(analyseIssueAnchor(issue.original, { ...issue, revised: '[Author to confirm sample count]' }, []).state).toBe('manual');
+  });
+
+  it('drops persisted edits with invalid ranges, mismatched anchors, or overlaps', () => {
+    const source = 'Alpha beta gamma.';
+    const valid = {
+      issueId: 'valid', start: 6, end: 10, original: 'beta', revised: 'BETA', appliedAt: '2026-07-31T00:00:00.000Z',
+    };
+    const invalid = {
+      issueId: 'invalid', start: 0, end: 5, original: 'wrong', revised: 'ALPHA', appliedAt: '2026-07-31T00:00:00.000Z',
+    };
+    const overlap = {
+      issueId: 'overlap', start: 7, end: 12, original: 'eta g', revised: 'X', appliedAt: '2026-07-31T00:00:00.000Z',
+    };
+    const normalized = normalizeAppliedEdits(source, [valid, invalid, overlap]);
+    expect(normalized.valid.map((edit) => edit.issueId)).toEqual(['valid']);
+    expect(composeWorkingText(source, [valid, invalid, overlap])).toBe('Alpha BETA gamma.');
+  });
+
 });

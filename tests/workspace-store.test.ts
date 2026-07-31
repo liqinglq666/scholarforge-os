@@ -119,4 +119,45 @@ describe('workspace store', () => {
   it('rejects unsupported backup envelopes', () => {
     expect(() => parseWorkspaceBackup({ format: 'other', version: 1, history: [] })).toThrow('这不是受支持的 ScholarForge 工作区备份。');
   });
+
+  it('sanitizes invalid decisions and persisted edits before restoring history', () => {
+    const sourceText = 'The tests was conducted.';
+    const stored = snapshot({
+      sourceText,
+      result: {
+        ...snapshot().result as Record<string, unknown>,
+        issues: [{
+          id: 'issue-1', agent: 'language', severity: 'minor', location: 'P1', original: sourceText,
+          revised: 'The tests were conducted.', reason: 'Grammar', category: 'Grammar', meaningChanged: false,
+        }],
+      },
+      decisions: { 'issue-1': 'not-a-decision', ghost: 'accepted' },
+      appliedEdits: [{
+        issueId: 'issue-1', start: 0, end: 4, original: 'Wrong', revised: 'The', appliedAt: '2026-07-31T00:00:00.000Z',
+      }],
+    });
+    const state = readWorkspaceState(memoryStorage({ [STORAGE_KEYS.history]: JSON.stringify([stored]) }));
+    expect(state.history[0]?.decisions).toEqual({});
+    expect(state.history[0]?.appliedEdits).toEqual([]);
+  });
+
+  it('normalizes duplicate issue and terminology identifiers', () => {
+    const stored = snapshot({
+      lockedTerms: [
+        { id: 'same', source: 'A', preferred: 'Alpha' },
+        { id: 'same', source: 'B', preferred: 'Beta' },
+      ],
+      result: {
+        ...snapshot().result as Record<string, unknown>,
+        issues: [
+          { id: 'same', agent: 'language', severity: 'minor', location: 'P1', original: 'A', revised: 'B', reason: 'R', category: 'C', meaningChanged: false },
+          { id: 'same', agent: 'logic', severity: 'major', location: 'P2', original: 'C', revised: 'D', reason: 'R', category: 'C', meaningChanged: true },
+        ],
+      },
+    });
+    const restored = readWorkspaceState(memoryStorage({ [STORAGE_KEYS.history]: JSON.stringify([stored]) })).history[0];
+    expect(new Set(restored?.lockedTerms.map((lock) => lock.id)).size).toBe(2);
+    expect(new Set(restored?.result.issues.map((item) => item.id)).size).toBe(2);
+  });
+
 });

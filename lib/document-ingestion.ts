@@ -195,7 +195,9 @@ async function extractDocx(file: File): Promise<IngestedDocument> {
   ]);
 
   const document = new DOMParser().parseFromString(htmlResult.value, 'text/html');
-  const blocks: StructuredBlock[] = Array.from(document.body.querySelectorAll('h1,h2,h3,h4,p,li,td'))
+  const contentNodes = Array.from(document.body.querySelectorAll('h1,h2,h3,h4,p,li,td'))
+    .filter((node) => !((node.tagName === 'TD' || node.tagName === 'LI') && node.querySelector('p,li')));
+  const blocks: StructuredBlock[] = contentNodes
     .map((node) => ({
       kind: /^H[1-4]$/.test(node.tagName) ? 'heading' as const : 'paragraph' as const,
       level: /^H[1-4]$/.test(node.tagName) ? Number(node.tagName.slice(1)) : undefined,
@@ -221,6 +223,7 @@ async function extractDocx(file: File): Promise<IngestedDocument> {
 }
 
 export async function ingestResearchDocument(file: File): Promise<IngestedDocument> {
+  if (file.size === 0) throw new Error('文件为空，请重新选择有效的 DOCX 文件。');
   if (file.size > DOCUMENT_MAX_BYTES) throw new Error('文件超过 20 MB，请压缩或拆分后再导入。');
   if (file.name.toLowerCase().endsWith('.docx')) return extractDocx(file);
   throw new Error('当前只支持 DOCX 文件。PDF 请先复制需要处理的文本，再粘贴到工作台。');

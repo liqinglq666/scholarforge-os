@@ -118,8 +118,8 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
     const query = issueQuery.trim().toLowerCase();
     return evidenceItems.filter((item) => severityFilter === 'all' || item.issue.severity === severityFilter).filter((item) => !query || [item.issue.category, item.issue.location, item.issue.reason, item.issue.original, item.issue.revised].join(' ').toLowerCase().includes(query));
   }, [evidenceItems, issueQuery, severityFilter]);
-  const selectedItem = evidenceItems.find((item) => item.issue.id === selectedIssueId) || evidenceItems[0];
-  const selectedIndex = selectedItem ? evidenceItems.findIndex((item) => item.issue.id === selectedItem.issue.id) : -1;
+  const selectedItem = filteredItems.find((item) => item.issue.id === selectedIssueId) || filteredItems[0];
+  const selectedIndex = selectedItem ? filteredItems.findIndex((item) => item.issue.id === selectedItem.issue.id) : -1;
   const pendingCount = evidenceItems.filter((item) => item.decision === 'pending' || item.decision === 'deferred').length;
 
   useEffect(() => {
@@ -148,6 +148,16 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
     return () => window.clearInterval(timer);
   }, [loading]);
 
+  useEffect(() => {
+    if (!filteredItems.length) {
+      if (selectedIssueId !== null) setSelectedIssueId(null);
+      return;
+    }
+    if (!filteredItems.some((item) => item.issue.id === selectedIssueId)) {
+      setSelectedIssueId(filteredItems[0].issue.id);
+    }
+  }, [filteredItems, selectedIssueId]);
+
   function currentSnapshot(nextResult = result, nextDecisions = decisions, nextEdits = appliedEdits): ReviewSnapshot | null {
     if (!nextResult || !snapshotId) return null;
     return {
@@ -171,19 +181,30 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
     if (snapshot) onSnapshotChanged(snapshot);
   }
 
-  async function runWorkflow() {
-    if (!inputValid || loading) return;
+  async function runWorkflow(textOverride?: string) {
+    const analysisText = textOverride ?? sourceText;
+    const analysisValid = analysisText.trim().length >= minimum && analysisText.length <= WORKSPACE_TEXT_LIMIT;
+    if (!analysisValid || loading) return;
     setLoading(true);
     setElapsedMs(0);
     setError('');
     setNotice('');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 65_000);
     try {
       const response = await fetch('/api/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectTitle, taskType, text: sourceText, targetJournal, sectionType, lockedTerms }),
+        body: JSON.stringify({ projectTitle, taskType, text: analysisText, targetJournal, sectionType, lockedTerms }),
+        signal: controller.signal,
       });
-      const payload = await response.json() as ReviewPayload;
+      const raw = await response.text();
+      let payload: ReviewPayload;
+      try {
+        payload = JSON.parse(raw) as ReviewPayload;
+      } catch {
+        throw new Error(response.ok ? '分析服务返回了无法识别的结果。' : `分析服务暂不可用（HTTP ${response.status}）。`);
+      }
       if (!response.ok) throw new Error(payload.detail || payload.error || '工作流请求失败。');
       if (!Array.isArray(payload.issues) || typeof payload.revisedText !== 'string') throw new Error('工作流返回的数据结构不完整。');
       const nextId = crypto.randomUUID();
@@ -193,7 +214,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
         id: nextId,
         projectTitle: projectTitle.trim() || '未命名科研写作任务',
         taskType,
-        sourceText,
+        sourceText: analysisText,
         targetJournal,
         sectionType,
         lockedTerms,
@@ -203,6 +224,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
         appliedEdits: [],
         savedAt: new Date().toISOString(),
       };
+      if (analysisText !== sourceText) setSourceText(analysisText);
       setResult(payload);
       setRequestId(nextRequestId);
       setSnapshotId(nextId);
@@ -215,8 +237,12 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
       setMobilePanel('evidence');
       onSnapshotChanged(snapshot);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '任务失败，请检查服务配置后重试。');
+      const message = caught instanceof DOMException && caught.name === 'AbortError'
+        ? '分析请求超时，请缩短文本后重试。'
+        : caught instanceof Error ? caught.message : '任务失败，请检查服务配置后重试。';
+      setError(message);
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }
@@ -269,16 +295,26 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   }
 
   function addLock() {
-    if (!lockSource.trim() || !lockPreferred.trim() || lockedTerms.length >= 12) return;
-    setLockedTerms((current) => [...current, { id: crypto.randomUUID(), source: lockSource.trim(), preferred: lockPreferred.trim() }]);
+    const source = lockSource.trim();
+    const preferred = lockPreferred.trim();
+    if (!source || !preferred) return;
+    if (lockedTerms.length >= 12) {
+      setNotice('最多可以设置 12 条术语锁。');
+      return;
+    }
+    if (lockedTerms.some((lock) => lock.source.toLowerCase() === source.toLowerCase())) {
+      setNotice('这个原词已经设置过术语锁。');
+      return;
+    }
+    setLockedTerms((current) => [...current, { id: crypto.randomUUID(), source, preferred }]);
     setLockSource('');
     setLockPreferred('');
   }
 
   function moveIssue(offset: number) {
-    if (!evidenceItems.length) return;
-    const index = selectedIndex < 0 ? 0 : (selectedIndex + offset + evidenceItems.length) % evidenceItems.length;
-    setSelectedIssueId(evidenceItems[index].issue.id);
+    if (!filteredItems.length) return;
+    const index = selectedIndex < 0 ? 0 : (selectedIndex + offset + filteredItems.length) % filteredItems.length;
+    setSelectedIssueId(filteredItems[index].issue.id);
   }
 
   function exportArtifact(kind: 'text' | 'report' | 'docx') {
@@ -301,6 +337,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   const selectedAnalysis = selectedItem ? analyseIssueAnchor(sourceText, selectedItem.issue, appliedEdits) : null;
   const decidedCount = evidenceItems.length - pendingCount;
   const selectedAnchorReady = selectedAnalysis?.state === 'applied' || selectedAnalysis?.state.startsWith('safe');
+  const selectedCanApply = selectedAnalysis?.state === 'safe-exact' || selectedAnalysis?.state === 'safe-whitespace';
 
   return (
     <main className={`sf-studio ${result ? 'is-reviewing' : 'is-composing'}`}>
@@ -328,7 +365,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
             <summary aria-label="更多操作"><Icon name="more" /></summary>
             <div>
               <button onClick={onImport} type="button"><Icon name="import" />重新导入文档</button>
-              {result ? <button disabled={!inputValid || loading} onClick={() => void runWorkflow()} type="button"><Icon name="spark" />重新分析当前文本</button> : null}
+              {result ? <button disabled={workingText.trim().length < minimum || workingText.length > WORKSPACE_TEXT_LIMIT || loading} onClick={() => void runWorkflow(workingText)} type="button"><Icon name="spark" />重新分析工作稿</button> : null}
             </div>
           </details>
 
@@ -404,7 +441,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
                 <div className="sf-term-settings">
                   <header><span>术语锁</span><small>{lockedTerms.length}/12</small></header>
                   {lockedTerms.length ? <div className="sf-term-chips">{lockedTerms.map((lock) => <span key={lock.id}><b>{lock.source}</b> → {lock.preferred}<button aria-label="删除术语锁" onClick={() => setLockedTerms((current) => current.filter((item) => item.id !== lock.id))} type="button"><Icon name="close" size={12} /></button></span>)}</div> : <p>锁定必须保持一致的专业术语或缩写。</p>}
-                  <div className="sf-term-add"><input onChange={(event) => setLockSource(event.target.value)} placeholder="原词" value={lockSource} /><input onChange={(event) => setLockPreferred(event.target.value)} placeholder="规范表达" value={lockPreferred} /><button aria-label="添加术语锁" disabled={!lockSource.trim() || !lockPreferred.trim()} onClick={addLock} type="button"><Icon name="plus" size={16} /></button></div>
+                  <div className="sf-term-add"><input onChange={(event) => setLockSource(event.target.value)} placeholder="原词" value={lockSource} /><input onChange={(event) => setLockPreferred(event.target.value)} placeholder="规范表达" value={lockPreferred} /><button aria-label="添加术语锁" disabled={!lockSource.trim() || !lockPreferred.trim() || lockedTerms.length >= 12} onClick={addLock} type="button"><Icon name="plus" size={16} /></button></div>
                 </div>
               </div>
             </details>
@@ -508,7 +545,7 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
                     <button aria-pressed={selectedItem.decision === 'deferred'} onClick={() => setDecision(selectedItem.issue.id, 'deferred')} type="button"><Icon name="clock" size={15} />稍后</button>
                     <button aria-pressed={selectedItem.decision === 'dismissed'} className="is-dismiss" onClick={() => setDecision(selectedItem.issue.id, 'dismissed')} type="button"><Icon name="close" size={15} />不采用</button>
                   </div>
-                  <button className="sf-button is-primary is-full" disabled={selectedItem.decision !== 'accepted' || selectedItem.applied} onClick={() => applyIssue(selectedItem.issue)} type="button">{selectedItem.applied ? '已应用到工作稿' : '应用到工作稿'} <Icon name="arrow-right" /></button>
+                  <button className="sf-button is-primary is-full" disabled={selectedItem.decision !== 'accepted' || selectedItem.applied || !selectedCanApply} onClick={() => applyIssue(selectedItem.issue)} type="button">{selectedItem.applied ? '已应用到工作稿' : selectedCanApply ? '应用到工作稿' : '需要手动修改'} <Icon name="arrow-right" /></button>
                   <div className="sf-issue-nav"><button onClick={() => moveIssue(-1)} type="button"><Icon name="arrow-left" size={15} />上一条</button><button onClick={() => moveIssue(1)} type="button">下一条<Icon name="arrow-right" size={15} /></button></div>
                 </footer>
               </> : <div className="sf-panel-empty"><span><Icon name="shield" size={26} /></span><h2>没有匹配的问题</h2><p>调整筛选条件，或返回文稿继续查看。</p></div>}

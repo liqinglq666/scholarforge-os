@@ -18,6 +18,15 @@ import type { WorkspaceTask } from '@/lib/types';
 
 type View = 'hub' | 'workbench';
 type ServiceState = 'checking' | 'ready' | 'unconfigured' | 'offline';
+const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
+
+function setSessionView(view: View) {
+  try {
+    window.sessionStorage.setItem(STORAGE_KEYS.hubView, view);
+  } catch {
+    // Restricted browser storage should not block navigation.
+  }
+}
 
 function defaultDraft(task: WorkspaceTask): WorkspaceDraft {
   return {
@@ -57,7 +66,11 @@ export function WorkspaceHub() {
 
   useEffect(() => {
     refresh();
-    if (window.sessionStorage.getItem(STORAGE_KEYS.hubView) === 'workbench') setView('workbench');
+    try {
+      if (window.sessionStorage.getItem(STORAGE_KEYS.hubView) === 'workbench') setView('workbench');
+    } catch {
+      // Restricted browser storage should not block the home screen.
+    }
 
     let alive = true;
     fetch('/api/health', { cache: 'no-store' })
@@ -109,7 +122,7 @@ export function WorkspaceHub() {
     saveDraft(draft);
     setActiveSnapshot(snapshot);
     setView('workbench');
-    window.sessionStorage.setItem(STORAGE_KEYS.hubView, 'workbench');
+    setSessionView('workbench');
     window.scrollTo({ top: 0 });
   }
 
@@ -132,7 +145,7 @@ export function WorkspaceHub() {
   function returnToHub() {
     setView('hub');
     setActiveSnapshot(null);
-    window.sessionStorage.setItem(STORAGE_KEYS.hubView, 'hub');
+    setSessionView('hub');
     refresh();
     window.scrollTo({ top: 0 });
   }
@@ -140,15 +153,29 @@ export function WorkspaceHub() {
   function deleteSnapshot(snapshot: ReviewSnapshot) {
     if (!window.confirm(`删除“${snapshot.projectTitle}”的本地任务记录？`)) return;
     const next = state.history.filter((item) => item.id !== snapshot.id);
-    writeWorkspaceHistory(window.localStorage, next);
-    setState((current) => ({ ...current, history: next }));
+    try {
+      writeWorkspaceHistory(window.localStorage, next);
+      setState((current) => ({ ...current, history: next }));
+    } catch {
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([...current.warnings, '删除任务记录失败，浏览器可能阻止了本地存储。'])),
+      }));
+    }
   }
 
   function exportBackup() {
-    downloadJson(
-      `scholarforge-backup-${new Date().toISOString().slice(0, 10)}.json`,
-      createWorkspaceBackup(window.localStorage),
-    );
+    try {
+      downloadJson(
+        `scholarforge-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        createWorkspaceBackup(window.localStorage),
+      );
+    } catch {
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([...current.warnings, '本地备份导出失败，请检查浏览器存储权限。'])),
+      }));
+    }
   }
 
   async function importBackup(event: ChangeEvent<HTMLInputElement>) {
@@ -157,10 +184,21 @@ export function WorkspaceHub() {
     if (!file) return;
 
     try {
+      if (file.size > BACKUP_MAX_BYTES) throw new Error('备份文件超过 5 MB，请检查是否选择了正确文件。');
       const backup = parseWorkspaceBackup(JSON.parse(await file.text()) as unknown);
       if (!window.confirm(`恢复 ${backup.history.length} 条历史记录，并替换当前本地草稿？`)) return;
-      writeWorkspaceDraft(window.localStorage, backup.draft);
-      writeWorkspaceHistory(window.localStorage, backup.history);
+      const previousDraft = window.localStorage.getItem(STORAGE_KEYS.draft);
+      const previousHistory = window.localStorage.getItem(STORAGE_KEYS.history);
+      try {
+        writeWorkspaceDraft(window.localStorage, backup.draft);
+        writeWorkspaceHistory(window.localStorage, backup.history);
+      } catch (writeError) {
+        if (previousDraft === null) window.localStorage.removeItem(STORAGE_KEYS.draft);
+        else window.localStorage.setItem(STORAGE_KEYS.draft, previousDraft);
+        if (previousHistory === null) window.localStorage.removeItem(STORAGE_KEYS.history);
+        else window.localStorage.setItem(STORAGE_KEYS.history, previousHistory);
+        throw writeError;
+      }
       refresh();
     } catch (caught) {
       setState((current) => ({
@@ -175,10 +213,17 @@ export function WorkspaceHub() {
 
   function clearData() {
     if (!window.confirm('清除当前浏览器中的草稿和任务历史？此操作无法撤销。')) return;
-    window.localStorage.removeItem(STORAGE_KEYS.draft);
-    window.localStorage.removeItem(STORAGE_KEYS.history);
-    window.localStorage.removeItem(STORAGE_KEYS.authorEditingSession);
-    setState({ draft: null, history: [], warnings: [] });
+    try {
+      window.localStorage.removeItem(STORAGE_KEYS.draft);
+      window.localStorage.removeItem(STORAGE_KEYS.history);
+      window.localStorage.removeItem(STORAGE_KEYS.authorEditingSession);
+      setState({ draft: null, history: [], warnings: [] });
+    } catch {
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([...current.warnings, '清除本地数据失败，浏览器可能阻止了存储操作。'])),
+      }));
+    }
   }
 
   if (view === 'workbench') {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { WORKSPACE_TEXT_LIMIT } from '@/lib/app-config';
 import { reviewWithBailian } from '@/lib/bailian';
 import type {
   ReviewRequest,
@@ -23,6 +24,7 @@ const VALID_SECTIONS = new Set<ReviewSection>([
 
 function sanitizeLocks(value: unknown): TerminologyLock[] {
   if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
   return value.slice(0, 12).flatMap((item, index) => {
     if (!item || typeof item !== 'object') return [];
     const record = item as Record<string, unknown>;
@@ -30,12 +32,11 @@ function sanitizeLocks(value: unknown): TerminologyLock[] {
     const preferred = typeof record.preferred === 'string' ? record.preferred.trim().slice(0, 160) : '';
     const note = typeof record.note === 'string' ? record.note.trim().slice(0, 240) : '';
     if (!source || !preferred) return [];
-    return [{
-      id: typeof record.id === 'string' ? record.id.slice(0, 80) : `lock-${index + 1}`,
-      source,
-      preferred,
-      note,
-    }];
+    const requestedId = typeof record.id === 'string' ? record.id.slice(0, 80) : '';
+    let id = requestedId || `lock-${index + 1}`;
+    while (seen.has(id)) id = `${id}-${index + 1}`;
+    seen.add(id);
+    return [{ id, source, preferred, note }];
   });
 }
 
@@ -57,10 +58,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const taskType = VALID_TASKS.has(body.taskType as WorkspaceTask)
-      ? body.taskType as WorkspaceTask
-      : 'precheck';
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (body.taskType !== undefined && !VALID_TASKS.has(body.taskType as WorkspaceTask)) {
+      return noStoreJson({ error: '不支持的任务类型。', requestId }, 400);
+    }
+    if (body.sectionType !== undefined && !VALID_SECTIONS.has(body.sectionType as ReviewSection)) {
+      return noStoreJson({ error: '不支持的论文章节类型。', requestId }, 400);
+    }
+    const taskType = body.taskType as WorkspaceTask || 'precheck';
+    const text = typeof body.text === 'string' ? body.text : '';
     const projectTitle = typeof body.projectTitle === 'string' ? body.projectTitle.trim().slice(0, 120) : '';
     const targetJournal = typeof body.targetJournal === 'string' ? body.targetJournal.trim().slice(0, 160) : '';
     const lockedTerms = sanitizeLocks(body.lockedTerms);
@@ -68,12 +73,12 @@ export async function POST(request: Request) {
       ? body.sectionType as ReviewSection
       : 'general';
 
-    if (text.length < 40) {
+    if (text.trim().length < 40) {
       return noStoreJson({ error: '请至少提供 40 个字符后再开始分析。', requestId }, 400);
     }
 
-    if (text.length > 12_000) {
-      return noStoreJson({ error: '当前工作台单次最多处理 12,000 个字符。', requestId }, 400);
+    if (text.length > WORKSPACE_TEXT_LIMIT) {
+      return noStoreJson({ error: `当前工作台单次最多处理 ${WORKSPACE_TEXT_LIMIT.toLocaleString('en-US')} 个字符。`, requestId }, 400);
     }
 
     if (!process.env.DASHSCOPE_API_KEY?.trim()) {
