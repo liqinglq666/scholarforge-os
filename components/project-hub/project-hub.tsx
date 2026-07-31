@@ -1,7 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/ui/icon';
-import { SECTION_LABELS, WORKFLOW_DESCRIPTIONS, WORKFLOW_LABELS } from '@/lib/app-config';
+import { SECTION_LABELS, WORKFLOW_LABELS } from '@/lib/app-config';
 import type { ReviewSnapshot, WorkspaceDraft } from '@/lib/workspace-schema';
 import type { WorkspaceTask } from '@/lib/types';
 
@@ -25,124 +25,147 @@ function formatDate(value?: string) {
   if (!value) return '尚未保存';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间未知';
-  return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function pendingCount(snapshot: ReviewSnapshot) {
-  return snapshot.result.issues.filter((issue) => (snapshot.decisions[issue.id] || 'pending') === 'pending').length;
+  return snapshot.result.issues.filter((issue) => {
+    const decision = snapshot.decisions[issue.id] || 'pending';
+    return decision === 'pending' || decision === 'deferred';
+  }).length;
 }
 
-const WORKFLOW_ORDER: WorkspaceTask[] = ['precheck', 'polish', 'translate', 'review-response'];
+function serviceLabel(state: ProjectHubProps['serviceState'], model: string) {
+  if (state === 'live') return `${model} 已连接`;
+  if (state === 'demo') return '安全演示模式';
+  if (state === 'offline') return '服务暂不可用';
+  return '正在检查服务';
+}
 
 export function ProjectHub(props: ProjectHubProps) {
-  const totalPending = props.history.reduce((sum, snapshot) => sum + pendingCount(snapshot), 0);
-  const currentTask = props.draft?.taskType ? WORKFLOW_LABELS[props.draft.taskType] : '';
-  const draftText = props.draft?.sourceText || '';
+  const hasDraft = Boolean(props.draft?.sourceText?.trim());
+  const recent = props.history.slice(0, 6);
 
   return (
-    <main className="sf-app-shell">
-      <header className="sf-appbar">
-        <a className="sf-brand" href="#main-content" aria-label="ScholarForge OS 研究项目中心">
-          <span className="sf-brand-symbol">S</span>
-          <span><strong>ScholarForge OS</strong><small>Evidence-first research writing</small></span>
+    <main className="sf-home-shell">
+      <header className="sf-home-header">
+        <a className="sf-wordmark" href="#home-main" aria-label="ScholarForge OS 首页">
+          <span className="sf-wordmark-mark">S</span>
+          <span>
+            <strong>ScholarForge</strong>
+            <small>科研写作审阅</small>
+          </span>
         </a>
-        <div className="sf-appbar-status">
-          <span className={`sf-service-dot is-${props.serviceState}`} />
-          <span>{props.serviceState === 'live' ? `${props.model} 已连接` : props.serviceState === 'demo' ? '安全演示模式' : props.serviceState === 'offline' ? '服务状态不可用' : '正在检查服务'}</span>
-        </div>
+
+        <details className="sf-home-menu">
+          <summary aria-label="打开工作区菜单"><Icon name="more" /></summary>
+          <div>
+            <div className="sf-home-menu-status">
+              <span className={`sf-service-dot is-${props.serviceState}`} />
+              <span>{serviceLabel(props.serviceState, props.model)}</span>
+            </div>
+            <hr />
+            <button onClick={props.onExportBackup} type="button"><Icon name="download" />导出本地备份</button>
+            <button onClick={props.onImportBackup} type="button"><Icon name="import" />恢复本地备份</button>
+            <hr />
+            <button className="is-danger" onClick={props.onClearData} type="button"><Icon name="trash" />清除本地数据</button>
+          </div>
+        </details>
       </header>
 
-      <div className="sf-hub" id="main-content">
-        <section className="sf-hub-heading">
-          <div>
-            <span className="sf-eyebrow">Research projects</span>
-            <h1>研究项目</h1>
-            <p>从论文文本到证据、作者决策和可交付文稿，所有关键状态都保留在同一项目中。</p>
+      <div className="sf-home" id="home-main">
+        {props.warnings.length ? (
+          <div className="sf-home-alerts" aria-live="polite">
+            {props.warnings.map((warning) => <div className="sf-alert is-warning" key={warning}><Icon name="warning" />{warning}</div>)}
           </div>
-          <div className="sf-heading-actions">
-            <button className="sf-button" onClick={props.onImport} type="button"><Icon name="import" /> 导入文档</button>
-            <button className="sf-button is-primary" onClick={() => props.onCreate('precheck')} type="button"><Icon name="plus" /> 新建研究任务</button>
+        ) : null}
+
+        <section className="sf-start-panel">
+          <div className="sf-start-copy">
+            <span className="sf-kicker">Author-controlled research writing</span>
+            <h1>从论文内容开始，<br />逐条做出可靠修改。</h1>
+            <p>导入论文或粘贴一段文本。系统负责提出可追溯建议，是否接受、怎样修改始终由作者决定。</p>
+          </div>
+
+          <div className="sf-start-actions">
+            <button className="sf-start-primary" onClick={props.onImport} type="button">
+              <span><Icon name="import" size={22} /></span>
+              <div><b>打开论文文件</b><small>DOCX 或文字型 PDF</small></div>
+              <Icon name="arrow-right" />
+            </button>
+            <button className="sf-start-secondary" onClick={() => props.onCreate('precheck')} type="button">
+              <span><Icon name="edit" size={20} /></span>
+              <div><b>直接粘贴文本</b><small>适合处理单个段落或审稿意见</small></div>
+              <Icon name="arrow-right" />
+            </button>
           </div>
         </section>
 
-        {props.warnings.length ? <section className="sf-alert-stack" aria-live="polite">{props.warnings.map((warning) => <div className="sf-alert is-warning" key={warning}><Icon name="warning" />{warning}</div>)}</section> : null}
-
-        {draftText.trim() ? (
-          <section className="sf-resume-card">
-            <div className="sf-resume-icon"><Icon name="edit" /></div>
-            <div>
-              <span>当前草稿</span>
-              <h2>{props.draft?.projectTitle || '未命名科研写作任务'}</h2>
-              <p>{currentTask} · {SECTION_LABELS[props.draft?.sectionType || 'general']} · {draftText.length.toLocaleString()} 字符</p>
-            </div>
-            <time>{formatDate(props.draft?.savedAt)}</time>
-            <button className="sf-button is-primary" onClick={props.onOpenDraft} type="button">继续处理 <Icon name="arrow-right" /></button>
-          </section>
-        ) : null}
-
-        {totalPending > 0 ? (
-          <section className="sf-attention-strip">
-            <span><Icon name="warning" /></span>
-            <div><b>还有 {totalPending} 条证据等待作者决策</b><p>待处理建议不会自动写入文稿，也不会被批量应用。</p></div>
-          </section>
-        ) : null}
-
-        <section className="sf-hub-section">
-          <header className="sf-section-header">
-            <div><span className="sf-eyebrow">Start a workflow</span><h2>新建任务</h2></div>
-          </header>
-          <div className="sf-workflow-list">
-            {WORKFLOW_ORDER.map((task, index) => (
-              <button key={task} onClick={() => props.onCreate(task)} type="button">
-                <span className="sf-workflow-index">0{index + 1}</span>
-                <div><b>{WORKFLOW_LABELS[task]}</b><p>{WORKFLOW_DESCRIPTIONS[task]}</p></div>
-                <Icon name="arrow-right" />
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="sf-hub-section">
-          <header className="sf-section-header">
-            <div><span className="sf-eyebrow">Recent work</span><h2>最近任务</h2></div>
-            <span>{props.history.length} / 8</span>
-          </header>
-
-          {props.history.length ? (
-            <div className="sf-project-table" role="table" aria-label="最近科研任务">
-              <div className="sf-project-row is-head" role="row">
-                <span role="columnheader">项目</span><span role="columnheader">工作流</span><span role="columnheader">准备度</span><span role="columnheader">待决策</span><span role="columnheader">修改时间</span><span aria-hidden="true" />
+        {hasDraft ? (
+          <section className="sf-current-work">
+            <header>
+              <span className="sf-section-label">继续上次工作</span>
+              <time>{formatDate(props.draft?.savedAt)}</time>
+            </header>
+            <button onClick={props.onOpenDraft} type="button">
+              <div className="sf-file-symbol"><Icon name="document" size={22} /></div>
+              <div>
+                <h2>{props.draft?.projectTitle || '未命名科研写作任务'}</h2>
+                <p>{WORKFLOW_LABELS[props.draft?.taskType || 'precheck']} · {SECTION_LABELS[props.draft?.sectionType || 'general']} · {(props.draft?.sourceText?.length || 0).toLocaleString()} 字符</p>
               </div>
-              {props.history.map((snapshot) => {
+              <span>继续</span>
+              <Icon name="arrow-right" />
+            </button>
+          </section>
+        ) : null}
+
+        <section className="sf-recent-work">
+          <header className="sf-home-section-header">
+            <div>
+              <span className="sf-section-label">最近任务</span>
+              <h2>{recent.length ? '继续审阅或查看结果' : '你的任务会保存在这里'}</h2>
+            </div>
+            {recent.length ? <span>当前浏览器 · 最多 8 条</span> : null}
+          </header>
+
+          {recent.length ? (
+            <div className="sf-recent-list">
+              {recent.map((snapshot) => {
                 const pending = pendingCount(snapshot);
                 return (
-                  <article className="sf-project-row" key={snapshot.id} role="row">
-                    <div role="cell"><b>{snapshot.projectTitle}</b><small>{snapshot.targetJournal || SECTION_LABELS[snapshot.sectionType]}</small></div>
-                    <span role="cell">{WORKFLOW_LABELS[snapshot.taskType]}</span>
-                    <span role="cell"><b>{snapshot.result.scoreAfter}</b><small>/100</small></span>
-                    <span role="cell" className={pending ? 'is-pending' : 'is-complete'}>{pending ? `${pending} 条` : '已完成'}</span>
-                    <time role="cell">{formatDate(snapshot.savedAt)}</time>
-                    <div className="sf-row-actions" role="cell">
-                      <button className="sf-button is-compact" onClick={() => props.onOpenSnapshot(snapshot)} type="button">打开</button>
-                      <button aria-label={`删除 ${snapshot.projectTitle}`} className="sf-icon-button" onClick={() => props.onDeleteSnapshot(snapshot)} type="button"><Icon name="trash" size={16} /></button>
-                    </div>
+                  <article key={snapshot.id}>
+                    <button className="sf-recent-open" onClick={() => props.onOpenSnapshot(snapshot)} type="button">
+                      <span className="sf-recent-type">{WORKFLOW_LABELS[snapshot.taskType].slice(0, 2)}</span>
+                      <div>
+                        <h3>{snapshot.projectTitle}</h3>
+                        <p>{WORKFLOW_LABELS[snapshot.taskType]} · {SECTION_LABELS[snapshot.sectionType]} · {formatDate(snapshot.savedAt)}</p>
+                      </div>
+                      <span className={pending ? 'sf-task-state is-pending' : 'sf-task-state is-done'}>{pending ? `${pending} 条待处理` : '已完成决策'}</span>
+                      <Icon name="arrow-right" />
+                    </button>
+                    <button aria-label={`删除 ${snapshot.projectTitle}`} className="sf-recent-delete" onClick={() => props.onDeleteSnapshot(snapshot)} type="button"><Icon name="trash" size={16} /></button>
                   </article>
                 );
               })}
             </div>
           ) : (
-            <div className="sf-empty-state"><span><Icon name="folder" size={24} /></span><h3>还没有任务历史</h3><p>创建任务或导入文档后，成功运行的审阅会出现在这里。</p></div>
+            <div className="sf-empty-home">
+              <span><Icon name="folder" size={24} /></span>
+              <h3>还没有审阅记录</h3>
+              <p>打开论文或粘贴文本，完成第一次分析后即可从这里继续。</p>
+            </div>
           )}
         </section>
 
-        <section className="sf-data-panel">
-          <div><span className="sf-eyebrow">Local workspace</span><h2>数据与恢复</h2><p>草稿和最近 8 条历史保存在当前浏览器。可导出 JSON 备份，换设备前请主动保存。</p></div>
-          <div>
-            <button className="sf-button is-ghost" onClick={props.onExportBackup} type="button"><Icon name="download" /> 导出备份</button>
-            <button className="sf-button is-ghost" onClick={props.onImportBackup} type="button"><Icon name="import" /> 恢复备份</button>
-            <button className="sf-button is-danger-ghost" onClick={props.onClearData} type="button"><Icon name="trash" /> 清除本地数据</button>
-          </div>
-        </section>
+        <footer className="sf-home-footer">
+          <span><Icon name="shield" size={15} /> 原始文件在浏览器本地解析</span>
+          <span>建议不会自动写入论文</span>
+        </footer>
       </div>
     </main>
   );

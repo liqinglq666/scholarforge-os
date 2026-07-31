@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Icon } from '@/components/ui/icon';
 import {
   DOCUMENT_MAX_BYTES,
@@ -9,9 +9,8 @@ import {
   type IngestedDocument,
   type IngestedSection,
 } from '@/lib/document-ingestion';
-import { MODE_LABELS, SECTION_LABELS, WORKFLOW_LABELS } from '@/lib/app-config';
+import { SECTION_LABELS } from '@/lib/app-config';
 import type { WorkspaceDraft } from '@/lib/workspace-schema';
-import type { ReviewMode, WorkspaceTask } from '@/lib/types';
 
 interface DocumentImportDialogProps {
   open: boolean;
@@ -30,8 +29,6 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
   const [processing, setProcessing] = useState(false);
   const [document, setDocument] = useState<IngestedDocument | null>(null);
   const [selectedId, setSelectedId] = useState('');
-  const [taskType, setTaskType] = useState<WorkspaceTask>('precheck');
-  const [reviewMode, setReviewMode] = useState<ReviewMode>('balanced');
   const [error, setError] = useState('');
 
   const availableSections = useMemo(() => {
@@ -40,17 +37,31 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
     if (document.fullText.length >= 40 && document.fullText.length <= WORKSPACE_TEXT_LIMIT && document.sections.length > 1) {
       sections.unshift({
         id: 'full-document',
-        title: '全文（已提取文本）',
+        title: '全文',
         sectionType: 'general',
         text: document.fullText,
         charCount: document.fullText.length,
-        sourceLabel: document.pageCount ? `${document.pageCount} pages` : 'Complete document',
+        sourceLabel: document.pageCount ? `${document.pageCount} 页` : '完整文档',
       });
     }
     return sections;
   }, [document]);
 
   const selected = availableSections.find((section) => section.id === selectedId) || availableSections[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = window.document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -60,6 +71,11 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
     setError('');
     setProcessing(false);
     setDragging(false);
+  }
+
+  function close() {
+    onClose();
+    reset();
   }
 
   async function processFile(file?: File) {
@@ -73,8 +89,6 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
       if (!next.sections.length) throw new Error('没有识别到可导入的正文段落。');
       setDocument(next);
       setSelectedId(next.sections[0].id);
-      setTaskType(next.suggestedTask);
-      setReviewMode(next.suggestedMode);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '文档解析失败，请改用可复制文本的 PDF 或 DOCX。');
     } finally {
@@ -99,14 +113,14 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
     const savedAt = new Date().toISOString();
     onImported({
       ...existingDraft,
-      projectTitle: `${document.title || 'Imported manuscript'} · ${section.title}`,
-      taskType,
+      projectTitle: document.title || document.fileName.replace(/\.[^.]+$/, ''),
+      taskType: document.suggestedTask,
       sourceText: section.text,
       supportingContext: '',
       responseLocation: '',
       targetJournal: typeof existingDraft?.targetJournal === 'string' ? existingDraft.targetJournal : '',
       sectionType: section.sectionType,
-      reviewMode,
+      reviewMode: document.suggestedMode,
       lockedTerms: Array.isArray(existingDraft?.lockedTerms) ? existingDraft.lockedTerms : [],
       savedAt,
       importedDocument: {
@@ -117,20 +131,19 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
         importedAt: savedAt,
       },
     });
-    onClose();
-    reset();
+    close();
   }
 
   return (
-    <div className="sf-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section aria-labelledby="import-title" aria-modal="true" className="sf-dialog sf-import-dialog" role="dialog">
+    <div className="sf-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+      <section aria-labelledby="import-title" aria-modal="true" className="sf-import-dialog" role="dialog">
         <header className="sf-dialog-header">
           <div>
-            <span className="sf-eyebrow">Document import</span>
-            <h2 id="import-title">导入论文并选择审阅范围</h2>
-            <p>文档在浏览器中解析；只有选中的文本会在启动工作流后发送至服务端。</p>
+            <span className="sf-section-label">打开论文</span>
+            <h2 id="import-title">{document ? '选择要处理的内容' : '导入一个论文文件'}</h2>
+            <p>{document ? '先选定范围，再进入工作台选择具体处理目标。' : '文件在当前浏览器中解析，不会自动上传原始文档。'}</p>
           </div>
-          <button aria-label="关闭导入窗口" className="sf-icon-button" onClick={onClose} type="button"><Icon name="close" /></button>
+          <button aria-label="关闭" className="sf-icon-button is-quiet" onClick={close} type="button"><Icon name="close" /></button>
         </header>
 
         {!document ? (
@@ -143,54 +156,67 @@ export function DocumentImportDialog({ open, onClose, onImported, existingDraft 
               onDrop={onDrop}
             >
               {processing ? (
-                <><span className="sf-spinner" /><h3>正在本地解析文档</h3><p>提取正文、识别章节并建立可审阅文本。</p></>
+                <>
+                  <span className="sf-spinner" />
+                  <h3>正在读取论文</h3>
+                  <p>提取正文并识别常见论文章节。</p>
+                </>
               ) : (
                 <>
-                  <span className="sf-dropzone-icon"><Icon name="import" size={24} /></span>
+                  <span className="sf-dropzone-icon"><Icon name="document" size={26} /></span>
                   <h3>拖入 DOCX 或文字型 PDF</h3>
-                  <p>单个文件最大 {readableSize(DOCUMENT_MAX_BYTES)}。扫描型 PDF、复杂公式和双栏版式需要人工核对。</p>
+                  <p>最大 {readableSize(DOCUMENT_MAX_BYTES)}。扫描型 PDF 暂不支持，复杂表格和公式导入后请人工核对。</p>
                   <button className="sf-button is-primary" onClick={() => inputRef.current?.click()} type="button">选择文件</button>
                   <input accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf" hidden onChange={onFileChange} ref={inputRef} type="file" />
                 </>
               )}
             </div>
-            <div className="sf-boundary-grid">
-              <article><Icon name="shield" /><div><b>本地解析</b><p>原始文件不进入云端存储，选中范围可在工作台继续编辑。</p></div></article>
-              <article><Icon name="document" /><div><b>明确边界</b><p>DOCX 标题可识别；PDF 按页面提取文字。当前不提供 OCR。</p></div></article>
-            </div>
+            <p className="sf-import-privacy"><Icon name="shield" size={15} /> 只有你在工作台中主动提交的文本会进入分析请求。</p>
             {error ? <div className="sf-alert is-danger" role="alert"><Icon name="warning" />{error}<button onClick={reset} type="button">重新选择</button></div> : null}
           </div>
         ) : (
           <div className="sf-import-review">
             <div className="sf-import-filebar">
               <span><Icon name="file" /></span>
-              <div><b>{document.fileName}</b><small>{document.fileType.toUpperCase()} · {document.fullText.length.toLocaleString()} 字符 · {document.sections.length} 个片段</small></div>
-              <button className="sf-button is-ghost" onClick={reset} type="button">更换文件</button>
+              <div>
+                <b>{document.fileName}</b>
+                <small>{document.fileType.toUpperCase()} · {document.fullText.length.toLocaleString()} 字符 · {document.sections.length} 个识别片段</small>
+              </div>
+              <button className="sf-button is-quiet" onClick={reset} type="button">更换文件</button>
             </div>
-            <div className="sf-import-grid">
-              <section className="sf-import-sections">
-                <header><span>识别范围</span><b>{availableSections.length}</b></header>
-                <div>{availableSections.map((section) => (
-                  <button className={selected?.id === section.id ? 'is-selected' : ''} key={section.id} onClick={() => setSelectedId(section.id)} type="button">
-                    <span>{selected?.id === section.id ? <Icon name="check" size={15} /> : null}</span>
-                    <div><b>{section.title}</b><small>{SECTION_LABELS[section.sectionType]} · {section.sourceLabel}</small></div>
-                    <i>{section.charCount.toLocaleString()}</i>
-                  </button>
-                ))}</div>
-              </section>
-              <section className="sf-import-preview">
-                <header><div><span>文本预览</span><b>{selected?.title || '请选择范围'}</b></div><small>{selected?.charCount.toLocaleString() || 0} / {WORKSPACE_TEXT_LIMIT.toLocaleString()}</small></header>
-                <div className="sf-import-preview-text">{selected?.text || ''}</div>
-                <div className="sf-form-grid is-two">
-                  <label><span>工作流</span><select onChange={(event) => setTaskType(event.target.value as WorkspaceTask)} value={taskType}>{Object.entries(WORKFLOW_LABELS).filter(([key]) => key !== 'review-response').map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                  <label><span>处理强度</span><select onChange={(event) => setReviewMode(event.target.value as ReviewMode)} value={reviewMode}>{Object.entries(MODE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+
+            <div className="sf-import-content">
+              <aside className="sf-section-picker">
+                <header><span>可用范围</span><b>{availableSections.length}</b></header>
+                <div>
+                  {availableSections.map((section) => (
+                    <button className={selected?.id === section.id ? 'is-selected' : ''} key={section.id} onClick={() => setSelectedId(section.id)} type="button">
+                      <span>{selected?.id === section.id ? <Icon name="check" size={14} /> : null}</span>
+                      <div><b>{section.title}</b><small>{SECTION_LABELS[section.sectionType]} · {section.charCount.toLocaleString()} 字符</small></div>
+                    </button>
+                  ))}
                 </div>
+              </aside>
+
+              <section className="sf-section-preview">
+                <header>
+                  <div><span>预览</span><h3>{selected?.title || '请选择范围'}</h3></div>
+                  <small>{selected?.sourceLabel}</small>
+                </header>
+                <div>{selected?.text || ''}</div>
               </section>
             </div>
-            {document.warnings.length ? <details className="sf-details"><summary>解析提示（{document.warnings.length}）</summary><ul>{document.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+
+            {document.warnings.length ? (
+              <details className="sf-import-warnings">
+                <summary>查看 {document.warnings.length} 条解析提示</summary>
+                <ul>{document.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+              </details>
+            ) : null}
+
             <footer className="sf-dialog-footer">
-              <p>{selected ? `${WORKFLOW_LABELS[taskType]} · ${SECTION_LABELS[selected.sectionType]} · ${MODE_LABELS[reviewMode]}` : '请选择导入范围'}</p>
-              <button className="sf-button is-primary" disabled={!selected || selected.charCount > WORKSPACE_TEXT_LIMIT} onClick={() => selected && importSelection(selected)} type="button">导入所选范围 <Icon name="arrow-right" /></button>
+              <button className="sf-button is-quiet" onClick={close} type="button">取消</button>
+              <button className="sf-button is-primary" disabled={!selected || selected.charCount > WORKSPACE_TEXT_LIMIT} onClick={() => selected && importSelection(selected)} type="button">使用所选内容 <Icon name="arrow-right" /></button>
             </footer>
           </div>
         )}

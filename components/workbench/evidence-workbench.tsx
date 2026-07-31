@@ -372,99 +372,243 @@ export function EvidenceWorkbench({ initialDraft, initialSnapshot, onBack, onImp
   }
 
   const canvasText = canvasView === 'original' ? sourceText : canvasView === 'suggested' ? result?.revisedText || sourceText : workingText;
+  const selectedAnalysis = selectedItem ? analyseIssueAnchor(sourceText, selectedItem.issue, appliedEdits) : null;
+  const decidedCount = evidenceItems.length - pendingCount;
+  const safeBatchCount = evidenceItems.filter((item) => item.decision === 'accepted' && canBatchApplyIssue(sourceText, item.issue, appliedEdits)).length;
+  const selectedAnchorReady = selectedAnalysis?.state === 'applied' || selectedAnalysis?.state.startsWith('safe');
 
   return (
-    <main className="sf-workbench-shell">
-      <header className="sf-workbench-bar">
-        <div className="sf-workbench-left">
-          <button aria-label="返回项目中心" className="sf-icon-button" onClick={onBack} type="button"><Icon name="arrow-left" /></button>
-          <div className="sf-project-crumb"><span>研究项目</span><b>{projectTitle || '未命名任务'}</b></div>
+    <main className={`sf-studio ${result ? 'is-reviewing' : 'is-composing'}`}>
+      <header className="sf-studio-header">
+        <div className="sf-studio-identity">
+          <button aria-label="返回首页" className="sf-icon-button is-quiet" onClick={onBack} type="button"><Icon name="arrow-left" /></button>
+          <div>
+            <input aria-label="项目名称" maxLength={120} onChange={(event) => setProjectTitle(event.target.value)} value={projectTitle} />
+            <span>{result ? `${decidedCount}/${evidenceItems.length} 条已处理` : sourceText.trim() ? '内容已准备' : '新建任务'}</span>
+          </div>
         </div>
-        <div className="sf-save-state" aria-live="polite"><span /><span>{saveTime ? `已保存 ${new Date(saveTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待保存'}</span></div>
-        <div className="sf-workbench-actions">
-          <button aria-label="撤销" className="sf-icon-button" disabled={!undoStack.length} onClick={undo} type="button"><Icon name="undo" /></button>
-          <button aria-label="重做" className="sf-icon-button" disabled={!redoStack.length} onClick={redo} type="button"><Icon name="redo" /></button>
-          <button className="sf-button" onClick={onImport} type="button"><Icon name="import" /> 导入</button>
-          <details className="sf-menu">
-            <summary className="sf-button"><Icon name="download" /> 导出 <Icon name="chevron-down" size={15} /></summary>
+
+        <div className="sf-save-indicator" aria-live="polite">
+          <span />
+          {saveTime ? `已自动保存 ${new Date(saveTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待保存'}
+        </div>
+
+        <div className="sf-studio-actions">
+          {result ? <>
+            <button aria-label="撤销" className="sf-icon-button is-quiet" disabled={!undoStack.length} onClick={undo} type="button"><Icon name="undo" /></button>
+            <button aria-label="重做" className="sf-icon-button is-quiet" disabled={!redoStack.length} onClick={redo} type="button"><Icon name="redo" /></button>
+          </> : null}
+
+          <details className="sf-action-menu">
+            <summary aria-label="更多操作"><Icon name="more" /></summary>
             <div>
-              <button disabled={!result} onClick={() => exportArtifact('text')} type="button">建议文本 <small>TXT</small></button>
-              <button disabled={!result} onClick={() => exportArtifact('report')} type="button">证据报告 <small>MD</small></button>
-              <button disabled={!result} onClick={() => exportArtifact('json')} type="button">结构化结果 <small>JSON</small></button>
-              <hr />
-              <button disabled={!result} onClick={() => exportArtifact('clean-docx')} type="button">作者工作稿 <small>DOCX</small></button>
-              <button disabled={!result || !appliedEdits.length} onClick={() => exportArtifact('tracked-docx')} type="button">修订痕迹稿 <small>DOCX</small></button>
+              <button onClick={onImport} type="button"><Icon name="import" />重新导入文档</button>
+              {result ? <button disabled={!inputValid || loading} onClick={() => void runWorkflow()} type="button"><Icon name="spark" />重新分析当前文本</button> : null}
             </div>
           </details>
-          <button className="sf-button is-primary" disabled={!inputValid || loading} onClick={() => void runWorkflow()} type="button">{loading ? `处理中 ${formatDuration(elapsedMs)}` : result ? '重新运行' : '开始审阅'} <Icon name="spark" /></button>
+
+          {result ? (
+            <details className="sf-export-menu">
+              <summary className="sf-button is-primary"><Icon name="download" />导出</summary>
+              <div>
+                <button onClick={() => exportArtifact('clean-docx')} type="button"><span>作者工作稿</span><small>DOCX</small></button>
+                <button disabled={!appliedEdits.length} onClick={() => exportArtifact('tracked-docx')} type="button"><span>修订痕迹稿</span><small>DOCX</small></button>
+                <hr />
+                <button onClick={() => exportArtifact('text')} type="button"><span>建议文本</span><small>TXT</small></button>
+                <button onClick={() => exportArtifact('report')} type="button"><span>证据报告</span><small>MD</small></button>
+                <button onClick={() => exportArtifact('json')} type="button"><span>结构化结果</span><small>JSON</small></button>
+              </div>
+            </details>
+          ) : null}
         </div>
       </header>
 
-      <nav className="sf-mobile-workbench-nav" aria-label="工作台面板">
-        <button aria-current={mobilePanel === 'structure'} onClick={() => setMobilePanel('structure')} type="button"><Icon name="menu" />结构</button>
-        <button aria-current={mobilePanel === 'manuscript'} onClick={() => setMobilePanel('manuscript')} type="button"><Icon name="document" />正文</button>
-        <button aria-current={mobilePanel === 'evidence'} onClick={() => setMobilePanel('evidence')} type="button"><Icon name="shield" />证据{pendingCount ? <i>{pendingCount}</i> : null}</button>
-      </nav>
+      {error ? <div className="sf-studio-notice is-danger" role="alert"><Icon name="warning" />{error}<button onClick={() => setError('')} type="button"><Icon name="close" size={15} /></button></div> : null}
+      {notice ? <div className="sf-studio-notice" aria-live="polite"><Icon name="check" />{notice}<button onClick={() => setNotice('')} type="button"><Icon name="close" size={15} /></button></div> : null}
 
-      {error ? <div className="sf-workbench-alert is-danger" role="alert"><Icon name="warning" />{error}<button onClick={() => setError('')} type="button"><Icon name="close" size={15} /></button></div> : null}
-      {notice ? <div className="sf-workbench-alert" aria-live="polite"><Icon name="check" />{notice}<button onClick={() => setNotice('')} type="button"><Icon name="close" size={15} /></button></div> : null}
-
-      <div className="sf-workbench-grid">
-        <aside className={`sf-structure-panel ${mobilePanel === 'structure' ? 'is-mobile-active' : ''}`}>
-          <details className="sf-setup" open={!result}>
-            <summary><div><span className="sf-eyebrow">Workflow setup</span><b>任务配置</b></div><Icon name="chevron-down" /></summary>
-            <div className="sf-setup-body">
-              <label><span>项目名称</span><input maxLength={120} onChange={(event) => setProjectTitle(event.target.value)} value={projectTitle} /></label>
-              <label><span>工作流</span><select onChange={(event) => { setTaskType(event.target.value as WorkspaceTask); setResult(null); setSnapshotId(''); setDecisions({}); setAppliedEdits([]); }} value={taskType}>{WORKFLOW_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><small>{WORKFLOW_DESCRIPTIONS[taskType]}</small></label>
-              <div className="sf-form-grid is-two">
-                <label><span>章节</span><select onChange={(event) => setSectionType(event.target.value as ReviewSection)} value={sectionType}>{SECTION_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                <label><span>强度</span><select onChange={(event) => setReviewMode(event.target.value as ReviewMode)} value={reviewMode}>{MODE_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      {!result ? (
+        <div className="sf-compose-layout">
+          <section className="sf-compose-document">
+            <header>
+              <div>
+                <span className="sf-section-label">01 · 文稿内容</span>
+                <h1>{initialDraft.importedDocument?.sectionTitle || '粘贴或编辑要处理的文本'}</h1>
               </div>
-              <label><span>目标期刊</span><input maxLength={160} onChange={(event) => setTargetJournal(event.target.value)} placeholder="可选" value={targetJournal} /></label>
-              {taskType === 'review-response' ? <><label><span>作者依据 / 拟修改内容</span><textarea onChange={(event) => setSupportingContext(event.target.value)} rows={4} value={supportingContext} /></label><label><span>修改位置</span><input onChange={(event) => setResponseLocation(event.target.value)} value={responseLocation} /></label></> : null}
-              <details className="sf-terms"><summary>术语锁 <span>{lockedTerms.length}/12</span></summary><div>{lockedTerms.map((lock) => <div className="sf-term-row" key={lock.id}><span><b>{lock.source}</b><small>{lock.preferred}</small></span><button aria-label="删除术语锁" onClick={() => setLockedTerms((current) => current.filter((item) => item.id !== lock.id))} type="button"><Icon name="close" size={14} /></button></div>)}<div className="sf-term-form"><input onChange={(event) => setLockSource(event.target.value)} placeholder="原词" value={lockSource} /><input onChange={(event) => setLockPreferred(event.target.value)} placeholder="规范表达" value={lockPreferred} /><button disabled={!lockSource.trim() || !lockPreferred.trim()} onClick={addLock} type="button"><Icon name="plus" size={15} /></button></div></div></details>
-            </div>
-          </details>
-
-          <section className="sf-outline">
-            <header><div><span className="sf-eyebrow">Evidence queue</span><b>审阅问题</b></div><span>{evidenceItems.length}</span></header>
-            {result ? <>
-              <div className="sf-issue-tools"><label><Icon name="search" size={15} /><input onChange={(event) => setIssueQuery(event.target.value)} placeholder="搜索问题" value={issueQuery} /></label><select aria-label="按严重程度筛选" onChange={(event) => setSeverityFilter(event.target.value as typeof severityFilter)} value={severityFilter}><option value="all">全部</option><option value="major">重大</option><option value="minor">一般</option><option value="suggestion">建议</option></select></div>
-              <div className="sf-issue-list">{filteredItems.map((item, index) => <button className={selectedItem?.issue.id === item.issue.id ? 'is-selected' : ''} key={item.issue.id} onClick={() => { setSelectedIssueId(item.issue.id); setMobilePanel('evidence'); }} type="button"><span className={`sf-risk-dot is-${item.risk}`} /><div><b>{item.issue.category}</b><small>{AGENT_LABELS[item.issue.agent]} · {riskLabel(item.issue)}</small></div><i>{String(index + 1).padStart(2, '0')}</i><em className={`is-${item.decision}`}>{DECISION_LABELS[item.decision]}</em></button>)}</div>
-            </> : <div className="sf-panel-empty"><Icon name="shield" size={22} /><p>运行工作流后，结构化问题和作者决策会出现在这里。</p></div>}
-          </section>
-        </aside>
-
-        <section className={`sf-manuscript-panel ${mobilePanel === 'manuscript' ? 'is-mobile-active' : ''}`}>
-          <header className="sf-canvas-header">
-            <div><span className="sf-eyebrow">Text review canvas</span><h1>{projectTitle || '未命名任务'}</h1><p>{WORKFLOW_LABELS[taskType]} · {SECTION_LABELS[sectionType]} · {sourceText.length.toLocaleString()} 字符</p></div>
-            <div className="sf-view-tabs" role="tablist" aria-label="文稿视图">{(['original', 'suggested', 'working', 'diff'] as CanvasView[]).map((view) => <button aria-selected={canvasView === view} disabled={!result && view !== 'original'} key={view} onClick={() => setCanvasView(view)} role="tab" type="button">{{ original: '原文', suggested: '建议稿', working: '工作稿', diff: '差异' }[view]}</button>)}</div>
-          </header>
-
-          <div className="sf-paper-canvas">
-            {!result && canvasView === 'original' ? <textarea aria-label="科研文本" maxLength={WORKSPACE_TEXT_LIMIT} onChange={(event) => setSourceText(event.target.value)} placeholder={taskType === 'translate' ? '粘贴中文科研段落……' : taskType === 'review-response' ? '粘贴 Reviewer Comment……' : '粘贴英文论文段落……'} value={sourceText} /> : canvasView === 'diff' ? <div className="sf-diff-text">{diff.map((segment, index) => <span className={`is-${segment.kind}`} key={`${segment.kind}-${index}`}>{segment.text}</span>)}</div> : <div className="sf-document-text">{canvasText || '暂无文本'}</div>}
-          </div>
-
-          {!inputValid && !result ? <footer className="sf-canvas-status is-warning"><Icon name="warning" /><span>{sourceText.trim().length < minimum ? `至少输入 ${minimum} 个字符` : `最多支持 ${WORKSPACE_TEXT_LIMIT.toLocaleString()} 个字符`}</span></footer> : <footer className="sf-canvas-status"><Icon name="shield" /><span>建议不会自动写入正文。接受并安全定位后，才可进入工作稿。</span></footer>}
-        </section>
-
-        <aside className={`sf-evidence-panel ${mobilePanel === 'evidence' ? 'is-mobile-active' : ''}`}>
-          {selectedItem ? <>
-            <header className="sf-evidence-header">
-              <div><span className="sf-eyebrow">Evidence {String(selectedIndex + 1).padStart(2, '0')} / {String(evidenceItems.length).padStart(2, '0')}</span><h2>{selectedItem.issue.category}</h2></div>
-              <span className={`sf-risk-badge is-${selectedItem.risk}`}>{riskLabel(selectedItem.issue)}</span>
+              <span className={sourceText.length > WORKSPACE_TEXT_LIMIT ? 'is-over' : ''}>{sourceText.length.toLocaleString()} / {WORKSPACE_TEXT_LIMIT.toLocaleString()}</span>
             </header>
-            <div className="sf-evidence-meta"><span>{AGENT_LABELS[selectedItem.issue.agent]}</span><span>{selectedItem.issue.location || '未指定位置'}</span><span>{selectedItem.issue.severity}</span></div>
-            <section className="sf-evidence-reason"><span>判断理由</span><p>{selectedItem.issue.reason}</p>{selectedItem.issue.meaningChanged ? <div className="sf-alert is-danger"><Icon name="warning" />该建议可能改变科学含义，必须人工核对。</div> : null}</section>
-            <section className="sf-evidence-compare"><div><span>原文</span><p>{selectedItem.issue.original || '未提供可定位原文'}</p></div><div><span>建议</span><p>{selectedItem.issue.revised || '需要作者手动补充'}</p></div></section>
-            <section className="sf-anchor-state"><span>应用检查</span><p>{analyseIssueAnchor(sourceText, selectedItem.issue, appliedEdits).message}</p></section>
-            <section className="sf-decision-section"><span>作者决策</span><div>{(['accepted', 'dismissed', 'deferred'] as IssueDecision[]).map((decision) => <button className={selectedItem.decision === decision ? 'is-selected' : ''} key={decision} onClick={() => setDecision(selectedItem.issue.id, decision)} type="button">{DECISION_LABELS[decision]}</button>)}</div><button className="sf-button is-primary is-full" disabled={selectedItem.decision !== 'accepted' || selectedItem.applied} onClick={() => applyIssue(selectedItem.issue)} type="button">{selectedItem.applied ? '已应用到工作稿' : '应用到工作稿'} <Icon name="arrow-right" /></button></section>
-            <details className="sf-details sf-agent-details"><summary>Agent 运行信息</summary><div>{result?.agentRuns.map((run) => <p key={run.agent}><b>{AGENT_LABELS[run.agent]}</b><span>{run.status} · {formatDuration(run.durationMs)} · {run.issueCount} issues</span></p>)}</div></details>
-          </> : <div className="sf-panel-empty is-large"><span><Icon name="shield" size={28} /></span><h2>证据与作者决策</h2><p>运行任务后，在这里逐条查看理由、风险、原文定位和建议文本。</p></div>}
-        </aside>
-      </div>
 
-      {result ? <footer className="sf-decision-bar"><div className="sf-decision-nav"><button aria-label="上一条" className="sf-icon-button" onClick={() => moveIssue(-1)} type="button"><Icon name="arrow-left" /></button><span>{selectedIndex + 1} / {evidenceItems.length}</span><button aria-label="下一条" className="sf-icon-button" onClick={() => moveIssue(1)} type="button"><Icon name="arrow-right" /></button></div><div className="sf-decision-progress"><span>作者决策</span><b>{evidenceItems.length - pendingCount} / {evidenceItems.length}</b><i><em style={{ width: evidenceItems.length ? `${((evidenceItems.length - pendingCount) / evidenceItems.length) * 100}%` : '0%' }} /></i></div><button className="sf-button" onClick={applyAllEligible} type="button">批量应用已接受的低风险建议</button><div className="sf-score-chip"><span>准备度</span><b>{result.scoreAfter}</b><small>/100</small></div></footer> : null}
+            {initialDraft.importedDocument ? (
+              <div className="sf-imported-source"><Icon name="file" size={15} /><span>{initialDraft.importedDocument.fileName}</span><small>{initialDraft.importedDocument.sourceLabel}</small></div>
+            ) : null}
+
+            <textarea
+              aria-label="科研文本"
+              maxLength={WORKSPACE_TEXT_LIMIT}
+              onChange={(event) => setSourceText(event.target.value)}
+              placeholder={taskType === 'translate' ? '粘贴需要翻译的中文科研内容……' : taskType === 'review-response' ? '粘贴审稿人的完整意见……' : '粘贴英文论文段落，或使用右上角菜单导入文档……'}
+              value={sourceText}
+            />
+
+            <footer>
+              <span><Icon name="shield" size={15} /> 分析不会直接覆盖你的原文</span>
+              {!inputValid ? <b>{sourceText.trim().length < minimum ? `还需至少 ${Math.max(0, minimum - sourceText.trim().length)} 个字符` : '文本超过当前处理上限'}</b> : <b className="is-ready"><Icon name="check" size={14} /> 可以开始分析</b>}
+            </footer>
+          </section>
+
+          <aside className="sf-compose-settings">
+            <div className="sf-compose-heading">
+              <span className="sf-section-label">02 · 处理目标</span>
+              <h2>这次希望完成什么？</h2>
+              <p>选择最接近的目标即可。其他设置已有安全默认值。</p>
+            </div>
+
+            <div className="sf-goal-list">
+              {WORKFLOW_OPTIONS.map(([key, label]) => (
+                <button aria-pressed={taskType === key} className={taskType === key ? 'is-selected' : ''} key={key} onClick={() => { setTaskType(key); setResult(null); setSnapshotId(''); setDecisions({}); setAppliedEdits([]); }} type="button">
+                  <span>{taskType === key ? <Icon name="check" size={15} /> : null}</span>
+                  <div><b>{label}</b><small>{WORKFLOW_DESCRIPTIONS[key]}</small></div>
+                </button>
+              ))}
+            </div>
+
+            {taskType === 'review-response' ? (
+              <div className="sf-response-fields">
+                <label><span>作者依据或拟修改内容</span><textarea onChange={(event) => setSupportingContext(event.target.value)} placeholder="只填写已有实验、数据或实际修改计划" rows={4} value={supportingContext} /></label>
+                <label><span>正文修改位置</span><input onChange={(event) => setResponseLocation(event.target.value)} placeholder="例如：Methods, Section 2.3" value={responseLocation} /></label>
+              </div>
+            ) : null}
+
+            <details className="sf-advanced-settings">
+              <summary>章节、强度与术语设置 <Icon name="chevron-down" size={16} /></summary>
+              <div>
+                <div className="sf-form-grid is-two">
+                  <label><span>论文章节</span><select onChange={(event) => setSectionType(event.target.value as ReviewSection)} value={sectionType}>{SECTION_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                  <label><span>处理强度</span><select onChange={(event) => setReviewMode(event.target.value as ReviewMode)} value={reviewMode}>{MODE_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                </div>
+                <label><span>目标期刊（可选）</span><input maxLength={160} onChange={(event) => setTargetJournal(event.target.value)} placeholder="例如 Construction and Building Materials" value={targetJournal} /></label>
+
+                <div className="sf-term-settings">
+                  <header><span>术语锁</span><small>{lockedTerms.length}/12</small></header>
+                  {lockedTerms.length ? <div className="sf-term-chips">{lockedTerms.map((lock) => <span key={lock.id}><b>{lock.source}</b> → {lock.preferred}<button aria-label="删除术语锁" onClick={() => setLockedTerms((current) => current.filter((item) => item.id !== lock.id))} type="button"><Icon name="close" size={12} /></button></span>)}</div> : <p>锁定必须保持一致的专业术语或缩写。</p>}
+                  <div className="sf-term-add"><input onChange={(event) => setLockSource(event.target.value)} placeholder="原词" value={lockSource} /><input onChange={(event) => setLockPreferred(event.target.value)} placeholder="规范表达" value={lockPreferred} /><button aria-label="添加术语锁" disabled={!lockSource.trim() || !lockPreferred.trim()} onClick={addLock} type="button"><Icon name="plus" size={16} /></button></div>
+                </div>
+              </div>
+            </details>
+
+            <button className="sf-compose-run" disabled={!inputValid || loading} onClick={() => void runWorkflow()} type="button">
+              <span>{loading ? <span className="sf-spinner" /> : <Icon name="spark" size={20} />}</span>
+              <div><b>{loading ? '正在生成可核对建议' : '开始分析'}</b><small>{loading ? formatDuration(elapsedMs) : `${WORKFLOW_LABELS[taskType]} · ${SECTION_LABELS[sectionType]}`}</small></div>
+              {!loading ? <Icon name="arrow-right" /> : null}
+            </button>
+          </aside>
+        </div>
+      ) : (
+        <>
+          <nav className="sf-review-mobile-nav" aria-label="审阅页面">
+            <button aria-current={mobilePanel === 'structure'} onClick={() => setMobilePanel('structure')} type="button"><Icon name="menu" />问题{pendingCount ? <i>{pendingCount}</i> : null}</button>
+            <button aria-current={mobilePanel === 'manuscript'} onClick={() => setMobilePanel('manuscript')} type="button"><Icon name="document" />文稿</button>
+            <button aria-current={mobilePanel === 'evidence'} onClick={() => setMobilePanel('evidence')} type="button"><Icon name="shield" />建议</button>
+          </nav>
+
+          <div className="sf-review-layout">
+            <aside className={`sf-review-queue ${mobilePanel === 'structure' ? 'is-mobile-active' : ''}`}>
+              <header className="sf-queue-header">
+                <div><span className="sf-section-label">审阅问题</span><h2>{pendingCount ? `${pendingCount} 条需要处理` : '全部处理完成'}</h2></div>
+                <div className="sf-review-progress" aria-label={`已处理 ${decidedCount} 条，共 ${evidenceItems.length} 条`}><span style={{ width: evidenceItems.length ? `${(decidedCount / evidenceItems.length) * 100}%` : '0%' }} /></div>
+              </header>
+
+              <div className="sf-queue-tools">
+                <label><Icon name="search" size={15} /><input onChange={(event) => setIssueQuery(event.target.value)} placeholder="搜索问题" value={issueQuery} /></label>
+                <select aria-label="按严重程度筛选" onChange={(event) => setSeverityFilter(event.target.value as typeof severityFilter)} value={severityFilter}>
+                  <option value="all">全部</option><option value="major">重大</option><option value="minor">一般</option><option value="suggestion">建议</option>
+                </select>
+              </div>
+
+              <div className="sf-queue-list">
+                {filteredItems.map((item, index) => (
+                  <button className={selectedItem?.issue.id === item.issue.id ? 'is-selected' : ''} key={item.issue.id} onClick={() => { setSelectedIssueId(item.issue.id); setMobilePanel('evidence'); }} type="button">
+                    <span className={`sf-severity-marker is-${item.risk}`} />
+                    <div><b>{item.issue.category}</b><small>{item.issue.location || AGENT_LABELS[item.issue.agent]}</small></div>
+                    <span className={`sf-decision-state is-${item.decision}`}>{item.applied ? '已应用' : item.decisionLabel}</span>
+                    <i>{String(index + 1).padStart(2, '0')}</i>
+                  </button>
+                ))}
+              </div>
+
+              <footer className="sf-queue-footer">
+                <button disabled={!safeBatchCount} onClick={applyAllEligible} type="button"><Icon name="check" size={15} />应用 {safeBatchCount || 0} 条已接受的低风险建议</button>
+                <p>术语、数值、逻辑与方法问题始终需要逐条处理。</p>
+              </footer>
+            </aside>
+
+            <section className={`sf-review-document ${mobilePanel === 'manuscript' ? 'is-mobile-active' : ''}`}>
+              <header className="sf-document-toolbar">
+                <div>
+                  <span className="sf-section-label">文稿</span>
+                  <p>{WORKFLOW_LABELS[taskType]} · {SECTION_LABELS[sectionType]} · 准备度 {result.scoreAfter}/100</p>
+                </div>
+                <div className="sf-document-tabs" role="tablist" aria-label="文稿视图">
+                  {(['working', 'original', 'suggested', 'diff'] as CanvasView[]).map((view) => <button aria-selected={canvasView === view} key={view} onClick={() => setCanvasView(view)} role="tab" type="button">{{ working: '工作稿', original: '原文', suggested: '建议稿', diff: '对比' }[view]}</button>)}
+                </div>
+              </header>
+
+              <div className="sf-reading-area">
+                {canvasView === 'diff' ? <div className="sf-diff-text">{diff.map((segment, index) => <span className={`is-${segment.kind}`} key={`${segment.kind}-${index}`}>{segment.text}</span>)}</div> : <article className="sf-document-text">{canvasText || '暂无文本'}</article>}
+              </div>
+
+              <footer className="sf-document-footer"><Icon name="shield" size={15} /><span>{canvasView === 'working' ? `工作稿已应用 ${appliedEdits.length} 条修改，可撤销或导出。` : '切换到工作稿查看作者已确认并安全应用的内容。'}</span></footer>
+            </section>
+
+            <aside className={`sf-review-inspector ${mobilePanel === 'evidence' ? 'is-mobile-active' : ''}`}>
+              {selectedItem ? <>
+                <header className="sf-inspector-header">
+                  <div><span className="sf-section-label">建议 {selectedIndex + 1} / {evidenceItems.length}</span><h2>{selectedItem.issue.category}</h2></div>
+                  <span className={`sf-risk-badge is-${selectedItem.risk}`}>{riskLabel(selectedItem.issue)}</span>
+                </header>
+
+                <div className="sf-inspector-meta">
+                  <span>{AGENT_LABELS[selectedItem.issue.agent]}</span>
+                  <span>{selectedItem.issue.location || '未指定位置'}</span>
+                  <span>{selectedItem.issue.severity === 'major' ? '重大问题' : selectedItem.issue.severity === 'minor' ? '一般问题' : '优化建议'}</span>
+                </div>
+
+                {selectedItem.issue.meaningChanged ? <div className="sf-alert is-danger"><Icon name="warning" />该建议可能改变科学含义，请结合原始证据人工判断。</div> : null}
+
+                <section className="sf-inspector-compare">
+                  <div><span>原文</span><p>{selectedItem.issue.original || '未提供可定位原文'}</p></div>
+                  <div><span>建议</span><p>{selectedItem.issue.revised || '需要作者手动补充'}</p></div>
+                </section>
+
+                <section className="sf-inspector-reason">
+                  <span>为什么提出这条建议</span>
+                  <p>{selectedItem.issue.reason}</p>
+                </section>
+
+                <section className={`sf-anchor-check ${selectedAnchorReady ? 'is-safe' : 'is-manual'}`}>
+                  <Icon name={selectedAnchorReady ? 'check' : 'warning'} size={16} />
+                  <div><b>{selectedAnalysis?.state === 'applied' ? '已经应用' : selectedAnchorReady ? '可以安全定位' : '需要人工处理'}</b><p>{selectedAnalysis?.message}</p></div>
+                </section>
+
+                <details className="sf-inspector-details">
+                  <summary>查看分析来源</summary>
+                  <div>{result.agentRuns.map((run) => <p key={run.agent}><b>{AGENT_LABELS[run.agent]}</b><span>{run.status} · {formatDuration(run.durationMs)} · {run.issueCount} 条</span></p>)}</div>
+                </details>
+
+                <footer className="sf-inspector-actions">
+                  <span>作者决定</span>
+                  <div className="sf-decision-buttons">
+                    <button aria-pressed={selectedItem.decision === 'accepted'} className="is-accept" onClick={() => setDecision(selectedItem.issue.id, 'accepted')} type="button"><Icon name="check" size={15} />接受</button>
+                    <button aria-pressed={selectedItem.decision === 'deferred'} onClick={() => setDecision(selectedItem.issue.id, 'deferred')} type="button"><Icon name="clock" size={15} />稍后</button>
+                    <button aria-pressed={selectedItem.decision === 'dismissed'} className="is-dismiss" onClick={() => setDecision(selectedItem.issue.id, 'dismissed')} type="button"><Icon name="close" size={15} />不采用</button>
+                  </div>
+                  <button className="sf-button is-primary is-full" disabled={selectedItem.decision !== 'accepted' || selectedItem.applied} onClick={() => applyIssue(selectedItem.issue)} type="button">{selectedItem.applied ? '已应用到工作稿' : '应用到工作稿'} <Icon name="arrow-right" /></button>
+                  <div className="sf-issue-nav"><button onClick={() => moveIssue(-1)} type="button"><Icon name="arrow-left" size={15} />上一条</button><button onClick={() => moveIssue(1)} type="button">下一条<Icon name="arrow-right" size={15} /></button></div>
+                </footer>
+              </> : <div className="sf-panel-empty"><span><Icon name="shield" size={26} /></span><h2>没有匹配的问题</h2><p>调整筛选条件，或返回文稿继续查看。</p></div>}
+            </aside>
+          </div>
+        </>
+      )}
     </main>
   );
 }
