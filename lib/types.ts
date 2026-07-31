@@ -1,7 +1,6 @@
 export type AgentId = 'terminology' | 'language' | 'logic' | 'method';
 
 export type IssueSeverity = 'major' | 'minor' | 'suggestion';
-export type AgentRunStatus = 'completed' | 'failed' | 'demo';
 
 export type WorkspaceTask = 'translate' | 'polish' | 'precheck';
 
@@ -44,20 +43,7 @@ export interface ReviewIssue {
   meaningChanged: boolean;
 }
 
-export interface AgentRun {
-  agent: AgentId;
-  status: AgentRunStatus;
-  durationMs: number;
-  issueCount: number;
-  summary: string;
-  model: string;
-  error?: string;
-}
-
 export interface ReviewResult {
-  mode: 'live' | 'demo';
-  executionMode: 'parallel-multi-agent' | 'safe-demo';
-  workflowVersion: string;
   outputKind: ReviewOutputKind;
   profile: ReviewProfile;
   summary: string;
