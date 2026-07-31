@@ -12,7 +12,7 @@ import './auth.css';
 import './auth-inline.css';
 import './auth-gate.css';
 import './v06.css';
-import './v06-fixes.css';
+import './workbench-responsive.css';
 import './v07.css';
 import './v08.css';
 import './v09.css';
