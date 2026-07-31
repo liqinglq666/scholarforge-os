@@ -17,7 +17,6 @@
 .sf-home-menu-status { min-height: 34px; padding: 0 9px; display: flex; align-items: center; gap: 9px; color: var(--sf-muted); font-size: 11px; }
 .sf-service-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sf-faint); }
 .sf-service-dot.is-live { background: var(--sf-success); box-shadow: 0 0 0 4px rgb(37 119 90 / .1); }
-.sf-service-dot.is-demo { background: var(--sf-warning); box-shadow: 0 0 0 4px rgb(166 103 22 / .1); }
 .sf-service-dot.is-offline { background: var(--sf-danger); box-shadow: 0 0 0 4px rgb(180 71 77 / .1); }
 .sf-home { width: min(1060px, calc(100% - 40px)); margin: 0 auto; padding: 76px 0 42px; }
 .sf-home-alerts { margin-bottom: 18px; display: grid; gap: 8px; }
