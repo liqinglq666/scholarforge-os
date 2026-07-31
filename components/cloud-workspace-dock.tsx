@@ -136,11 +136,7 @@ export function CloudWorkspaceDock() {
 
   if (!user) return null;
 
-  const modeLabel = user.mode === 'supabase'
-    ? 'Supabase 云端账户'
-    : user.mode === 'guest'
-      ? '访客模式'
-      : '本地演示账户';
+  const modeLabel = user.mode === 'supabase' ? 'Supabase 云端账户' : '访客模式';
 
   return <div className={`cloud-dock ${open ? 'is-open' : ''}`}>
     <button
@@ -164,20 +160,20 @@ export function CloudWorkspaceDock() {
       {!supabaseConfigured ? <section className="cloud-state-card is-local">
         <span>本地</span>
         <h3>Supabase 尚未配置</h3>
-        <p>当前草稿和任务历史继续安全地保存在此浏览器。配置 Supabase 后即可启用跨设备项目。</p>
+        <p>当前草稿和任务历史继续保存在此浏览器。配置 Supabase 后即可启用真实邮箱账户与跨设备项目。</p>
         <a href="https://github.com/liqinglq666/scholarforge-os/blob/main/docs/cloud-workspace.md" rel="noreferrer" target="_blank">查看配置文档 ↗</a>
       </section> : null}
 
-      {supabaseConfigured && user.mode !== 'supabase' ? <section className="cloud-state-card is-local">
+      {supabaseConfigured && user.mode === 'guest' ? <section className="cloud-state-card is-local">
         <span>账户</span>
-        <h3>当前会话不属于云端账户</h3>
-        <p>访客和本地演示账户继续使用浏览器存储。切换为 Supabase 邮箱账户后，才能访问隔离的云端项目。</p>
-        <a href="/login">切换云端账户 →</a>
+        <h3>访客会话没有云端项目</h3>
+        <p>访客继续使用浏览器存储。登录 Supabase 邮箱账户后，才能访问按用户隔离的云端项目。</p>
+        <a href="/login">登录云端账户 →</a>
       </section> : null}
 
       {cloudEnabled ? <>
         <section className="cloud-sync-card">
-          <div><span>Local → Cloud</span><h3>迁移本机工作区</h3><p>同步只会在你点击后发生，不会后台偷偷上传论文文本。</p></div>
+          <div><span>Local → Cloud</span><h3>迁移本机工作区</h3><p>同步只会在你点击后发生，不会后台自动上传论文文本。</p></div>
           <div className="cloud-sync-metrics"><span><b>{localCount}</b> 本机项目</span><span><b>{projects.length}</b> 云端项目</span></div>
           <div className="cloud-sync-actions">
             <button disabled={state === 'loading' || localCount === 0} onClick={() => void runSync('current')} type="button">同步当前项目</button>
