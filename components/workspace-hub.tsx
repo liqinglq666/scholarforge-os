@@ -17,10 +17,10 @@ import type { ReviewSnapshot, WorkspaceDraft, WorkspaceState } from '@/lib/works
 import type { WorkspaceTask } from '@/lib/types';
 
 type View = 'hub' | 'workbench';
-type ServiceState = 'checking' | 'live' | 'demo' | 'offline';
+type ServiceState = 'checking' | 'ready' | 'unconfigured' | 'offline';
 
 function defaultDraft(task: WorkspaceTask): WorkspaceDraft {
-  const base: WorkspaceDraft = {
+  return {
     projectTitle: '未命名科研写作任务',
     taskType: task,
     sourceText: '',
@@ -29,7 +29,6 @@ function defaultDraft(task: WorkspaceTask): WorkspaceDraft {
     lockedTerms: [],
     savedAt: new Date().toISOString(),
   };
-  return base;
 }
 
 function downloadJson(filename: string, value: unknown) {
@@ -50,7 +49,6 @@ export function WorkspaceHub() {
   const [activeSnapshot, setActiveSnapshot] = useState<ReviewSnapshot | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [serviceState, setServiceState] = useState<ServiceState>('checking');
-  const [model, setModel] = useState('qwen-plus');
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -60,18 +58,19 @@ export function WorkspaceHub() {
   useEffect(() => {
     refresh();
     if (window.sessionStorage.getItem(STORAGE_KEYS.hubView) === 'workbench') setView('workbench');
+
     let alive = true;
     fetch('/api/health', { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Health check failed');
-        return response.json() as Promise<{ model?: string; modelStudioConfigured?: boolean }>;
+        return response.json() as Promise<{ analysisConfigured?: boolean }>;
       })
       .then((payload) => {
         if (!alive) return;
-        setModel(payload.model || 'qwen-plus');
-        setServiceState(payload.modelStudioConfigured ? 'live' : 'demo');
+        setServiceState(payload.analysisConfigured ? 'ready' : 'unconfigured');
       })
       .catch(() => alive && setServiceState('offline'));
+
     return () => { alive = false; };
   }, [refresh]);
 
@@ -80,7 +79,13 @@ export function WorkspaceHub() {
       writeWorkspaceDraft(window.localStorage, draft);
       setState((current) => ({ ...current, draft }));
     } catch {
-      setState((current) => ({ ...current, warnings: Array.from(new Set([...current.warnings, '浏览器阻止了本地保存，当前内容仅保留在本次页面中。'])) }));
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([
+          ...current.warnings,
+          '浏览器阻止了本地保存，当前内容仅保留在本次页面中。',
+        ])),
+      }));
     }
   }, []);
 
@@ -90,7 +95,13 @@ export function WorkspaceHub() {
       setState((current) => ({ ...current, history }));
       setActiveSnapshot(snapshot);
     } catch {
-      setState((current) => ({ ...current, warnings: Array.from(new Set([...current.warnings, '任务历史保存失败，当前结果仍可继续使用。'])) }));
+      setState((current) => ({
+        ...current,
+        warnings: Array.from(new Set([
+          ...current.warnings,
+          '任务历史保存失败，当前结果仍可继续使用。',
+        ])),
+      }));
     }
   }, []);
 
@@ -107,7 +118,7 @@ export function WorkspaceHub() {
   }
 
   function openSnapshot(snapshot: ReviewSnapshot) {
-    const draft: WorkspaceDraft = {
+    openDraft({
       projectTitle: snapshot.projectTitle,
       taskType: snapshot.taskType,
       sourceText: snapshot.sourceText,
@@ -115,8 +126,7 @@ export function WorkspaceHub() {
       sectionType: snapshot.sectionType,
       lockedTerms: snapshot.lockedTerms,
       savedAt: new Date().toISOString(),
-    };
-    openDraft(draft, snapshot);
+    }, snapshot);
   }
 
   function returnToHub() {
@@ -135,13 +145,17 @@ export function WorkspaceHub() {
   }
 
   function exportBackup() {
-    downloadJson(`scholarforge-backup-${new Date().toISOString().slice(0, 10)}.json`, createWorkspaceBackup(window.localStorage));
+    downloadJson(
+      `scholarforge-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      createWorkspaceBackup(window.localStorage),
+    );
   }
 
   async function importBackup(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+
     try {
       const backup = parseWorkspaceBackup(JSON.parse(await file.text()) as unknown);
       if (!window.confirm(`恢复 ${backup.history.length} 条历史记录，并替换当前本地草稿？`)) return;
@@ -149,7 +163,13 @@ export function WorkspaceHub() {
       writeWorkspaceHistory(window.localStorage, backup.history);
       refresh();
     } catch (caught) {
-      setState((current) => ({ ...current, warnings: [...current.warnings, caught instanceof Error ? caught.message : '备份恢复失败。'] }));
+      setState((current) => ({
+        ...current,
+        warnings: [
+          ...current.warnings,
+          caught instanceof Error ? caught.message : '备份恢复失败。',
+        ],
+      }));
     }
   }
 
@@ -173,7 +193,12 @@ export function WorkspaceHub() {
         onImport={() => setImportOpen(true)}
         onSnapshotChanged={saveSnapshot}
       />
-      <DocumentImportDialog existingDraft={state.draft} onClose={() => setImportOpen(false)} onImported={(next) => openDraft(next)} open={importOpen} />
+      <DocumentImportDialog
+        existingDraft={state.draft}
+        onClose={() => setImportOpen(false)}
+        onImported={(next) => openDraft(next)}
+        open={importOpen}
+      />
     </>;
   }
 
@@ -181,7 +206,6 @@ export function WorkspaceHub() {
     <ProjectHub
       draft={state.draft}
       history={state.history}
-      model={model}
       onClearData={clearData}
       onCreate={createTask}
       onDeleteSnapshot={deleteSnapshot}
@@ -193,7 +217,18 @@ export function WorkspaceHub() {
       serviceState={serviceState}
       warnings={state.warnings}
     />
-    <input accept="application/json,.json" hidden onChange={(event) => void importBackup(event)} ref={backupInputRef} type="file" />
-    <DocumentImportDialog existingDraft={state.draft} onClose={() => setImportOpen(false)} onImported={(next) => openDraft(next)} open={importOpen} />
+    <input
+      accept="application/json,.json"
+      hidden
+      onChange={(event) => void importBackup(event)}
+      ref={backupInputRef}
+      type="file"
+    />
+    <DocumentImportDialog
+      existingDraft={state.draft}
+      onClose={() => setImportOpen(false)}
+      onImported={(next) => openDraft(next)}
+      open={importOpen}
+    />
   </>;
 }
