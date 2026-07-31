@@ -2,17 +2,19 @@ import { NextResponse } from 'next/server';
 import { APP_VERSION } from '@/lib/app-config';
 
 export function GET() {
+  const analysisConfigured = Boolean(process.env.DASHSCOPE_API_KEY?.trim());
+
   return NextResponse.json({
-    status: 'ok',
+    status: analysisConfigured ? 'ready' : 'unconfigured',
     service: 'ScholarForge OS',
     version: APP_VERSION,
-    provider: 'Alibaba Cloud Model Studio',
-    model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
     taskTypes: ['translate', 'polish', 'precheck'],
     documentFormats: ['docx'],
     cleanDocxExport: true,
     localWorkspace: true,
-    modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
+    analysisConfigured,
     timestamp: new Date().toISOString(),
+  }, {
+    headers: { 'Cache-Control': 'no-store' },
   });
 }
