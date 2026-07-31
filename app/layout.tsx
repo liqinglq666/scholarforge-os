@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { AccountDock } from '@/components/account-dock';
 import { AuthGate } from '@/components/auth-gate';
 import { AuthProvider } from '@/components/auth-provider';
@@ -21,13 +21,14 @@ import './v11.css';
 import './v12.css';
 import './v13.css';
 import './history-preview.css';
+import './product-ui.css';
 
 export const metadata: Metadata = {
   title: {
     default: 'ScholarForge OS｜研语工坊',
     template: '%s · ScholarForge OS',
   },
-  description: '支持 DOCX/PDF 导入、云端论文项目、作者修改和原始 DOCX 结构保留补丁的科研写作工作台',
+  description: '面向科研论文翻译、润色、投稿预检与审稿回复的多 Agent 写作工作台，支持 DOCX/PDF 导入、作者决策与原始 Word 结构保留交付。',
   applicationName: 'ScholarForge OS',
   keywords: ['科研英语', '原始 DOCX 补丁', 'Word 修订痕迹', 'DOCX 论文导入', '作者修改', '学术翻译', '英文润色', '审稿回复', '云端论文项目', '多智能体', '阿里云百炼', 'qwen-plus'],
   icons: {
@@ -37,9 +38,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'ScholarForge OS｜研语工坊',
-    description: '导入论文、运行多 Agent 审校、逐条应用建议，并把安全修改写回保留原样式与结构的 DOCX 修订版。',
+    description: '导入论文、运行多 Agent 审校、逐条核对证据，并把安全修改写回保留原样式与结构的 DOCX 修订版。',
     type: 'website',
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  colorScheme: 'light',
+  themeColor: '#f4f1ea',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
