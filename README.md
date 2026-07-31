@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://scholarforge-os.vercel.app">在线体验</a> ·
-  <a href="https://scholarforge-os.vercel.app/login">登录 / 注册</a> ·
+  <a href="https://scholarforge-os.vercel.app/login">登录 / 访客体验</a> ·
   <a href="docs/PRD.md">PRD</a> ·
   <a href="docs/technical.md">技术文档</a> ·
   <a href="docs/cloud-workspace.md">云端项目部署</a> ·
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img alt="应用版本 v1.3.0" src="https://img.shields.io/badge/app-v1.3.0-17233d" />
+  <img alt="应用版本 v1.3.2" src="https://img.shields.io/badge/app-v1.3.2-17233d" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
   <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
   <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
@@ -183,7 +183,14 @@ API Key 只从服务端环境变量读取。最终分数和 Reviewer Decision �
 
 这些保护不能替代正式同行评议、统计审查、文献核验和作者责任。
 
-## 云端论文项目
+## 账户与云端论文项目
+
+账户入口只保留两种明确模式：
+
+- **Supabase 云端账户**：真实邮箱注册、登录与按用户隔离的云端项目；
+- **访客模式**：无需注册，草稿与历史只保存在当前浏览器。
+
+未配置 Supabase 时，登录页会隐藏无效的邮箱表单，只显示访客入口。旧版“本地演示账户”已删除，避免把浏览器身份误解为真实注册账户。
 
 Supabase 邮箱账户可以同步当前项目、迁移本机项目、跨浏览器恢复项目，并通过 Row Level Security 隔离数据：
 
@@ -191,9 +198,9 @@ Supabase 邮箱账户可以同步当前项目、迁移本机项目、跨浏览�
 auth.uid() = owner_id
 ```
 
-首次登录不会自动上传本机论文。访客和本地演示账户始终使用浏览器本地存储。原始 DOCX 二进制包不属于当前云端同步范围。
+首次登录不会自动上传本机论文。访客始终使用浏览器本地存储。原始 DOCX 二进制包不属于当前云端同步范围。
 
-部署说明：[`docs/cloud-workspace.md`](docs/cloud-workspace.md)
+部署说明：[`docs/cloud-workspace.md`](docs/cloud-workspace.md) · [账户说明](docs/authentication.md)
 
 ## 技术架构
 
@@ -215,9 +222,8 @@ Next.js 16 + React 19 + TypeScript
 ├─ Browser Original File Store
 │  └─ IndexedDB + SHA-256 source binding
 └─ Account & Cloud
-   ├─ Supabase Auth
-   ├─ RLS isolation
-   └─ browser-local fallback
+   ├─ Supabase Auth + RLS
+   └─ browser-local guest fallback
 ```
 
 ## 快速开始
