@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://scholarforge-os.vercel.app">Live Demo</a> ·
-  <a href="https://scholarforge-os.vercel.app/login">Sign in</a> ·
+  <a href="https://scholarforge-os.vercel.app/login">Sign in / Guest access</a> ·
   <a href="docs/PRD.md">PRD</a> ·
   <a href="docs/technical.md">Technical Docs</a> ·
   <a href="docs/cloud-workspace.md">Cloud Setup</a> ·
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img alt="App v1.3.0" src="https://img.shields.io/badge/app-v1.3.0-17233d" />
+  <img alt="App v1.3.2" src="https://img.shields.io/badge/app-v1.3.2-17233d" />
   <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
   <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
   <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
@@ -169,7 +169,14 @@ ScholarForge OS currently enforces:
 
 These safeguards do not replace peer review, statistical review, reference verification, or author responsibility.
 
-## Cloud manuscript projects
+## Account and cloud manuscript projects
+
+ScholarForge OS now exposes only two explicit account modes:
+
+- **Supabase cloud account** for real email authentication and RLS-isolated cloud projects;
+- **Guest session** for registration-free evaluation with browser-local drafts and history.
+
+When Supabase is not configured, the login page hides non-functional email forms and shows guest access only. The former local demo-account simulation has been removed because it duplicated guest access and could be mistaken for a real registration flow.
 
 Supabase email accounts can explicitly sync and restore projects with Row Level Security:
 
@@ -177,7 +184,7 @@ Supabase email accounts can explicitly sync and restore projects with Row Level 
 auth.uid() = owner_id
 ```
 
-Signing in never automatically uploads existing local manuscripts. Original DOCX binaries are not part of the current cloud-sync payload.
+Signing in never automatically uploads existing local manuscripts. Guest sessions remain browser-local, and original DOCX binaries are not part of the current cloud-sync payload.
 
 ## Architecture
 
@@ -199,9 +206,8 @@ Next.js 16 + React 19 + TypeScript
 ├─ Browser Original File Store
 │  └─ IndexedDB + SHA-256 source binding
 └─ Account & Cloud
-   ├─ Supabase Auth
-   ├─ RLS isolation
-   └─ browser-local fallback
+   ├─ Supabase Auth + RLS
+   └─ browser-local guest fallback
 ```
 
 ## Quick start

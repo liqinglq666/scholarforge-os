@@ -12,7 +12,8 @@ import {
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
-const DEMO_SESSION_KEY = 'scholarforge.auth.demo-session.v1';
+const GUEST_SESSION_KEY = 'scholarforge.auth.guest-session.v1';
+const LEGACY_LOCAL_SESSION_KEY = 'scholarforge.auth.demo-session.v1';
 const AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-session-v1';
 const LEGACY_AUTHOR_EDITING_SESSION_KEY = 'scholarforge-os-author-editing-v1';
 
@@ -20,7 +21,7 @@ export type ScholarForgeUser = {
   id: string;
   email: string;
   displayName: string;
-  mode: 'supabase' | 'demo' | 'guest';
+  mode: 'supabase' | 'guest';
 };
 
 type AuthActionResult = {
@@ -60,13 +61,13 @@ function userFromSupabase(user: User): ScholarForgeUser {
   };
 }
 
-function isLocalSession(value: unknown): value is ScholarForgeUser {
+function isGuestSession(value: unknown): value is ScholarForgeUser {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<ScholarForgeUser>;
   return typeof candidate.id === 'string'
     && typeof candidate.email === 'string'
     && typeof candidate.displayName === 'string'
-    && (candidate.mode === 'demo' || candidate.mode === 'guest');
+    && candidate.mode === 'guest';
 }
 
 function removeLocalItem(key: string) {
@@ -88,29 +89,33 @@ function migrateAuthorEditingSession() {
   }
 }
 
-function readDemoSession() {
+function readGuestSession() {
   try {
-    const raw = window.localStorage.getItem(DEMO_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isLocalSession(parsed)) {
-      removeLocalItem(DEMO_SESSION_KEY);
-      return null;
-    }
-    return parsed;
+    const currentRaw = window.localStorage.getItem(GUEST_SESSION_KEY);
+    const legacyRaw = window.localStorage.getItem(LEGACY_LOCAL_SESSION_KEY);
+    const current = currentRaw ? JSON.parse(currentRaw) as unknown : null;
+    const legacy = legacyRaw ? JSON.parse(legacyRaw) as unknown : null;
+    const session = isGuestSession(current) ? current : isGuestSession(legacy) ? legacy : null;
+
+    if (session && !currentRaw) window.localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(session));
+    if (legacyRaw) window.localStorage.removeItem(LEGACY_LOCAL_SESSION_KEY);
+    if (currentRaw && !isGuestSession(current)) window.localStorage.removeItem(GUEST_SESSION_KEY);
+    return session;
   } catch {
-    removeLocalItem(DEMO_SESSION_KEY);
+    removeLocalItem(GUEST_SESSION_KEY);
+    removeLocalItem(LEGACY_LOCAL_SESSION_KEY);
     return null;
   }
 }
 
-function writeDemoSession(user: ScholarForgeUser | null) {
+function writeGuestSession(user: ScholarForgeUser | null) {
   try {
+    window.localStorage.removeItem(LEGACY_LOCAL_SESSION_KEY);
     if (!user || user.mode === 'supabase') {
-      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      window.localStorage.removeItem(GUEST_SESSION_KEY);
       return;
     }
-    window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
+    window.localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(user));
   } catch {
     // Keep the current in-memory session even when persistence is unavailable.
   }
@@ -127,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase) {
-      setUser(readDemoSession());
+      setUser(readGuestSession());
       setLoading(false);
       return;
     }
@@ -135,11 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase.auth.getSession()
       .then(({ data }) => {
         if (!alive) return;
-        setUser(data.session?.user ? userFromSupabase(data.session.user) : readDemoSession());
+        setUser(data.session?.user ? userFromSupabase(data.session.user) : readGuestSession());
       })
       .catch(() => {
         if (!alive) return;
-        setUser(readDemoSession());
+        setUser(readGuestSession());
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -148,10 +153,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!alive) return;
       if (session?.user) {
-        writeDemoSession(null);
+        writeGuestSession(null);
         setUser(userFromSupabase(session.user));
       } else {
-        setUser(readDemoSession());
+        setUser(readGuestSession());
       }
       setLoading(false);
     });
@@ -168,23 +173,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (password.length < 8) return { ok: false, message: '密码至少需要 8 个字符。' };
 
     const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { ok: false, message: error.message || '登录失败，请检查邮箱和密码。' };
-      if (!data.user) return { ok: false, message: '未能获取用户信息，请稍后重试。' };
-      setUser(userFromSupabase(data.user));
-      return { ok: true, message: '登录成功，正在进入论文工作区。' };
+    if (!supabase) {
+      return { ok: false, message: '当前未配置 Supabase 云端账户，请先使用访客体验。' };
     }
 
-    const demoUser: ScholarForgeUser = {
-      id: `demo-${email}`,
-      email,
-      displayName: email.split('@')[0] || 'Demo User',
-      mode: 'demo',
-    };
-    writeDemoSession(demoUser);
-    setUser(demoUser);
-    return { ok: true, message: '已进入本地演示账户。配置 Supabase 后可升级为云端账户。' };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, message: error.message || '登录失败，请检查邮箱和密码。' };
+    if (!data.user) return { ok: false, message: '未能获取用户信息，请稍后重试。' };
+    setUser(userFromSupabase(data.user));
+    return { ok: true, message: '登录成功，正在进入论文工作区。' };
   }, []);
 
   const signUp = useCallback(async (
@@ -199,38 +196,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (password.length < 8) return { ok: false, message: '密码至少需要 8 个字符。' };
 
     const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: displayName },
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
-        },
-      });
-
-      if (error) return { ok: false, message: error.message || '注册失败，请稍后重试。' };
-      if (data.session?.user) {
-        setUser(userFromSupabase(data.session.user));
-        return { ok: true, message: '账户创建成功，正在进入论文工作区。' };
-      }
-
-      return {
-        ok: true,
-        needsConfirmation: true,
-        message: '注册申请已提交。请检查邮箱并完成验证后再登录。',
-      };
+    if (!supabase) {
+      return { ok: false, message: '当前未配置 Supabase 云端账户，请先使用访客体验。' };
     }
 
-    const demoUser: ScholarForgeUser = {
-      id: `demo-${email}`,
+    const { data, error } = await supabase.auth.signUp({
       email,
-      displayName,
-      mode: 'demo',
+      password,
+      options: {
+        data: { full_name: displayName },
+        emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
+      },
+    });
+
+    if (error) return { ok: false, message: error.message || '注册失败，请稍后重试。' };
+    if (data.session?.user) {
+      setUser(userFromSupabase(data.session.user));
+      return { ok: true, message: '账户创建成功，正在进入论文工作区。' };
+    }
+
+    return {
+      ok: true,
+      needsConfirmation: true,
+      message: '注册申请已提交。请检查邮箱并完成验证后再登录。',
     };
-    writeDemoSession(demoUser);
-    setUser(demoUser);
-    return { ok: true, message: '本地演示账户已创建。当前页面会保留此会话；浏览器允许存储时可在刷新后恢复。' };
   }, []);
 
   const continueAsGuest = useCallback(async (): Promise<AuthActionResult> => {
@@ -240,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName: '访客研究员',
       mode: 'guest',
     };
-    writeDemoSession(guestUser);
+    writeGuestSession(guestUser);
     setUser(guestUser);
     return { ok: true, message: '已进入访客模式。浏览器允许存储时，草稿和会话会保留在当前设备。' };
   }, []);
@@ -251,7 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      return { ok: false, message: '本地演示账户无需重置密码；配置 Supabase 后可启用邮件重置。' };
+      return { ok: false, message: '当前未配置 Supabase 云端账户，无法发送密码重置邮件。' };
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -266,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase && user?.mode === 'supabase') {
       await supabase.auth.signOut({ scope: 'local' });
     }
-    writeDemoSession(null);
+    writeGuestSession(null);
     setUser(null);
   }, [user?.mode]);
 

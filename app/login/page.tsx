@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/components/auth-provider';
 
 type AuthTab = 'signin' | 'signup';
@@ -48,18 +48,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-
-  const authMode = useMemo(() => supabaseConfigured
-    ? {
-        label: 'Supabase Auth 已就绪',
-        description: '注册与登录会创建真实云端会话。',
-        tone: 'cloud',
-      }
-    : {
-        label: '本地演示账户模式',
-        description: '当前未配置 Supabase；账户仅保存在此浏览器，不会上传密码。',
-        tone: 'demo',
-      }, [supabaseConfigured]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,14 +111,11 @@ export default function LoginPage() {
         <div className="auth-story-copy">
           <div className="auth-eyebrow">Academic review workspace</div>
           <h1>让每一次科研英语修改，<em>都能被解释。</em></h1>
-          <p>登录、注册或选择访客身份后进入论文工作台。账户入口负责确认当前会话，科研安全边界仍由多 Agent 工作流与确定性规则共同保护。</p>
+          <p>使用 Supabase 云端账户登录，或选择访客身份快速体验。科研安全边界由多 Agent 工作流与确定性规则共同保护。</p>
         </div>
 
         <div className="auth-agent-board">
-          <div className="auth-board-head">
-            <span>Parallel specialist team</span>
-            <b>4 agents</b>
-          </div>
+          <div className="auth-board-head"><span>Parallel specialist team</span><b>4 agents</b></div>
           <div className="auth-agent-list">
             {SPECIALISTS.map(([short, name, role], index) => (
               <div className="auth-agent-row" key={name}>
@@ -154,31 +139,31 @@ export default function LoginPage() {
 
       <section className="auth-panel-wrap">
         <div className="auth-panel">
-          <div className={`auth-mode-badge tone-${authMode.tone}`}>
+          <div className={`auth-mode-badge tone-${supabaseConfigured ? 'cloud' : 'demo'}`}>
             <span />
-            <div><b>{authMode.label}</b><small>{authMode.description}</small></div>
+            <div>
+              <b>{supabaseConfigured ? 'Supabase Auth 已就绪' : '访客体验模式'}</b>
+              <small>{supabaseConfigured ? '注册与登录会创建真实云端会话。' : '当前未配置 Supabase；登录注册已隐藏，可直接使用访客模式。'}</small>
+            </div>
           </div>
 
           {sessionLoading ? (
-            <div className="auth-session-loading" aria-live="polite">
-              <span />
-              <strong>正在读取账户会话…</strong>
-            </div>
+            <div className="auth-session-loading" aria-live="polite"><span /><strong>正在读取账户会话…</strong></div>
           ) : user ? (
             <div className="auth-existing-session">
               <span className="auth-existing-avatar">{user.displayName.slice(0, 2).toUpperCase()}</span>
               <div className="auth-eyebrow">Active session</div>
               <h2>欢迎回来，{user.displayName}</h2>
-              <p>{user.mode === 'supabase' ? '你的云端账户会话仍然有效。' : user.mode === 'guest' ? '当前设备已保存访客会话。' : '当前设备已保存本地演示账户会话。'}</p>
+              <p>{user.mode === 'supabase' ? '你的云端账户会话仍然有效。' : '当前设备已保存访客会话。'}</p>
               <button className="auth-primary-button" onClick={() => router.replace(getDestination())} type="button">继续进入论文工作台 <span>→</span></button>
               <a className="auth-secondary-link" href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">查看项目仓库</a>
             </div>
-          ) : (
+          ) : supabaseConfigured ? (
             <>
               <div className="auth-panel-heading">
                 <div className="auth-eyebrow">Account access</div>
                 <h2>{tab === 'signin' ? '登录论文工作台' : '创建 ScholarForge 账户'}</h2>
-                <p>{tab === 'signin' ? '完成身份确认后进入论文审校、作者待办与结果交付页面。' : '创建云端账户后，可主动同步按用户隔离的论文项目与任务历史。'}</p>
+                <p>{tab === 'signin' ? '完成身份确认后进入论文项目与审校工作区。' : '创建云端账户后，可主动同步按用户隔离的论文项目与任务历史。'}</p>
               </div>
 
               <div className="auth-tabs" role="tablist" aria-label="登录或注册">
@@ -192,13 +177,7 @@ export default function LoginPage() {
                     <span>姓名或昵称</span>
                     <div className="auth-input-shell">
                       <span aria-hidden="true">署</span>
-                      <input
-                        autoComplete="name"
-                        onChange={(event) => setDisplayName(event.target.value)}
-                        placeholder="例如：Qing Li"
-                        required
-                        value={displayName}
-                      />
+                      <input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="例如：Qing Li" required value={displayName} />
                     </div>
                   </label>
                 ) : null}
@@ -207,15 +186,7 @@ export default function LoginPage() {
                   <span>邮箱</span>
                   <div className="auth-input-shell">
                     <span aria-hidden="true">@</span>
-                    <input
-                      autoComplete="email"
-                      inputMode="email"
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="researcher@example.com"
-                      required
-                      type="email"
-                      value={email}
-                    />
+                    <input autoComplete="email" inputMode="email" onChange={(event) => setEmail(event.target.value)} placeholder="researcher@example.com" required type="email" value={email} />
                   </div>
                 </label>
 
@@ -223,15 +194,7 @@ export default function LoginPage() {
                   <span className="auth-label-row"><b>密码</b>{tab === 'signin' ? <button disabled={submitting} onClick={() => void handleReset()} type="button">忘记密码？</button> : <small>至少 8 个字符</small>}</span>
                   <div className="auth-input-shell">
                     <span aria-hidden="true">密</span>
-                    <input
-                      autoComplete={tab === 'signin' ? 'current-password' : 'new-password'}
-                      minLength={8}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder="输入密码"
-                      required
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                    />
+                    <input autoComplete={tab === 'signin' ? 'current-password' : 'new-password'} minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="输入密码" required type={showPassword ? 'text' : 'password'} value={password} />
                     <button className="auth-password-toggle" onClick={() => setShowPassword((value) => !value)} type="button">{showPassword ? '隐藏' : '显示'}</button>
                   </div>
                 </label>
@@ -245,15 +208,26 @@ export default function LoginPage() {
               </form>
 
               <div className="auth-divider"><span>或者</span></div>
-
               <button className="auth-guest-button" disabled={submitting} onClick={() => void handleGuest()} type="button">
                 <span className="auth-guest-icon">游</span>
-                <span><b>以访客身份进入</b><small>先创建访客会话，草稿只保存在当前浏览器</small></span>
+                <span><b>以访客身份进入</b><small>无需注册，草稿只保存在当前浏览器</small></span>
                 <i>→</i>
               </button>
-
-              <p className="auth-legal">工作台需要有效会话。访客无需注册，但退出后不会拥有云端项目或跨设备历史记录。</p>
+              <p className="auth-legal">访客不会拥有云端项目或跨设备历史记录。</p>
             </>
+          ) : (
+            <div className="auth-existing-session">
+              <span className="auth-existing-avatar">游</span>
+              <div className="auth-eyebrow">Guest access</div>
+              <h2>直接体验科研写作工作台</h2>
+              <p>当前部署没有配置 Supabase，因此不展示无效的邮箱登录与注册表单。访客草稿、历史和作者决策只保存在当前浏览器。</p>
+              {notice ? <div aria-live="polite" className={`auth-notice tone-${notice.tone}`}>{notice.message}</div> : null}
+              <button className="auth-primary-button" disabled={submitting} onClick={() => void handleGuest()} type="button">
+                {submitting ? '正在创建访客会话…' : '以访客身份进入工作台'}
+                {!submitting ? <span>→</span> : null}
+              </button>
+              <a className="auth-secondary-link" href="https://github.com/liqinglq666/scholarforge-os/blob/main/docs/authentication.md" rel="noreferrer" target="_blank">查看云端账户配置说明</a>
+            </div>
           )}
         </div>
 
