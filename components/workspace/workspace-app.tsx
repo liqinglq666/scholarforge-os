@@ -9,7 +9,7 @@ import { useWorkspace } from '@/components/workspace/use-workspace';
 import { MAX_HISTORY_ENTRIES } from '@/lib/config';
 import { findResearchExample } from '@/lib/examples';
 import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createDraft, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
+import { createDraft, createDraftFromPreferences, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
@@ -174,6 +174,10 @@ export function WorkspaceApp() {
       targetJournal: workspace.draft.targetJournal,
       text: workspace.draft.sourceText,
       terminologyLocks: workspace.draft.terminologyLocks,
+      discipline: data.preferences.discipline,
+      academicStage: data.preferences.academicStage,
+      englishVariant: data.preferences.englishVariant,
+      explanationLevel: data.preferences.explanationLevel,
     };
 
     try {
@@ -238,7 +242,7 @@ export function WorkspaceApp() {
       : data.history;
     const nextData = {
       ...data,
-      current: createWorkspaceState(createDraft()),
+      current: createWorkspaceState(createDraftFromPreferences(data.preferences)),
       history,
       updatedAt: new Date().toISOString(),
     };
