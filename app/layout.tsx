@@ -7,6 +7,7 @@ import './project.css';
 import './revision.css';
 import './preferences.css';
 import './login.css';
+import './ui-system.css';
 
 export const metadata: Metadata = {
   title: {
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   colorScheme: 'light',
-  themeColor: '#f5f2eb',
+  themeColor: '#f4f1ea',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
