@@ -7,7 +7,10 @@ import {
 } from '@/lib/config';
 import type {
   HistoryEntry,
+  ImportedDocument,
   IssueDecision,
+  ManuscriptChapter,
+  ManuscriptProject,
   PersistedWorkspace,
   ReviewIssue,
   ReviewResult,
@@ -23,6 +26,8 @@ import { cleanSingleLine, cleanText, isRecord } from '@/lib/validation/common';
 const TASKS = new Set<TaskType>(['translate', 'polish', 'precheck']);
 const SECTIONS = new Set<SectionType>(['general', 'abstract', 'introduction', 'methods', 'results', 'discussion', 'conclusion']);
 const DECISIONS = new Set<IssueDecision>(['pending', 'accepted', 'rejected', 'deferred']);
+const MAX_PROJECT_CHAPTERS = 12;
+const MAX_PROJECT_TERMS = 20;
 
 function isoDate(value: unknown, fallback = new Date().toISOString()) {
   if (typeof value !== 'string') return fallback;
@@ -40,6 +45,37 @@ export function createDraft(overrides: Partial<WorkspaceDraft> = {}): WorkspaceD
     sourceText: overrides.sourceText || '',
     terminologyLocks: overrides.terminologyLocks || [],
     ...(overrides.importedDocument ? { importedDocument: overrides.importedDocument } : {}),
+    ...(overrides.linkedProjectId ? { linkedProjectId: overrides.linkedProjectId } : {}),
+    ...(overrides.linkedChapterId ? { linkedChapterId: overrides.linkedChapterId } : {}),
+    createdAt: overrides.createdAt || now,
+    updatedAt: overrides.updatedAt || now,
+  };
+}
+
+export function createManuscriptChapter(overrides: Partial<ManuscriptChapter> = {}): ManuscriptChapter {
+  const now = new Date().toISOString();
+  return {
+    id: overrides.id || crypto.randomUUID(),
+    title: overrides.title || '未命名章节',
+    sectionType: overrides.sectionType || 'general',
+    taskType: overrides.taskType || 'precheck',
+    text: overrides.text || '',
+    createdAt: overrides.createdAt || now,
+    updatedAt: overrides.updatedAt || now,
+    ...(overrides.lastReviewedAt ? { lastReviewedAt: overrides.lastReviewedAt } : {}),
+  };
+}
+
+export function createManuscriptProject(overrides: Partial<ManuscriptProject> = {}): ManuscriptProject {
+  const now = new Date().toISOString();
+  const chapters = overrides.chapters || [createManuscriptChapter({ title: '摘要', sectionType: 'abstract', taskType: 'precheck' })];
+  return {
+    id: overrides.id || crypto.randomUUID(),
+    name: overrides.name || '',
+    targetJournal: overrides.targetJournal || '',
+    terminologyLocks: overrides.terminologyLocks || [],
+    chapters,
+    activeChapterId: overrides.activeChapterId || chapters[0]?.id,
     createdAt: overrides.createdAt || now,
     updatedAt: overrides.updatedAt || now,
   };
@@ -60,25 +96,42 @@ export function createWorkspaceState(draft = createDraft()): WorkspaceState {
 }
 
 export function createPersistedWorkspace(): PersistedWorkspace {
-  return { version: 2, current: createWorkspaceState(), history: [], updatedAt: new Date().toISOString() };
+  return { version: 2, current: createWorkspaceState(), history: [], project: null, updatedAt: new Date().toISOString() };
 }
 
-function parseLocks(value: unknown): TerminologyLock[] {
+function parseLocks(value: unknown, limit = 20): TerminologyLock[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 20).flatMap((item, index) => {
+  const seen = new Set<string>();
+  return value.slice(0, limit).flatMap((item, index) => {
     if (!isRecord(item)) return [];
     const source = cleanSingleLine(item.source, 120);
     const preferred = cleanSingleLine(item.preferred, 160);
-    if (!source || !preferred) return [];
+    const key = source.toLocaleLowerCase();
+    if (!source || !preferred || seen.has(key)) return [];
+    seen.add(key);
     const note = cleanSingleLine(item.note, 240);
     return [{ id: cleanSingleLine(item.id, 80) || `term-${index + 1}`, source, preferred, ...(note ? { note } : {}) }];
   });
+}
+
+function parseImportedDocument(value: unknown): ImportedDocument | undefined {
+  if (!isRecord(value)) return undefined;
+  const fileName = cleanSingleLine(value.fileName, 180);
+  if (!fileName) return undefined;
+  return {
+    fileName,
+    importedAt: isoDate(value.importedAt),
+    warnings: Array.isArray(value.warnings)
+      ? value.warnings.flatMap((item) => typeof item === 'string' ? [cleanSingleLine(item, 500)] : []).slice(0, 10)
+      : [],
+  };
 }
 
 function parseDraft(value: unknown): WorkspaceDraft {
   if (!isRecord(value)) return createDraft();
   const createdAt = isoDate(value.createdAt);
   const sourceText = cleanText(value.sourceText, MAX_SOURCE_CHARACTERS);
+  const importedDocument = parseImportedDocument(value.importedDocument);
   return createDraft({
     id: cleanSingleLine(value.id, 80) || crypto.randomUUID(),
     projectName: cleanSingleLine(value.projectName, 120),
@@ -87,6 +140,44 @@ function parseDraft(value: unknown): WorkspaceDraft {
     targetJournal: cleanSingleLine(value.targetJournal, 160),
     sourceText,
     terminologyLocks: parseLocks(value.terminologyLocks),
+    ...(importedDocument ? { importedDocument } : {}),
+    linkedProjectId: cleanSingleLine(value.linkedProjectId, 80) || undefined,
+    linkedChapterId: cleanSingleLine(value.linkedChapterId, 80) || undefined,
+    createdAt,
+    updatedAt: isoDate(value.updatedAt, createdAt),
+  });
+}
+
+function parseChapter(value: unknown, index: number): ManuscriptChapter | null {
+  if (!isRecord(value)) return null;
+  const createdAt = isoDate(value.createdAt);
+  return createManuscriptChapter({
+    id: cleanSingleLine(value.id, 80) || `chapter-${index + 1}`,
+    title: cleanSingleLine(value.title, 120) || `章节 ${index + 1}`,
+    sectionType: SECTIONS.has(value.sectionType as SectionType) ? value.sectionType as SectionType : 'general',
+    taskType: TASKS.has(value.taskType as TaskType) ? value.taskType as TaskType : 'precheck',
+    text: cleanText(value.text, MAX_SOURCE_CHARACTERS),
+    createdAt,
+    updatedAt: isoDate(value.updatedAt, createdAt),
+    lastReviewedAt: typeof value.lastReviewedAt === 'string' ? isoDate(value.lastReviewedAt) : undefined,
+  });
+}
+
+function parseProject(value: unknown): ManuscriptProject | null {
+  if (!isRecord(value)) return null;
+  const createdAt = isoDate(value.createdAt);
+  const chapters = Array.isArray(value.chapters)
+    ? value.chapters.slice(0, MAX_PROJECT_CHAPTERS).map(parseChapter).filter((chapter): chapter is ManuscriptChapter => chapter !== null)
+    : [];
+  const safeChapters = chapters.length ? chapters : [createManuscriptChapter({ title: '摘要', sectionType: 'abstract' })];
+  const requestedActiveId = cleanSingleLine(value.activeChapterId, 80);
+  return createManuscriptProject({
+    id: cleanSingleLine(value.id, 80) || crypto.randomUUID(),
+    name: cleanSingleLine(value.name, 120),
+    targetJournal: cleanSingleLine(value.targetJournal, 160),
+    terminologyLocks: parseLocks(value.terminologyLocks, MAX_PROJECT_TERMS),
+    chapters: safeChapters,
+    activeChapterId: safeChapters.some((chapter) => chapter.id === requestedActiveId) ? requestedActiveId : safeChapters[0].id,
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt),
   });
@@ -211,6 +302,7 @@ export function parsePersistedWorkspace(value: unknown): PersistedWorkspace {
     version: 2,
     current: sanitizeWorkspaceState(value.current),
     history: parseHistory(value.history),
+    project: parseProject(value.project),
     updatedAt: isoDate(value.updatedAt),
   };
 }
@@ -226,13 +318,20 @@ export function parseBackupText(text: string): WorkspaceBackup {
   if (!isRecord(raw) || raw.format !== 'scholarforge-workspace' || raw.version !== 2) {
     throw new Error('这不是受支持的 ScholarForge 工作区备份。');
   }
-  const parsed = parsePersistedWorkspace({ version: 2, current: raw.current, history: raw.history, updatedAt: raw.exportedAt });
+  const parsed = parsePersistedWorkspace({
+    version: 2,
+    current: raw.current,
+    history: raw.history,
+    project: raw.project,
+    updatedAt: raw.exportedAt,
+  });
   return {
     format: 'scholarforge-workspace',
     version: 2,
     exportedAt: isoDate(raw.exportedAt),
     current: parsed.current,
     history: parsed.history,
+    project: parsed.project || null,
   };
 }
 
@@ -243,6 +342,7 @@ export function createBackup(data: PersistedWorkspace): WorkspaceBackup {
     exportedAt: new Date().toISOString(),
     current: sanitizeWorkspaceState(data.current),
     history: parseHistory(data.history),
+    project: parseProject(data.project),
   };
 }
 
@@ -276,5 +376,5 @@ export function migrateLegacyWorkspace(storage: LegacyStorageReader): PersistedW
     sourceText: cleanText(legacyDraft.sourceText, MAX_SOURCE_CHARACTERS),
     terminologyLocks: parseLocks(legacyDraft.lockedTerms),
   });
-  return { version: 2, current: createWorkspaceState(draft), history: [], updatedAt: new Date().toISOString() };
+  return { version: 2, current: createWorkspaceState(draft), history: [], project: null, updatedAt: new Date().toISOString() };
 }
