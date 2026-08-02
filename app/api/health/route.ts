@@ -1,90 +1,32 @@
-import { NextResponse } from 'next/server';
+import {
+  APP_NAME,
+  APP_VERSION,
+  MAX_REQUEST_BYTES,
+  MAX_SOURCE_CHARACTERS,
+} from '@/lib/config';
+import { RATE_LIMITS } from '@/lib/security/rate-limit';
+import type { ReviewServiceStatus } from '@/lib/types';
+
+export const dynamic = 'force-dynamic';
 
 export function GET() {
-  const authConfigured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  );
-
-  return NextResponse.json({
-    status: 'ok',
-    service: 'ScholarForge OS',
-    version: '1.4.0',
-    ui: 'unified-editorial-research-workspace',
-    provider: 'Alibaba Cloud Model Studio',
-    model: process.env.DASHSCOPE_MODEL || 'qwen-plus',
-    workflow: 'task-aware-parallel-multi-agent',
-    specialists: 4,
-    taskTypes: ['translate', 'polish', 'precheck', 'review-response'],
-    reviewSections: 7,
-    reviewModes: 3,
-    terminologyLocks: true,
-    authorDecisionStates: 4,
-    safeIssueApply: true,
-    issueAnchorModes: ['exact', 'whitespace-normalized'],
-    overlappingEditProtection: true,
-    authorUndoRedo: true,
-    docxCleanExport: true,
-    docxTrackedChangesExport: true,
-    originalDocxPackageRetention: 'browser-indexeddb',
-    originalDocxPatchExport: true,
-    originalDocxPreservedParts: ['styles', 'media', 'tables', 'equations', 'headers', 'footers', 'relationships'],
-    originalDocxPatchSkippedStructures: ['tables', 'equations', 'fields', 'hyperlinks', 'comments', 'existing-revisions', 'complex-inline-content'],
-    documentIngestion: true,
-    documentFormats: ['docx', 'text-based-pdf'],
-    documentParsingLocation: 'browser',
-    documentSectionDetection: true,
-    documentChunkLimit: 12000,
-    scannedPdfOcr: false,
-    localReviewHistory: true,
-    canonicalHistorySurface: 'project-hub',
-    historyPreviewViews: ['output', 'issues', 'trace'],
-    duplicateWorkspaceHistoryEntries: false,
-    projectHub: true,
-    workflowTemplates: 4,
-    localWorkspaceBackup: true,
-    localWorkspaceRestore: true,
-    cloudWorkspaceSupported: true,
-    cloudWorkspaceConfigured: authConfigured,
-    cloudWorkspaceMigration: 'supabase/migrations/20260730_cloud_workspace.sql',
-    cloudWorkspaceIsolation: 'Supabase RLS by auth.uid()',
-    localFallback: 'guest-session',
-    workspaceAccess: 'authenticated-session-required',
-    accountModes: ['supabase', 'guest'],
-    guestAccess: true,
-    localDemoAccounts: false,
-    productionDependencyAudit: 'blocking-high-severity',
-    dependencyOverrides: {
-      postcss: '^8.5.22',
-      sharp: '^0.35.3',
+  const configured = Boolean(process.env.DASHSCOPE_API_KEY);
+  const payload: ReviewServiceStatus & { service: string; version: string } = {
+    service: APP_NAME,
+    version: APP_VERSION,
+    configured,
+    model: configured ? process.env.DASHSCOPE_MODEL || 'qwen-plus' : null,
+    message: configured
+      ? '分析服务已配置。只有在你确认并开始分析后，所选文本才会发送给模型。'
+      : '分析服务未配置。仍可编辑、保存、恢复和导出本地工作区；不会生成模拟结果。',
+    limits: {
+      maxCharacters: MAX_SOURCE_CHARACTERS,
+      maxRequestBytes: MAX_REQUEST_BYTES,
+      requestsPerWindow: RATE_LIMITS.requestsPerWindow,
+      windowMinutes: RATE_LIMITS.windowMinutes,
     },
-    experienceSystem: {
-      styleLayer: 'product-ui.css',
-      editorialDesignTokens: true,
-      compactWorkbenchBrief: true,
-      stickyEvidenceNavigation: true,
-      unifiedUtilityDock: true,
-      mobileSafeAreaSupport: true,
-      reducedMotionSupport: true,
-      increasedContrastSupport: true,
-      viewportThemeColor: '#f4f1ea',
-    },
-    codeAudit: {
-      unusedLocals: true,
-      unusedParameters: true,
-      obsoleteStyleOverridesRemoved: true,
-      localBackupValidation: true,
-      originalDocxRollback: true,
-      redundantDemoAuthRemoved: true,
-      duplicateHistoryNavigationRemoved: true,
-      hiddenHistoryImplementationRemoved: true,
-      duplicateWorkbenchControlsRemoved: true,
-      semanticStyleLayers: ['history-preview.css', 'workbench-responsive.css', 'product-ui.css'],
-      removedStyleLayers: ['v06-fixes.css', 'v133.css'],
-    },
-    modelStudioConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
-    authProvider: 'Supabase Auth',
-    authConfigured,
-    timestamp: new Date().toISOString(),
+  };
+  return Response.json(payload, {
+    headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
   });
 }

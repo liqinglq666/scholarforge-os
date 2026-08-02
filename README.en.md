@@ -1,272 +1,87 @@
 # ScholarForge OS
 
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) · [English](README.en.md)
 
-<p align="center">
-  <img src="public/scholarforge-lockup.svg" alt="ScholarForge OS logo" width="440" />
-</p>
+**An author-controlled workspace for scientific English review and revision.**
 
-<p align="center">
-  <strong>An end-to-end scientific writing workspace from document ingestion and multi-agent review to author editing and original-DOCX revisions</strong>
-</p>
-
-<p align="center">
-  Scientific translation, conservative polishing, pre-submission review, reviewer responses,<br />
-  cloud projects, safe issue application, and structure-preserving DOCX patch delivery.
-</p>
-
-<p align="center">
-  <a href="https://scholarforge-os.vercel.app">Live Demo</a> ·
-  <a href="https://scholarforge-os.vercel.app/login">Sign in / Guest access</a> ·
-  <a href="docs/PRD.md">PRD</a> ·
-  <a href="docs/technical.md">Technical Docs</a> ·
-  <a href="docs/cloud-workspace.md">Cloud Setup</a> ·
-  <a href="docs/releases/v1.3-original-docx-patching.md">v1.3 Release Notes</a>
-</p>
-
-<p align="center">
-  <img alt="App v1.3.2" src="https://img.shields.io/badge/app-v1.3.2-17233d" />
-  <img alt="Alibaba Cloud Model Studio" src="https://img.shields.io/badge/Alibaba%20Cloud-Model%20Studio-ff6a00" />
-  <img alt="qwen-plus" src="https://img.shields.io/badge/model-qwen--plus-7c3aed" />
-  <img alt="Four parallel agents" src="https://img.shields.io/badge/workflow-4%20parallel%20agents-0f766e" />
-  <img alt="Original DOCX patching" src="https://img.shields.io/badge/DOCX-original%20package%20patch-2f6d67" />
-  <img alt="Supabase Auth and RLS" src="https://img.shields.io/badge/cloud-Supabase%20Auth%20%2B%20RLS-3ecf8e" />
-</p>
-
----
+ScholarForge OS serves graduate students, researchers, and academic editors working with Chinese or English scientific passages. It is not a paper generator and does not replace author judgment. AI produces explainable suggestions; the author accepts, rejects, or defers each issue. Only a single suggestion that is uniquely anchored in the current working draft and does not change scientific meaning can be applied automatically.
 
 ## Product scope
 
-ScholarForge OS is built for graduate students, researchers, supervisors, and academic editors. It covers the complete author-side workflow rather than acting as a generic rewrite box.
+The product keeps three core tasks:
 
-```text
-DOCX / PDF manuscript
-→ section detection and scope selection
-→ four parallel Model Studio agents
-→ issue evidence and scientific guardrails
-→ author decisions
-→ safe issue-level application
-→ generated working DOCX or original-package DOCX patch
-→ local or user-isolated cloud project
-```
+| Task | Purpose | Explicit boundary |
+| --- | --- | --- |
+| Scientific Chinese-to-English | Produce reviewable academic English | Preserve values, units, terminology, and claim strength |
+| Conservative English polishing | Improve grammar, syntax, wording, concision, and cohesion | Do not add facts, citations, experiments, or stronger claims |
+| Pre-submission check | Identify language, terminology, logic, reporting, and evidence-boundary issues | No readiness score, acceptance prediction, or peer-review claim |
 
-Core principle:
+PDF, OCR, automated reviewer responses, accounts, cloud sync, collaboration, original-OOXML patching, Word tracked changes, unreliable scoring, and batch apply are intentionally unsupported.
 
-> **Models make specialist judgments; deterministic code owns constraints, anchoring, conflict handling, scoring, and final workflow state.**
+## Core flow
 
-## Four scientific writing workflows
+1. Understand product scope, data handling, and AI limitations on the welcome page.
+2. Paste text or extract DOCX body text locally and select one section.
+3. Choose a task and section; optionally add journal context and terminology locks.
+4. Confirm the exact payload before sending. The original DOCX is never uploaded.
+5. Compare the immutable source, AI suggestion, author working draft, and issue list.
+6. Decide every issue and revalidate the current anchor before applying one suggestion.
+7. Undo or redo changes; export TXT, a Markdown report, a clean DOCX, or a workspace backup.
+8. Restore browser-local history from one canonical Recent Tasks page.
 
-| Workflow | Input | Main purpose | Primary output |
-| --- | --- | --- | --- |
-| **Scientific Translation** | Chinese research text | Preserve values, terminology, evidence strength, and scientific tone | Academic English Translation |
-| **Conservative Polishing** | English manuscript text | Improve grammar and academic style without inventing facts | Conservative Revision |
-| **Pre-submission Review** | English manuscript text | Audit terminology, language, logic, methods, and readiness | Revision + Evidence |
-| **Reviewer Response** | Reviewer comment + author evidence | Draft a formal response without fabricating experiments or locations | Response to Reviewer Draft |
+## Scientific safety boundary
 
-All workflows share seven section profiles, three review modes, terminology locks, issue evidence, author decisions, and scientific guardrails.
+After model generation, deterministic code checks numbers, scientific notation, percentages, values with units, terminology locks, invented DOI strings, empty/oversized/truncated/non-JSON output, placeholders, duplicate issue IDs, field lengths, anchor uniqueness, cross-paragraph edits, author-required content, and potential meaning changes.
 
-## Four independent Model Studio agents
+Passing these checks does not make the output scientifically correct. The author must still verify facts, references, statistics, experimental parameters, sample counts, causality, methods, claim strength, and current journal requirements.
 
-| Agent | Responsibility |
-| --- | --- |
-| **Terminology Guardian** | Terminology, abbreviations, units, symbols, naming, and locked terms |
-| **Academic Editor** | Translation, polishing, revision, or reviewer-response primary output |
-| **Logic Auditor** | Causality, evidence boundaries, claim strength, and response completeness |
-| **Method Auditor** | Samples, equipment, parameters, statistics, reproducibility, and author evidence |
+When the model is not configured, the workbench disables analysis and `POST /api/review` returns `503`. No simulated result is generated or saved.
 
-A normal workflow sends four independent `qwen-plus` requests through Alibaba Cloud Model Studio and executes them in parallel with `Promise.all`.
+## Data and recovery
 
-```text
-Browser
-  ↓
-Next.js POST /api/review
-  ↓
-4 independent specialist requests
-  ↓
-Alibaba Cloud Model Studio · qwen-plus
-  ↓
-Deterministic aggregator and scientific guardrails
-  ↓
-Primary output + issue evidence + terminology + author decisions
-```
+- The draft, review result, decisions, working copy, and 12 recent tasks are stored in browser `localStorage`.
+- DOCX parsing happens in the browser. Original binary files are neither uploaded nor retained.
+- Only an author-confirmed payload is sent to the server and model.
+- Importing a backup validates size, format, and version. Stored edit offsets and replacement text are not trusted; safe edits are rebuilt from current issues.
 
-The Model Studio API key is server-side only. Readiness scores and reviewer decisions are calculated from normalized issues by code rather than freely generated by the model.
+See [Product](docs/product.md), [Architecture](docs/ARCHITECTURE.md), [Technical and Security](docs/technical.md), [Privacy](docs/PRIVACY.md), and [Deployment](docs/DEPLOYMENT.md).
 
-## Document ingestion
+## Local development
 
-Browser-side ingestion supports semantic DOCX headings, page-aware text-based PDF extraction, standard manuscript section detection, paragraph-aware splitting above 12,000 characters, and exact scope preview.
-
-Selecting a file does not automatically upload the original document. Only text explicitly imported into PaperLens and submitted by the author enters a review request. Scanned-PDF OCR is not implemented.
-
-## Author editing workflow
-
-An issue is eligible for automatic application only when its original and revised text exist, its source anchor is unique, it does not contain an author placeholder, it stays inside one paragraph, and it does not overlap another accepted edit.
-
-```text
-exact match
-→ unique whitespace-normalized match
-→ manual author action when missing, repeated, overlapping, or cross-paragraph
-```
-
-The Author Editing dock provides issue-level apply, apply-all-safe, working-copy preview, undo, redo, reset, and write-back to PaperLens.
-
-### Two Word delivery paths
-
-**Generated author working documents**
-
-- clean DOCX;
-- DOCX with native insert/delete revisions;
-- Author Decision Appendix.
-
-These files are convenient editing copies, but they do not reproduce every layout object from the uploaded document.
-
-**Original DOCX package patching — v1.3**
-
-- the imported DOCX OOXML package is stored in the current browser's IndexedDB;
-- selected review text is bound to the package with a SHA-256 fingerprint;
-- accepted edits reopen the original package after author confirmation;
-- only uniquely located ordinary text in `word/document.xml` is modified;
-- edits use native Word `w:del` and `w:ins` revision elements;
-- untouched styles, media, tables, equations, headers, footers, relationships, and other package parts remain in the package;
-- the patched result is downloaded as a new copy and never overwrites the stored original.
-
-### Conservative skip rules
-
-The original-package patcher will not automatically modify:
-
-- table cells;
-- Word equations;
-- fields, cross-references, and hyperlinks;
-- comments, bookmarks, footnote references, or endnote references;
-- paragraphs already containing revisions;
-- drawings, objects, or complex inline structures;
-- missing, repeated, or overlapping source anchors.
-
-A patch report lists applied and skipped issue IDs.
-
-> v1.3 does not claim byte-identical preservation. `word/document.xml` and, when present, `word/settings.xml` are reserialized. Other untouched ZIP entries are retained and repackaged by JSZip.
-
-### Browser-local original-file boundary
-
-- original DOCX binaries stay in the current browser only;
-- up to six recent source packages are retained;
-- source packages are not synced through Supabase;
-- another device or cleared browser storage requires re-importing the DOCX;
-- documents imported before v1.3 must be imported again to establish a package binding;
-- manually changing the reviewed source text breaks the source fingerprint binding.
-
-## Scientific guardrails
-
-ScholarForge OS currently enforces:
-
-- no new numeric values outside source text and author-provided evidence;
-- no fabricated experiments, samples, equipment, standards, or references;
-- no automatic conversion of correlation into causality;
-- missing method details remain `[Please provide ...]` tasks;
-- major logic and method risks are not erased by smoother language;
-- locked terminology is passed to all four agents and rechecked;
-- missing, repeated, cross-paragraph, and overlapping anchors are never auto-replaced.
-
-These safeguards do not replace peer review, statistical review, reference verification, or author responsibility.
-
-## Account and cloud manuscript projects
-
-ScholarForge OS now exposes only two explicit account modes:
-
-- **Supabase cloud account** for real email authentication and RLS-isolated cloud projects;
-- **Guest session** for registration-free evaluation with browser-local drafts and history.
-
-When Supabase is not configured, the login page hides non-functional email forms and shows guest access only. The former local demo-account simulation has been removed because it duplicated guest access and could be mistaken for a real registration flow.
-
-Supabase email accounts can explicitly sync and restore projects with Row Level Security:
-
-```sql
-auth.uid() = owner_id
-```
-
-Signing in never automatically uploads existing local manuscripts. Guest sessions remain browser-local, and original DOCX binaries are not part of the current cloud-sync payload.
-
-## Architecture
-
-```text
-Next.js 16 + React 19 + TypeScript
-├─ Project Hub
-├─ Browser Document Ingestion
-│  ├─ Mammoth DOCX parser
-│  └─ Mozilla PDF.js
-├─ PaperLens Workspace
-│  └─ 4 × qwen-plus through Model Studio
-├─ Author Editing Engine
-│  ├─ exact / whitespace anchors
-│  ├─ overlap protection
-│  └─ undo / redo
-├─ DOCX Delivery
-│  ├─ docx.js generated working document
-│  └─ JSZip + OOXML original-package patcher
-├─ Browser Original File Store
-│  └─ IndexedDB + SHA-256 source binding
-└─ Account & Cloud
-   ├─ Supabase Auth + RLS
-   └─ browser-local guest fallback
-```
-
-## Quick start
-
-Requirements: Node.js `>= 22.12`.
+Node.js `>= 22.12.0` is required.
 
 ```bash
 git clone https://github.com/liqinglq666/scholarforge-os.git
 cd scholarforge-os
-npm install
+npm ci
 cp .env.example .env.local
+npm run dev
 ```
 
 ```env
-DASHSCOPE_API_KEY=your_key
+DASHSCOPE_API_KEY=your_server_side_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-plus
+REVIEW_DAILY_REQUEST_BUDGET=0
 ```
 
-Optional Supabase variables:
+`DASHSCOPE_API_KEY` is server-only. A daily budget of `0` disables the request-count circuit breaker; production deployments should set an appropriate positive limit.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
-```
-
-Run `supabase/migrations/20260730_cloud_workspace.sql` in Supabase SQL Editor, then validate:
+## Verification
 
 ```bash
-npm run dev
+npm ci
+npm audit --omit=dev --audit-level=high
+npm run lint
+npm run test
 npm run typecheck
 npm run build
+npx playwright install --with-deps chromium
+npm run test:e2e
 ```
 
-## Key files
+## Deployment limitations
 
-```text
-components/document-import-dock.tsx
-components/author-editing-dock.tsx
-components/original-docx-patch-dock.tsx
-lib/document-ingestion.ts
-lib/author-editing.ts
-lib/docx-export.ts
-lib/original-docx-store.ts
-lib/original-docx-patcher.ts
-lib/bailian.ts
-app/api/review/route.ts
-app/api/health/route.ts
-```
+The current rate limiter is per Node.js instance. A public multi-instance deployment should use shared rate-limit storage plus platform WAF controls, monitoring, and provider cost limits. Browser-local workspaces do not sync across devices. DOCX extraction and clean export do not preserve the source document's layout or complex objects. The product does not verify reference authenticity, statistical correctness, journal rules, or acceptance readiness.
 
-## Current boundaries and roadmap
-
-- scanned PDFs do not receive OCR;
-- cloud projects keep the latest eight task snapshots rather than unlimited history;
-- original-package patching only supports uniquely located ordinary text paragraphs;
-- original DOCX packages do not sync across devices;
-- agent progress is returned after the API response rather than streamed through SSE;
-- planned work includes stronger paragraph mapping, unlimited versions, collaboration approval, DOI checks, and cross-section consistency analysis.
-
-## License
-
-Copyright © ScholarForge OS contributors. Review repository licensing information before reuse.
+The repository currently has no standalone open-source license file. The owner should add an explicit license before public redistribution or third-party reuse.

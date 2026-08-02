@@ -1,559 +1,89 @@
-# ScholarForge OS｜研语工坊 技术文档
+# 技术与安全说明
 
-## 1. 文档信息
+## API
 
-- 技术版本：v0.2
-- 架构形态：Next.js 全栈应用
-- 部署平台：Vercel
-- 模型平台：阿里云百炼 Model Studio
-- 默认模型：`qwen-plus`
-- 运行模式：四个独立 Agent 并行调用 + 本地确定性聚合
+### `GET /api/health`
 
-## 2. 技术目标
+返回真实服务配置状态、模型名称和用户相关限制。响应禁止缓存。未配置时 `configured=false`，不声称存在演示能力。
 
-ScholarForge OS 的技术设计围绕以下目标展开：
+### `POST /api/review`
 
-1. 证明多 Agent 不是前端动画，而是真实独立调用。
-2. 保持科研写作场景中的保守性和可解释性。
-3. 避免模型自由生成最终分数和 Reviewer Decision。
-4. 在 Vercel 60 秒函数限制内完成四个 Agent 的并行执行。
-5. 即使没有 API Key，也能提供稳定演示。
-6. 单个 Agent 失败时仍保留其他成功结果。
-
-## 3. 系统架构
-
-```text
-Browser
-  ├─ Review input
-  ├─ Comparison / Issues / Terminology / Trace
-  └─ Client-side TXT / Markdown / JSON export
-        ↓
-Next.js Route Handler: POST /api/review
-  ├─ Input validation
-  ├─ Demo/live routing
-  ├─ Request ID
-  └─ Error boundary
-        ↓
-Parallel Orchestration: Promise.all
-  ├─ Terminology Guardian → Model Studio
-  ├─ Academic Editor      → Model Studio
-  ├─ Logic Auditor        → Model Studio
-  └─ Method Auditor       → Model Studio
-        ↓
-Deterministic Aggregator
-  ├─ Normalize JSON
-  ├─ De-duplicate issues
-  ├─ De-duplicate terminology
-  ├─ Numeric-token guardrail
-  ├─ Score calculation
-  ├─ Reviewer Decision
-  └─ Partial-failure isolation
-        ↓
-ReviewResult JSON
-```
-
-## 4. 仓库结构
-
-```text
-.
-├── app/
-│   ├── api/
-│   │   ├── health/route.ts       # 健康检查
-│   │   └── review/route.ts       # 审校入口
-│   ├── globals.css               # 基础视觉系统
-│   ├── v02.css                   # v0.2 多 Agent 与交付物样式
-│   ├── layout.tsx                # Metadata 与全局样式
-│   └── page.tsx                  # 三栏工作台
-├── lib/
-│   ├── bailian.ts                # 多 Agent 执行与聚合
-│   ├── demo-review.ts            # 无 Key 演示结果
-│   └── types.ts                  # 核心类型
-├── public/
-│   └── scholarforge-mark.svg     # 品牌标识
-├── docs/
-│   ├── PRD.md
-│   ├── product.md
-│   ├── technical.md
-│   └── readme-assets/
-├── .github/workflows/ci.yml
-├── .env.example
-├── package.json
-└── README.md
-```
-
-## 5. 技术栈
-
-| 层级 | 技术 |
-| --- | --- |
-| Web 框架 | Next.js 16 App Router |
-| UI | React 19、TypeScript、原生 CSS |
-| 服务端接口 | Next.js Route Handlers |
-| 模型调用 | 阿里云百炼 OpenAI 兼容接口 |
-| 并行调度 | `Promise.all` |
-| 数据结构 | TypeScript interfaces |
-| 文件导出 | Browser `Blob` + Object URL |
-| 部署 | Vercel |
-| CI | GitHub Actions、Node.js 22 |
-
-当前没有引入数据库、队列、状态管理库或 UI 组件库，以减少比赛阶段的依赖面和部署风险。
-
-## 6. 环境变量
-
-```env
-DASHSCOPE_API_KEY=
-DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-DASHSCOPE_MODEL=qwen-plus
-```
-
-### 安全要求
-
-- `DASHSCOPE_API_KEY` 只能在服务端读取。
-- 禁止使用 `NEXT_PUBLIC_DASHSCOPE_API_KEY`。
-- `.env.local` 必须被 `.gitignore` 忽略。
-- 日志不得打印 Key。
-- API 错误仅返回模型错误摘要，不返回请求头。
-
-## 7. API 设计
-
-### 7.1 `GET /api/health`
-
-用途：验证部署、版本、工作流模式和 Key 是否存在。
-
-示例：
-
-```json
-{
-  "status": "ok",
-  "service": "ScholarForge OS",
-  "version": "0.2.0",
-  "workflow": "parallel-multi-agent",
-  "specialists": 4,
-  "modelStudioConfigured": true,
-  "timestamp": "2026-07-30T00:00:00.000Z"
-}
-```
-
-注意：该接口只检查环境变量是否存在，不会实际调用模型。
-
-### 7.2 `POST /api/review`
-
-请求体：
-
-```json
-{
-  "text": "Academic manuscript passage...",
-  "targetJournal": "Construction and Building Materials"
-}
-```
-
-输入限制：
-
-- `text` 最少 40 字符
-- `text` 最多 12,000 字符
-- `targetJournal` 最多 160 字符
-
-成功响应核心结构：
-
-```json
-{
-  "mode": "live",
-  "executionMode": "parallel-multi-agent",
-  "workflowVersion": "0.2.0",
-  "summary": "...",
-  "revisedText": "...",
-  "scoreBefore": 72,
-  "scoreAfter": 78,
-  "decision": "major_revision",
-  "decisionReason": "...",
-  "issues": [],
-  "terminology": [],
-  "agentRuns": [],
-  "guardrails": [],
-  "generatedAt": "...",
-  "requestId": "..."
-}
-```
-
-响应头：
-
-```text
-Cache-Control: no-store
-X-ScholarForge-Workflow: 0.2.0
-```
-
-## 8. 多 Agent 执行模型
-
-### 8.1 独立调用
-
-`lib/bailian.ts` 为四个 Agent 定义四套独立 System Prompt：
-
-- `terminology`
-- `language`
-- `logic`
-- `method`
-
-每个 Agent 都发起一次独立 `POST /chat/completions` 请求。
-
-### 8.2 并行调度
+请求：
 
 ```ts
-const executions = await Promise.all(
-  AGENT_IDS.map((agent) =>
-    runSpecialist(agent, text, targetJournal, apiKey, baseUrl, model),
-  ),
-);
+type ReviewRequest = {
+  taskId: string;
+  projectName: string;
+  taskType: 'translate' | 'polish' | 'precheck';
+  sectionType: 'general' | 'abstract' | 'introduction' | 'methods' | 'results' | 'discussion' | 'conclusion';
+  targetJournal: string;
+  text: string;
+  terminologyLocks: Array<{ id: string; source: string; preferred: string; note?: string }>;
+};
 ```
 
-并行执行的目的：
+成功响应只包含用户需要的 `ReviewResult` 与 `requestId`。不包含 Agent 轨迹、评分、内部模式或调试数据。
 
-- 避免四次调用耗时相加
-- 保持不同专业角色互不污染
-- 适配 Vercel 函数时间限制
+常见错误：
 
-### 8.3 Agent 局部失败
+| HTTP | code | 含义 |
+| --- | --- | --- |
+| 400 | `INVALID_JSON`, `INVALID_BODY`, `INVALID_TASK`, `INVALID_SECTION` | 请求格式无效 |
+| 413 | `REQUEST_TOO_LARGE` | 请求超过 80 KB |
+| 422 | `SAFETY_CHECK_FAILED` | 模型输出未通过确定性检查 |
+| 429 | `RATE_LIMITED`, `PROVIDER_RATE_LIMITED` | 本地或供应商限流，包含 `Retry-After` |
+| 502 | `INVALID_MODEL_JSON`, `MODEL_OUTPUT_TRUNCATED`, `MODEL_ERROR` | 模型结果不可用 |
+| 503 | `SERVICE_NOT_CONFIGURED` | 服务未配置，没有调用模型 |
+| 504 | `MODEL_TIMEOUT` | 55 秒超时 |
 
-`runSpecialist` 不直接抛出错误终止整个工作流，而是返回：
+所有 API 响应包含 `Cache-Control: no-store` 和 `X-Content-Type-Options: nosniff`。
 
-```ts
-{
-  payload: emptyPayload,
-  run: {
-    agent,
-    status: 'failed',
-    durationMs,
-    error,
-  },
-}
-```
+## 请求保护
 
-聚合器只使用成功 Agent 的结果。如果四个 Agent 全部失败，才抛出整体错误。
+- 读取 `Content-Length` 并对实际 UTF-8 字节再次检查；
+- 正文 40–12,000 字符；
+- 最多 20 条术语锁；
+- 每个客户端 10 分钟 6 次；
+- 单 Node.js 实例最多 4 个并发模型请求；
+- `REVIEW_DAILY_REQUEST_BUDGET` 可按 UTC 日启用请求数预算熔断；
+- 模型请求 55 秒超时；
+- 模型响应最大 100,000 字符，`finish_reason=length` 视为失败。
 
-这种策略适合比赛演示和轻量生产：一个角色超时不会让用户完全失去结果。
+当前限流使用进程内 Map。它适合单实例基础保护，不是多实例公开部署的唯一防线。
 
-## 9. Prompt 设计
+## 确定性模型输出检查
 
-### 9.1 共享硬规则
+1. JSON 对象、字段类型、长度和唯一 Issue ID。
+2. 数值、科学计数法、百分数多重集与原文一致。
+3. “数值 + 单位”多重集与原文一致。
+4. 术语锁的 `source` 出现在原文时，指定 `preferred` 必须出现在建议稿。
+5. 建议稿不能包含原文未提供的 DOI。
+6. 建议稿不能包含常见待补占位符。
+7. 每个 Issue 的 `safeToApply` 会由代码再次收紧：含义变化、作者待补、跨段落、空文本或非唯一精确锚点都会禁用。
 
-四个 Agent 共用以下规则：
+## 安全应用
 
-- 不虚构实验、样本、数值、标准、参考文献或设备参数
-- 保留原始数字、单位、材料名称和试件编号
-- 缺失信息使用 `[Please provide ...]`
-- 不新增 DOI 或参考文献
-- 只返回 JSON
+每次点击应用都会针对**当前作者工作稿**重新检查：Issue 尚未应用、服务端安全标记、原文/建议非空、文本不同、原文长度、单段落、无占位符、无含义变化、无需作者补充、精确或忽略空白后唯一匹配。任何失败都会返回具体原因。
 
-### 9.2 职责隔离
+作者决定与应用是分开的：接受建议不等于自动替换。应用成功会加入撤销栈并清空重做栈。
 
-Terminology、Logic 和 Method Agent 不输出全文修改稿。
+## 浏览器持久化与迁移
 
-只有 Academic Editor 输出 `revisedText`，其职责被限定为保守语言修改。
+`scholarforge.workspace.v2` 是唯一当前键。自动保存延迟 500 ms，并显示保存、保存中或失败状态。失败不会清空内存状态。
 
-这样可以减少多个 Agent 同时重写全文导致冲突的问题。
+旧版 v1 草稿只迁移能够安全解释的输入字段。旧结果、评分、Agent 轨迹和编辑不会迁移；旧键不会被删除，避免静默损坏。
 
-### 9.3 结构化输出
+JSON 备份限制 2 MB。导入顺序为：读取文本、JSON 解析、格式/版本验证、字段清洗、Issue 验证、根据当前 Issue 重建已应用修改、用户预览、确认替换、原子写入。失败时当前工作区不变。
 
-所有 Agent 输出：
+## DOCX
 
-```json
-{
-  "summary": "string",
-  "revisedText": "string",
-  "issues": [
-    {
-      "severity": "major | minor | suggestion",
-      "location": "string",
-      "original": "string",
-      "revised": "string",
-      "reason": "string",
-      "category": "string",
-      "meaningChanged": false
-    }
-  ],
-  "terminology": []
-}
-```
+浏览器使用 Mammoth 读取 `.docx`，文件上限 8 MB。它识别 Title/Heading 1–3 和常见论文章节，只允许用户选择一个不超过 12,000 字符的章节。公式、表格结构、图片、脚注、批注、修订痕迹和页面样式不会作为可编辑结构导入。
 
-服务端会再次规范化字段，避免模型返回缺失字段导致前端崩溃。
+清洁 DOCX 是由 `docx` 新生成的作者工作稿副本，不声称保留原样式。
 
-## 10. 聚合与去重
+## 测试
 
-### 10.1 问题去重键
-
-```text
-agent | location | category | original
-```
-
-使用小写字符串构建 Set，避免同一 Agent 重复返回相同问题。
-
-### 10.2 术语去重键
-
-使用 `preferred.toLowerCase()`。
-
-### 10.3 数量上限
-
-- 单 Agent 最多保留 16 条问题
-- 最终最多保留 40 条问题
-- 最终最多保留 16 条术语规则
-
-防止模型输出异常膨胀。
-
-## 11. 评分系统
-
-### 11.1 为什么不让模型打分
-
-模型评分存在明显漂移，同样的问题可能给出不同分数，Decision 也可能与分数冲突。因此 ScholarForge OS 只采信模型识别的问题，不采信模型分数。
-
-### 11.2 修改前惩罚
-
-示意规则：
-
-```text
-Suggestion = 1
-Minor Language / Terminology = 3
-Minor Logic / Method = 4
-Major Language / Terminology = 7
-Major Logic / Method = 10
-```
-
-```text
-scoreBefore = 100 - sum(penalty)
-```
-
-分数会限制在 0—100。
-
-### 11.3 修改后惩罚
-
-语言和术语问题被认为可以由保守修改部分处理，因此惩罚降低。
-
-Logic 与 Method 往往依赖作者、数据或实验信息，因此仍保留较高惩罚。
-
-### 11.4 Decision
-
-```text
-if scoreAfter < 80 OR unresolvedMajorLogicMethod >= 2:
-    Major Revision
-else if scoreAfter < 92 OR anyMajorIssue:
-    Minor Revision
-else:
-    Ready for Submission
-```
-
-Decision 原因由代码模板生成，而不是模型自由撰写。
-
-## 12. 科学保护规则
-
-### 12.1 新增数字检测
-
-```ts
-function numericTokens(value: string): Set<string>
-```
-
-服务端提取原文和修改稿中的数字 token。如果修改稿出现原文没有的数字：
-
-```text
-revisedText = sourceText
-```
-
-这是保守回退，不代表完整事实核验。
-
-### 12.2 意义改变
-
-只要任意问题返回 `meaningChanged=true`，保护规则即标记为失败。
-
-### 12.3 方法缺失占位符
-
-重大 Method 问题应使用：
-
-```text
-[Please provide ...]
-```
-
-服务端会检查这一格式并显示保护状态。
-
-## 13. 前端状态模型
-
-### 13.1 请求前
-
-- Agent：等待
-- 下载按钮：禁用
-- 评分：空
-
-### 13.2 请求中
-
-- 四个 Agent 同时显示“并行运行”
-- 显示等待时间
-- 进度条为体验进度，不代表单个模型 token 进度
-
-### 13.3 请求完成
-
-- Agent 显示真实耗时
-- 失败 Agent 显示失败状态
-- 结果切换到四个 Tab
-- 下载按钮启用
-
-## 14. 文件导出
-
-当前导出在浏览器端完成，不调用服务端文件系统。
-
-```ts
-const blob = new Blob([content], { type });
-const url = URL.createObjectURL(blob);
-```
-
-优点：
-
-- 无需对象存储
-- 不保存用户论文
-- 不增加后端复杂度
-
-当前格式：
-
-- TXT
-- Markdown
-- JSON
-
-后续 DOCX/PDF 需要服务端文档生成或专用导出服务。
-
-## 15. 错误处理
-
-### 15.1 输入错误
-
-返回 400。
-
-### 15.2 模型或配额错误
-
-返回 502，并携带 `requestId`。
-
-生产环境不返回完整内部错误；开发环境可返回 `detail`。
-
-### 15.3 超时
-
-每个 Agent 使用独立 `AbortController`，超时约 46 秒。
-
-### 15.4 全部 Agent 失败
-
-抛出整体错误，提示检查：
-
-- API Key
-- Base URL
-- Model
-- Quota
-- Vercel Logs
-
-## 16. 本地开发
-
-```bash
-git clone git@github.com:liqinglq666/scholarforge-os.git
-cd scholarforge-os
-npm install
-copy .env.example .env.local
-npm run dev
-```
-
-打开：
-
-```text
-http://localhost:3000
-http://localhost:3000/api/health
-```
-
-## 17. Vercel 部署
-
-1. 导入 GitHub 仓库。
-2. Framework 选择 Next.js。
-3. Root Directory 保持 `./`。
-4. 添加三个环境变量。
-5. Deploy。
-6. 打开 `/api/health` 检查 `modelStudioConfigured`。
-7. 在首页执行一次真实审校。
-
-## 18. CI
-
-GitHub Actions 使用 Node.js 22：
-
-```text
-npm install
-npm run typecheck
-npm run build
-```
-
-所有功能分支必须在合并前通过类型检查和生产构建。
-
-## 19. 当前技术边界
-
-- 没有数据库和用户系统
-- 没有任务队列
-- 没有 SSE/WebSocket
-- 没有断点恢复
-- 没有模型调用成本统计
-- 没有对象存储
-- 没有 PDF/DOCX 解析
-- 没有全文分块与跨章节记忆
-- 数值 guardrail 只做 token 对比，不是完整事实验证
-- Promise.all 仍受单次 Vercel 函数生命周期限制
-
-## 20. 未来架构
-
-当支持全文论文和长期项目后，建议升级为：
-
-```text
-Next.js Client
-    ↓
-FastAPI / Node Platform API
-    ↓
-PostgreSQL + Redis Queue
-    ↓
-Workflow Worker Pool
-    ├─ Parser Agent
-    ├─ Terminology Agent
-    ├─ Language Agent
-    ├─ Logic Agent
-    ├─ Method Agent
-    ├─ Reviewer Agent
-    └─ Revision Agent
-    ↓
-OSS / S3 Artifacts
-    ↓
-SSE realtime events
-```
-
-核心对象建议：
-
-- users
-- projects
-- manuscript_versions
-- sections
-- terminology_rules
-- review_runs
-- agent_runs
-- issues
-- accepted_revisions
-- artifacts
-
-## 21. 测试重点
-
-### 单元测试
-
-- severity normalization
-- issue de-duplication
-- terminology de-duplication
-- score calculation
-- decision thresholds
-- new numeric token detection
-- partial agent failure
-
-### 集成测试
-
-- 无 Key 进入 demo
-- 有 Key 执行四次请求
-- 单 Agent 失败仍返回结果
-- 四 Agent 全失败返回 502
-- 12,000 字符边界
-
-### UI 测试
-
-- 移动端 Tab 横向布局
-- 下载按钮状态
-- 长错误文本换行
-- 运行轨迹卡片
-- 评分与 Decision 一致
+- Vitest：请求校验、安全检查、锚点、应用、撤销/重做、备份、DOCX、API、限流、组件状态。
+- Playwright：桌面与移动端核心流程、服务未配置、横向溢出、下载和历史恢复。
+- ESLint：Next.js Core Web Vitals 与 TypeScript 规则，CI 不允许警告。
+- TypeScript：`strict`、`noUnusedLocals`、`noUnusedParameters`。

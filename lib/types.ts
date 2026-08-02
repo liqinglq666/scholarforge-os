@@ -1,11 +1,6 @@
-export type AgentId = 'terminology' | 'language' | 'logic' | 'method';
+export type TaskType = 'translate' | 'polish' | 'precheck';
 
-export type IssueSeverity = 'major' | 'minor' | 'suggestion';
-export type AgentRunStatus = 'completed' | 'failed' | 'demo';
-
-export type WorkspaceTask = 'translate' | 'polish' | 'precheck' | 'review-response';
-
-export type ReviewSection =
+export type SectionType =
   | 'general'
   | 'abstract'
   | 'introduction'
@@ -14,9 +9,9 @@ export type ReviewSection =
   | 'discussion'
   | 'conclusion';
 
-export type ReviewMode = 'conservative' | 'balanced' | 'deep';
-export type IssueDecision = 'pending' | 'accepted' | 'deferred' | 'dismissed';
-export type ReviewOutputKind = 'translation' | 'revision' | 'precheck' | 'reviewer-response';
+export type IssueSeverity = 'major' | 'minor' | 'suggestion';
+export type IssueDecision = 'pending' | 'accepted' | 'rejected' | 'deferred';
+export type WorkspaceStatus = 'draft' | 'analyzing' | 'reviewing' | 'error';
 
 export interface TerminologyLock {
   id: string;
@@ -25,78 +20,131 @@ export interface TerminologyLock {
   note?: string;
 }
 
-export interface ReviewProfile {
-  projectTitle: string;
-  taskType: WorkspaceTask;
-  sectionType: ReviewSection;
-  reviewMode: ReviewMode;
+export interface ImportedDocument {
+  fileName: string;
+  importedAt: string;
+  warnings: string[];
+}
+
+export interface WorkspaceDraft {
+  id: string;
+  projectName: string;
+  taskType: TaskType;
+  sectionType: SectionType;
   targetJournal: string;
-  responseLocation: string;
-  supportingContextProvided: boolean;
-  lockedTerms: TerminologyLock[];
+  sourceText: string;
+  terminologyLocks: TerminologyLock[];
+  importedDocument?: ImportedDocument;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ReviewIssue {
   id: string;
-  agent: AgentId;
+  category: string;
   severity: IssueSeverity;
   location: string;
   original: string;
   revised: string;
   reason: string;
-  category: string;
   meaningChanged: boolean;
-}
-
-export interface TerminologyItem {
-  preferred: string;
-  avoid: string[];
-  note: string;
-}
-
-export interface AgentRun {
-  agent: AgentId;
-  status: AgentRunStatus;
-  durationMs: number;
-  issueCount: number;
-  summary: string;
-  model: string;
-  error?: string;
-}
-
-export interface ReviewGuardrail {
-  id: string;
-  label: string;
-  passed: boolean;
+  authorActionRequired: boolean;
+  safeToApply: boolean;
+  safetyReason?: string;
 }
 
 export interface ReviewResult {
-  mode: 'live' | 'demo';
-  executionMode: 'parallel-multi-agent' | 'safe-demo';
-  workflowVersion: string;
-  outputKind: ReviewOutputKind;
-  profile: ReviewProfile;
+  id: string;
+  taskId: string;
   summary: string;
-  revisedText: string;
-  scoreBefore: number;
-  scoreAfter: number;
-  decision: 'major_revision' | 'minor_revision' | 'ready';
-  decisionReason: string;
+  suggestedText: string;
   issues: ReviewIssue[];
-  terminology: TerminologyItem[];
-  agentRuns: AgentRun[];
-  guardrails: ReviewGuardrail[];
+  warnings: string[];
   generatedAt: string;
 }
 
+export interface AppliedEdit {
+  id: string;
+  issueId: string;
+  start: number;
+  end: number;
+  original: string;
+  revised: string;
+  appliedAt: string;
+}
+
+export interface UndoFrame {
+  workingText: string;
+  appliedEdits: AppliedEdit[];
+}
+
+export interface WorkspaceState {
+  version: 2;
+  draft: WorkspaceDraft;
+  currentResult: ReviewResult | null;
+  decisions: Record<string, IssueDecision>;
+  appliedEdits: AppliedEdit[];
+  undoStack: UndoFrame[];
+  redoStack: UndoFrame[];
+  workingText: string;
+  status: WorkspaceStatus;
+  lastError?: string;
+  savedAt?: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  projectName: string;
+  taskType: TaskType;
+  sectionType: SectionType;
+  sourceCharacterCount: number;
+  issueCount: number;
+  resolvedIssueCount: number;
+  savedAt: string;
+  workspace: WorkspaceState;
+}
+
+export interface PersistedWorkspace {
+  version: 2;
+  current: WorkspaceState;
+  history: HistoryEntry[];
+  updatedAt: string;
+}
+
+export interface WorkspaceBackup {
+  format: 'scholarforge-workspace';
+  version: 2;
+  exportedAt: string;
+  current: WorkspaceState;
+  history: HistoryEntry[];
+}
+
 export interface ReviewRequest {
+  taskId: string;
+  projectName: string;
+  taskType: TaskType;
+  sectionType: SectionType;
+  targetJournal: string;
   text: string;
-  projectTitle?: string;
-  taskType?: WorkspaceTask;
-  targetJournal?: string;
-  sectionType?: ReviewSection;
-  reviewMode?: ReviewMode;
-  supportingContext?: string;
-  responseLocation?: string;
-  lockedTerms?: TerminologyLock[];
+  terminologyLocks: TerminologyLock[];
+}
+
+export interface ReviewServiceStatus {
+  configured: boolean;
+  model: string | null;
+  message: string;
+  limits: {
+    maxCharacters: number;
+    maxRequestBytes: number;
+    requestsPerWindow: number;
+    windowMinutes: number;
+  };
+}
+
+export interface ApiErrorPayload {
+  error: string;
+  code: string;
+  requestId: string;
+  detail?: string;
+  retryAfter?: number;
 }
