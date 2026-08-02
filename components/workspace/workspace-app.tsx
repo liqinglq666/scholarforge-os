@@ -59,14 +59,15 @@ export function WorkspaceApp() {
 
     if (requestedExample) {
       const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
-      if (hasCurrentWork && !window.confirm('载入示例会开始一个新任务。当前已分析任务会保留在最近任务中，未分析草稿仍可通过浏览器自动保存恢复。确定继续吗？')) {
+      if (hasCurrentWork && !window.confirm('载入示例会开始一个新任务。当前草稿或分析结果会先保存到最近任务。确定继续吗？')) {
         window.history.replaceState(null, '', '/workspace');
         return;
       }
-      const entry = data.current.currentResult ? createHistoryEntry(data.current) : null;
-      const history = entry
-        ? [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES)
-        : data.history;
+      const preservedCurrent = hasCurrentWork ? createHistoryEntry(data.current) : null;
+      const history = [
+        ...(preservedCurrent ? [preservedCurrent] : []),
+        ...data.history.filter((item) => item.id !== preservedCurrent?.id),
+      ].slice(0, MAX_HISTORY_ENTRIES);
       const draft = createDraft({
         projectName: requestedExample.projectName,
         taskType: requestedExample.taskType,
