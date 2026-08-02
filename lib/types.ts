@@ -52,12 +52,62 @@ export interface ManuscriptChapter {
   lastReviewedAt?: string;
 }
 
+export type SupervisorFeedbackStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'needs_clarification'
+  | 'not_adopted';
+
+export type SupervisorFeedbackPriority = 'high' | 'normal' | 'low';
+
+export interface SupervisorFeedbackItem {
+  id: string;
+  comment: string;
+  chapterId?: string;
+  location?: string;
+  status: SupervisorFeedbackStatus;
+  priority: SupervisorFeedbackPriority;
+  authorResponse: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export type RevisionChangeKind = 'added' | 'removed' | 'modified';
+export type RevisionChangeSource = 'author' | 'ai' | 'supervisor' | 'unknown';
+
+export interface RevisionChange {
+  id: string;
+  kind: RevisionChangeKind;
+  before: string;
+  after: string;
+  source: RevisionChangeSource;
+  reason: string;
+  feedbackId?: string;
+}
+
+export interface RevisionComparison {
+  id: string;
+  title: string;
+  chapterId?: string;
+  baseLabel: string;
+  revisedLabel: string;
+  baseText: string;
+  revisedText: string;
+  changes: RevisionChange[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ManuscriptProject {
   id: string;
   name: string;
   targetJournal: string;
   terminologyLocks: TerminologyLock[];
   chapters: ManuscriptChapter[];
+  supervisorFeedback: SupervisorFeedbackItem[];
+  revisionComparisons: RevisionComparison[];
   activeChapterId?: string;
   createdAt: string;
   updatedAt: string;
