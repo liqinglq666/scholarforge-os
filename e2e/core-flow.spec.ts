@@ -70,6 +70,7 @@ test('quick review keeps the primary path short and preserves a local history en
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '审校报告 Markdown' }).click();
   expect((await downloadPromise).suggestedFilename()).toContain('review-report.md');
+  await expect(page.locator('.save-indicator')).toContainText('已保存到此浏览器');
 
   await page.goto('/history');
   await expect(page.getByRole('heading', { name: 'E2E manuscript' })).toBeVisible();
