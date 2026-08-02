@@ -36,6 +36,16 @@ function formatDate(value?: string) {
   return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString('zh-CN');
 }
 
+function mergeTerminologyLocks(projectLocks: TerminologyLock[], personalLocks: TerminologyLock[]) {
+  const seen = new Set<string>();
+  return [...projectLocks, ...personalLocks].flatMap((item) => {
+    const key = item.source.toLocaleLowerCase();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ ...item, id: crypto.randomUUID() }];
+  }).slice(0, 20);
+}
+
 export function ProjectManager() {
   const router = useRouter();
   const { data, ready, saveState, saveMessage, replaceData, saveNow } = useWorkspace();
@@ -55,7 +65,17 @@ export function ProjectManager() {
   }
 
   function createProject() {
-    const nextProject = createManuscriptProject({ name: '我的论文项目' });
+    const chapters = data.preferences.chapterTemplate.map((item) => createManuscriptChapter({
+      title: item.title,
+      sectionType: item.sectionType,
+      taskType: item.taskType,
+    }));
+    const nextProject = createManuscriptProject({
+      name: '我的论文项目',
+      targetJournal: data.preferences.defaultTargetJournal,
+      terminologyLocks: data.preferences.customWritingRules.map((item) => ({ ...item, id: crypto.randomUUID() })).slice(0, 20),
+      chapters,
+    });
     const nextData = { ...data, project: nextProject, updatedAt: new Date().toISOString() };
     replaceData(nextData);
     saveNow(nextData);
@@ -78,7 +98,11 @@ export function ProjectManager() {
 
   function addChapter() {
     if (!project || project.chapters.length >= 12) return;
-    const chapter = createManuscriptChapter({ title: `章节 ${project.chapters.length + 1}` });
+    const chapter = createManuscriptChapter({
+      title: `章节 ${project.chapters.length + 1}`,
+      sectionType: data.preferences.defaultSectionType,
+      taskType: data.preferences.defaultTaskType,
+    });
     commitProject({ ...project, chapters: [...project.chapters, chapter], activeChapterId: chapter.id });
   }
 
@@ -125,7 +149,7 @@ export function ProjectManager() {
       sectionType: chapter.sectionType,
       targetJournal: project.targetJournal,
       sourceText: chapter.text,
-      terminologyLocks: project.terminologyLocks.map((item) => ({ ...item })),
+      terminologyLocks: mergeTerminologyLocks(project.terminologyLocks, data.preferences.customWritingRules),
       linkedProjectId: project.id,
       linkedChapterId: chapter.id,
     });
@@ -152,10 +176,10 @@ export function ProjectManager() {
   if (!project) {
     return (
       <div className="project-empty">
-        <span className="eyebrow">论文项目 · v2.1</span>
-        <h1>把多个章节放在同一个可恢复的工作区</h1>
-        <p>项目用于共享目标期刊和术语库，并在摘要、方法、结果、讨论与结论之间运行确定性一致性检查。章节不会被自动发送给模型。</p>
-        <button className="primary-button" onClick={createProject} type="button">创建本地论文项目</button>
+        <span className="eyebrow">论文项目 · v2.3</span>
+        <h1>从你的章节模板开始一篇新论文</h1>
+        <p>新项目会使用个性化页面中的章节结构、目标期刊和术语规则。项目仍保存在当前浏览器，章节不会被自动发送给模型。</p>
+        <button className="primary-button" onClick={createProject} type="button">按我的模板创建论文项目</button>
       </div>
     );
   }
@@ -194,7 +218,7 @@ export function ProjectManager() {
               </li>
             ))}
           </ul>
-          <small>最多 12 个章节。建议按摘要、引言、方法、结果、讨论和结论组织。</small>
+          <small>最多 12 个章节。新项目结构可在“个性化”页面调整。</small>
         </aside>
 
         {activeChapter ? (
@@ -221,7 +245,7 @@ export function ProjectManager() {
       </div>
 
       <section className="project-section" aria-labelledby="project-terms-title">
-        <div className="project-section-heading"><div><span className="step-number">04</span><h2 id="project-terms-title">项目术语与缩写库</h2></div><p>打开任一章节到工作台时自动带入，所有章节共享。</p></div>
+        <div className="project-section-heading"><div><span className="step-number">04</span><h2 id="project-terms-title">项目术语与缩写库</h2></div><p>打开章节时会与个人表达规则合并，项目规则优先。</p></div>
         <div className="term-entry">
           <label><span>原词或非首选表达</span><input maxLength={120} onChange={(event) => setTermSource(event.target.value)} placeholder="例如：neural net" value={termSource} /></label>
           <label><span>指定表达</span><input maxLength={160} onChange={(event) => setTermPreferred(event.target.value)} placeholder="例如：neural network (NN)" value={termPreferred} /></label>
@@ -229,7 +253,7 @@ export function ProjectManager() {
         </div>
         {project.terminologyLocks.length ? (
           <ul className="term-list">{project.terminologyLocks.map((term) => <li key={term.id}><span><b>{term.source}</b><small>统一使用：{term.preferred}</small></span><button aria-label={`删除术语 ${term.source}`} onClick={() => removeTerm(term.id)} type="button">删除</button></li>)}</ul>
-        ) : <p className="empty-inline">尚未建立项目术语库。建议先加入核心变量、材料名称、量表名称、模型名称和缩写。</p>}
+        ) : <p className="empty-inline">尚未建立项目术语库。个人规则仍会在打开章节时带入。</p>}
       </section>
 
       <section className="project-section" aria-labelledby="consistency-title">
