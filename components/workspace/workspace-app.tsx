@@ -61,7 +61,7 @@ export function WorkspaceApp() {
       }));
     }
     window.history.replaceState(null, '', '/workspace');
-  }, [data.current.currentResult, data.current.draft.sourceText, ready, updateCurrent]);
+  }, [data, ready, updateCurrent]);
 
   useEffect(() => () => analysisControllerRef.current?.abort(), []);
 
