@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { StatusBanner } from '@/components/feedback/status-banner';
@@ -31,12 +31,12 @@ export function WorkspaceApp() {
   const [projectMessage, setProjectMessage] = useState('');
   const analysisControllerRef = useRef<AbortController | null>(null);
   const entryParamAppliedRef = useRef(false);
-  const linkedChapter = useMemo(() => {
+  const linkedChapter = (() => {
     const project = data.project;
     const draft = data.current.draft;
     if (!project || draft.linkedProjectId !== project.id || !draft.linkedChapterId) return null;
     return project.chapters.find((chapter) => chapter.id === draft.linkedChapterId) || null;
-  }, [data.current.draft, data.project]);
+  })();
 
   useEffect(() => {
     let active = true;
