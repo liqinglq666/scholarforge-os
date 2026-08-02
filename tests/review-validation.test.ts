@@ -15,6 +15,10 @@ const request: ReviewRequest = {
   targetJournal: '',
   text: 'The strength was 42.5 MPa after 28 d, representing an increase of 12%.',
   terminologyLocks: [],
+  discipline: 'Materials Science',
+  academicStage: 'doctoral',
+  englishVariant: 'us',
+  explanationLevel: 'balanced',
 };
 
 describe('review request validation', () => {
@@ -27,16 +31,22 @@ describe('review request validation', () => {
     expect(() => parseReviewRequest({ taskType: 'polish', sectionType: 'general', text: 'short' })).toThrow('至少需要');
   });
 
-  it('sanitizes settings and terminology locks', () => {
+  it('sanitizes settings, preferences, and terminology locks', () => {
     const parsed = parseReviewRequest({
       taskType: 'translate',
       sectionType: 'abstract',
       projectName: ' Test\nProject ',
       text: '这是一段用于测试请求验证和术语锁行为的科研文本，长度应当超过四十个字符，并保持内容完整。',
       terminologyLocks: [{ source: '低场核磁共振', preferred: 'low-field nuclear magnetic resonance' }],
+      discipline: ' Environmental Engineering ',
+      academicStage: 'doctoral',
+      englishVariant: 'uk',
+      explanationLevel: 'detailed',
     });
     expect(parsed.projectName).toBe('Test Project');
     expect(parsed.terminologyLocks).toHaveLength(1);
+    expect(parsed.discipline).toBe('Environmental Engineering');
+    expect(parsed.englishVariant).toBe('uk');
   });
 });
 
