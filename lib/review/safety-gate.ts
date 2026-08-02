@@ -170,7 +170,7 @@ export function evaluateSafetyGate(request: ReviewRequest, candidateText: string
     if (!request.text.toLocaleLowerCase().includes(lock.source.toLocaleLowerCase())) return [];
     return candidateText.toLocaleLowerCase().includes(lock.preferred.toLocaleLowerCase())
       ? []
-      : [`术语“${lock.source}”没有按规则使用“${lock.preferred}”。`];
+      : [`术语锁未满足：“${lock.source}”应使用“${lock.preferred}”。`];
   });
   checks.push(createCheck(
     'terminology',
