@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ProjectManager } from '@/components/project/project-manager';
+import { ProjectToolNav } from '@/components/project/project-tool-nav';
 
 export const metadata: Metadata = {
   title: '论文项目',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function ProjectPage() {
-  return <main className="shell page-main project-main" id="main-content"><ProjectManager /></main>;
+  return <main className="shell page-main project-main" id="main-content"><ProjectToolNav /><ProjectManager /></main>;
 }
