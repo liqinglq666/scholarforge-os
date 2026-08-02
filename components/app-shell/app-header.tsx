@@ -1,6 +1,16 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+const navigation = [
+  { href: '/workspace', label: '工作台' },
+  { href: '/history', label: '最近任务' },
+  { href: '/settings', label: '数据与设置' },
+];
 
 export function AppHeader() {
+  const pathname = usePathname();
   return (
     <header className="app-header">
       <div className="shell header-inner">
@@ -9,9 +19,10 @@ export function AppHeader() {
           <span><b>ScholarForge</b><small>作者控制的科研英语工作台</small></span>
         </Link>
         <nav aria-label="主要导航">
-          <Link href="/workspace">工作台</Link>
-          <Link href="/history">最近任务</Link>
-          <Link href="/settings">数据与设置</Link>
+          {navigation.map((item) => {
+            const active = pathname === item.href;
+            return <Link aria-current={active ? 'page' : undefined} href={item.href} key={item.href} style={active ? { background: 'var(--brand-soft)', color: 'var(--brand-dark)' } : undefined}>{item.label}</Link>;
+          })}
         </nav>
       </div>
     </header>
@@ -23,7 +34,7 @@ export function AppFooter() {
     <footer className="app-footer">
       <div className="shell footer-inner">
         <p>AI 只提供建议。科研事实、引用、统计结果和最终文本由作者核对。</p>
-        <div><Link href="/settings">数据处理与当前限制</Link><a href="https://github.com/liqinglq666/scholarforge-os">GitHub</a></div>
+        <div><Link href="/settings">数据处理与当前限制</Link><a href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">GitHub</a></div>
       </div>
     </footer>
   );
