@@ -42,11 +42,17 @@ export function SettingsManager() {
 
   function confirmImport() {
     if (!importPreview) return;
-    const next = { version: 2 as const, current: importPreview.current, history: importPreview.history, updatedAt: new Date().toISOString() };
+    const next = {
+      version: 2 as const,
+      current: importPreview.current,
+      history: importPreview.history,
+      project: importPreview.project || null,
+      updatedAt: new Date().toISOString(),
+    };
     try {
       writeWorkspaceData(next);
       replaceData(next);
-      setMessage('备份验证并导入成功。所有应用记录已依据当前问题重新生成，不可信偏移已丢弃。');
+      setMessage('备份验证并导入成功。论文项目、章节、术语库和工作区已恢复；不可信编辑偏移已丢弃并重新定位。');
       setImportPreview(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '备份写入失败。当前工作区没有改变。');
@@ -57,7 +63,7 @@ export function SettingsManager() {
     try {
       clearWorkspaceData();
       replaceData(createPersistedWorkspace());
-      setMessage('此浏览器中的 ScholarForge 草稿、结果和历史已清除。已下载的导出文件不受影响。');
+      setMessage('此浏览器中的论文项目、草稿、结果和历史已清除。已下载的导出文件不受影响。');
       router.push('/workspace');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '无法清除本地数据。');
@@ -70,7 +76,7 @@ export function SettingsManager() {
     <div className="settings-content">
       <div className="page-heading">
         <div><span className="eyebrow">数据、隐私与限制</span><h1>知道文本在哪里，知道 AI 做了什么</h1></div>
-        <p>ScholarForge 默认把工作区保存在此浏览器。只有作者确认开始分析后，所选文本才会经服务端发送给模型。</p>
+        <p>ScholarForge 默认把论文项目与审校工作区保存在此浏览器。只有作者确认开始分析后，当前所选章节才会经服务端发送给模型。</p>
       </div>
       {message ? <StatusBanner tone="neutral" title="操作结果">{message}</StatusBanner> : null}
 
@@ -88,18 +94,18 @@ export function SettingsManager() {
       <section className="settings-section" aria-labelledby="data-title">
         <div><span className="step-number">02</span><h2 id="data-title">数据如何处理</h2></div>
         <div className="privacy-grid">
-          <article><strong>保存在此浏览器</strong><p>当前草稿、分析结果、作者决定、工作稿和最近 12 条历史。没有账户或云同步。</p></article>
-          <article><strong>仅在确认后发送</strong><p>所选正文、任务设置、目标期刊文本和术语锁。原始 DOCX 文件不会上传。</p></article>
-          <article><strong>不上传的内容</strong><p>DOCX 二进制文件、未选章节、其他浏览器文件、历史任务与导出文件。</p></article>
+          <article><strong>保存在此浏览器</strong><p>论文项目、章节、术语库、当前草稿、分析结果、作者决定、工作稿和最近 12 条历史。没有账户或云同步。</p></article>
+          <article><strong>仅在确认后发送</strong><p>当前打开章节的正文、任务设置、目标期刊文本和术语锁。其他章节与原始 DOCX 文件不会上传。</p></article>
+          <article><strong>本地一致性检查</strong><p>样本量候选、带单位指标、缩写和项目术语检查只在浏览器中运行，不调用模型。</p></article>
           <article><strong>作者责任</strong><p>必须核对事实、数值、单位、引用、术语、统计、方法、因果关系和结论强度。</p></article>
         </div>
       </section>
 
       <section className="settings-section" aria-labelledby="backup-title">
         <div><span className="step-number">03</span><h2 id="backup-title">备份与恢复</h2></div>
-        <p>备份采用可检查的 JSON。导入前会验证格式并预览影响；来自备份的编辑偏移不会被信任，而是根据当前问题重新定位。</p>
+        <p>备份包含论文项目、章节、术语库、当前工作区与历史。导入前会验证格式；来自备份的编辑偏移不会被信任，而是根据当前问题重新定位。</p>
         <div className="settings-actions">
-          <button onClick={() => exportWorkspaceBackup(data)} type="button">导出工作区备份</button>
+          <button onClick={() => exportWorkspaceBackup(data)} type="button">导出完整工作区备份</button>
           <label className="file-button"><input accept="application/json,.json" onChange={(event) => void chooseBackup(event)} type="file" />导入备份</label>
           <button className="danger-button" onClick={() => clearRef.current?.showModal()} type="button">清除此浏览器数据</button>
         </div>
@@ -108,10 +114,10 @@ export function SettingsManager() {
       <section className="settings-section" aria-labelledby="limits-title">
         <div><span className="step-number">04</span><h2 id="limits-title">当前明确限制</h2></div>
         <ul className="limit-list">
+          <li>论文项目最多 12 个章节，每个章节最多 12,000 个字符；不会自动把整篇论文发送给模型。</li>
+          <li>跨章节一致性检查是保守的规则检查，可能遗漏问题，也可能把不同时间点或分组提示为候选冲突。</li>
           <li>不支持 PDF、扫描 OCR、旧版 DOC、公式和表格结构解析。</li>
-          <li>DOCX 导入只提取正文；清洁 DOCX 导出不会保留原文件样式、图片、批注或修订痕迹。</li>
           <li>不验证参考文献真实性、统计正确性、期刊最新要求或论文是否可录用。</li>
-          <li>不提供账户、云同步、团队协作、审稿回复自动生成或一键批量应用建议。</li>
           <li>浏览器数据可能因清理站点数据、无痕模式或换设备而丢失，请定期导出备份。</li>
         </ul>
         <p className="version-line">ScholarForge OS v{APP_VERSION}</p>
@@ -119,8 +125,8 @@ export function SettingsManager() {
 
       <dialog className="confirm-dialog" ref={importRef}>
         <form method="dialog">
-          <span className="eyebrow">导入预览</span><h2>确认替换当前工作区？</h2>
-          <p>备份包含“{importPreview?.current.draft.projectName || '未命名任务'}”和 {importPreview?.history.length || 0} 条历史。确认后会替换当前本地工作区。</p>
+          <span className="eyebrow">导入预览</span><h2>确认替换当前本地数据？</h2>
+          <p>备份包含“{importPreview?.current.draft.projectName || '未命名任务'}”、{importPreview?.history.length || 0} 条历史，以及{importPreview?.project ? `论文项目“${importPreview.project.name || '未命名项目'}”的 ${importPreview.project.chapters.length} 个章节` : '不包含论文项目'}。</p>
           <div className="responsibility-note"><strong>安全恢复</strong><span>篡改、越界、冲突或无法根据当前问题重新定位的编辑会被丢弃。</span></div>
           <div className="dialog-actions"><button value="cancel">取消</button><button className="primary-button" onClick={confirmImport} value="confirm">确认导入</button></div>
         </form>
@@ -129,7 +135,7 @@ export function SettingsManager() {
       <dialog className="confirm-dialog" ref={clearRef}>
         <form method="dialog">
           <span className="eyebrow">不可撤销操作</span><h2>清除此浏览器中的全部数据？</h2>
-          <p>当前草稿、分析结果、作者决定和最近任务都会被删除。已下载的备份与导出文件不受影响。</p>
+          <p>论文项目、全部章节、术语库、当前草稿、分析结果和最近任务都会被删除。已下载的备份与导出文件不受影响。</p>
           <div className="dialog-actions"><button value="cancel">保留数据</button><button className="danger-button" onClick={confirmClear} value="confirm">确认清除</button></div>
         </form>
       </dialog>
