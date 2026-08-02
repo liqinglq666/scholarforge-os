@@ -30,7 +30,7 @@ export default function Home() {
       <section className="home-section shell" aria-labelledby="tasks-title">
         <div className="section-intro"><span className="eyebrow">三个可靠核心场景</span><h2 id="tasks-title">从一个明确任务开始</h2><p>不做通用聊天，不自动生成整篇论文，也不声称替代同行评议。</p></div>
         <div className="home-task-grid">
-          {tasks.map((task, index) => <article key={task}><span>0{index + 1}</span><h3>{TASK_LABELS[task]}</h3><p>{TASK_DESCRIPTIONS[task]}</p><Link href="/workspace">开始{TASK_LABELS[task]}</Link></article>)}
+          {tasks.map((task, index) => <article key={task}><span>0{index + 1}</span><h3>{TASK_LABELS[task]}</h3><p>{TASK_DESCRIPTIONS[task]}</p><Link href={`/workspace?task=${task}`}>开始{TASK_LABELS[task]}</Link></article>)}
         </div>
       </section>
 
