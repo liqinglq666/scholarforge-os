@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { MAX_HISTORY_ENTRIES } from '@/lib/config';
-import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, WorkspaceDraft } from '@/lib/types';
+import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, TaskType, WorkspaceDraft } from '@/lib/types';
 import { createDraft, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
@@ -17,12 +17,17 @@ const STAGE_LABELS: Record<AnalysisStage, { title: string; description: string }
   organizing: { title: '正在整理问题', description: '代码正在验证数值、单位、术语锁和问题结构。' },
 };
 
+const TASK_TYPES = new Set<TaskType>(['translate', 'polish', 'precheck']);
+const CLIENT_ANALYSIS_TIMEOUT_MS = 65_000;
+
 export function WorkspaceApp() {
   const { data, ready, saveState, saveMessage, updateCurrent, replaceData, saveNow } = useWorkspace();
   const [service, setService] = useState<ReviewServiceStatus | null>(null);
   const [serviceLoading, setServiceLoading] = useState(true);
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null);
   const [pageError, setPageError] = useState('');
+  const analysisControllerRef = useRef<AbortController | null>(null);
+  const taskParamAppliedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +49,22 @@ export function WorkspaceApp() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!ready || taskParamAppliedRef.current) return;
+    taskParamAppliedRef.current = true;
+    const requestedTask = new URLSearchParams(window.location.search).get('task') as TaskType | null;
+    if (!requestedTask || !TASK_TYPES.has(requestedTask)) return;
+    if (!data.current.currentResult && !data.current.draft.sourceText.trim()) {
+      updateCurrent((current) => ({
+        ...current,
+        draft: { ...current.draft, taskType: requestedTask, updatedAt: new Date().toISOString() },
+      }));
+    }
+    window.history.replaceState(null, '', '/workspace');
+  }, [data, ready, updateCurrent]);
+
+  useEffect(() => () => analysisControllerRef.current?.abort(), []);
+
   function updateDraft(patch: Partial<WorkspaceDraft>) {
     updateCurrent((current) => ({
       ...current,
@@ -55,7 +76,16 @@ export function WorkspaceApp() {
   }
 
   async function analyze() {
+    if (analysisControllerRef.current) return;
     const workspace = data.current;
+    const controller = new AbortController();
+    analysisControllerRef.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, CLIENT_ANALYSIS_TIMEOUT_MS);
+
     setPageError('');
     setAnalysisStage('preparing');
     updateCurrent({ ...workspace, status: 'analyzing', lastError: undefined });
@@ -76,6 +106,7 @@ export function WorkspaceApp() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-ScholarForge-Session': workspace.draft.id },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
       setAnalysisStage('organizing');
       const payload = await response.json() as { result?: ReviewResult } & Partial<ApiErrorPayload>;
@@ -104,12 +135,23 @@ export function WorkspaceApp() {
       replaceData(nextData);
       saveNow(nextData);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '分析失败。';
+      const aborted = error instanceof Error && error.name === 'AbortError';
+      const message = aborted
+        ? timedOut
+          ? '分析等待超过 65 秒，已在浏览器端停止等待。原文和设置仍保存在此浏览器中。'
+          : '分析已取消。原文和设置仍保存在此浏览器中。'
+        : error instanceof Error ? error.message : '分析失败。';
       setPageError(message);
-      updateCurrent({ ...workspace, status: 'error', lastError: message });
+      updateCurrent((current) => ({ ...current, status: current.currentResult ? 'reviewing' : 'draft', lastError: message }));
     } finally {
+      window.clearTimeout(timeout);
+      analysisControllerRef.current = null;
       setAnalysisStage(null);
     }
+  }
+
+  function cancelAnalysis() {
+    analysisControllerRef.current?.abort();
   }
 
   function startNew() {
@@ -145,6 +187,7 @@ export function WorkspaceApp() {
             {(['preparing', 'reviewing', 'organizing'] as AnalysisStage[]).map((stage) => <span className={stage === analysisStage ? 'current' : ''} key={stage}>{STAGE_LABELS[stage].title}</span>)}
           </div>
           <small>请保持页面打开。若请求失败，原文和设置仍保存在此浏览器中。</small>
+          <button className="secondary-button" onClick={cancelAnalysis} type="button">取消分析</button>
         </div>
       </main>
     );

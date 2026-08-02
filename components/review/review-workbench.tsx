@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { SECTION_LABELS, TASK_LABELS } from '@/lib/config';
-import { analyzeIssueAnchor, applyIssueToWorkspace, redoWorkspace, undoWorkspace } from '@/lib/editing/apply';
+import { analyzeIssueAnchor, applyIssueToWorkspace, redoWorkspace, removeAppliedIssueFromWorkspace, undoWorkspace } from '@/lib/editing/apply';
 import { exportCleanDocx, exportReviewReport, exportWorkingText } from '@/lib/exports/files';
 import type { IssueDecision, IssueSeverity, ReviewIssue, WorkspaceState } from '@/lib/types';
 import { StatusBanner } from '@/components/feedback/status-banner';
@@ -30,14 +30,17 @@ function IssueDetail({
   workspace,
   onDecision,
   onApply,
+  onRemove,
 }: {
   issue: ReviewIssue;
   decision: IssueDecision;
   workspace: WorkspaceState;
   onDecision: (decision: IssueDecision) => void;
   onApply: () => void;
+  onRemove: () => void;
 }) {
   const anchor = analyzeIssueAnchor(workspace.workingText, issue, workspace.appliedEdits);
+  const applied = workspace.appliedEdits.some((edit) => edit.issueId === issue.id);
   const canApply = anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
   return (
     <article className="issue-detail" aria-labelledby={`issue-title-${issue.id}`}>
@@ -61,12 +64,14 @@ function IssueDetail({
         ))}
       </fieldset>
 
-      <div className={canApply ? 'apply-status safe' : 'apply-status blocked'}>
-        <strong>{canApply ? '可以安全定位' : '不能自动应用'}</strong><span>{anchor.message}</span>
+      <div className={applied || canApply ? 'apply-status safe' : 'apply-status blocked'}>
+        <strong>{applied ? '已应用到作者工作稿' : canApply ? '可以安全定位' : '不能自动应用'}</strong><span>{anchor.message}</span>
       </div>
-      <button className="primary-button full-button" disabled={!canApply} onClick={onApply} type="button">
-        {anchor.state === 'already-applied' ? '已应用到作者工作稿' : '应用这一条建议'}
-      </button>
+      {applied ? (
+        <button className="secondary-button full-button" onClick={onRemove} type="button">从作者工作稿撤回这一条</button>
+      ) : (
+        <button className="primary-button full-button" disabled={!canApply} onClick={onApply} type="button">应用这一条建议</button>
+      )}
     </article>
   );
 }
@@ -99,18 +104,33 @@ export function ReviewWorkbench({
   if (!result) return null;
 
   function setDecision(issueId: string, decision: IssueDecision) {
-    onUpdate({ ...workspace, decisions: { ...workspace.decisions, [issueId]: decision } });
-    setMessage(`已记录作者决定：${DECISION_LABELS[decision]}。`);
+    const applied = workspace.appliedEdits.some((edit) => edit.issueId === issueId);
+    let next = workspace;
+    if (applied && decision !== 'accepted') {
+      const shouldRemove = window.confirm(`这条建议已经应用到作者工作稿。改为“${DECISION_LABELS[decision]}”时是否同时撤回该修改？`);
+      if (!shouldRemove) return;
+      next = removeAppliedIssueFromWorkspace(workspace, issueId);
+    }
+    onUpdate({ ...next, decisions: { ...next.decisions, [issueId]: decision } });
+    setMessage(applied && decision !== 'accepted'
+      ? `已撤回修改并记录作者决定：${DECISION_LABELS[decision]}。`
+      : `已记录作者决定：${DECISION_LABELS[decision]}。`);
   }
 
   function applyIssue(issue: ReviewIssue) {
     try {
       onUpdate(applyIssueToWorkspace(workspace, issue));
       setTextView('author');
-      setMessage('已把这一条建议应用到作者工作稿。可使用撤销恢复。');
+      setMessage('已把这一条建议应用到作者工作稿。可单独撤回，也可使用撤销恢复。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '建议无法安全应用。');
     }
+  }
+
+  function removeIssue(issue: ReviewIssue) {
+    onUpdate(removeAppliedIssueFromWorkspace(workspace, issue.id));
+    setTextView('author');
+    setMessage('已从作者工作稿撤回这一条建议，作者决定仍保留为“接受”。');
   }
 
   const displayedText = textView === 'original' ? workspace.draft.sourceText : textView === 'suggested' ? result.suggestedText : workspace.workingText;
@@ -168,18 +188,21 @@ export function ReviewWorkbench({
           </div>
           {filteredIssues.length ? (
             <>
-              <div className="issue-list" role="list" aria-label="审校问题">
-                {filteredIssues.map((issue, index) => {
+              <ul className="issue-list" aria-label="审校问题">
+                {filteredIssues.map((issue) => {
                   const decision = workspace.decisions[issue.id] || 'pending';
+                  const stableIndex = result.issues.findIndex((item) => item.id === issue.id) + 1;
                   return (
-                    <button aria-current={selectedIssue?.id === issue.id} key={issue.id} onClick={() => setSelectedId(issue.id)} role="listitem" type="button">
-                      <span className={`severity severity-${issue.severity}`}>{SEVERITY_LABELS[issue.severity]}</span>
-                      <span><b>{index + 1}. {issue.category}</b><small>{issue.location} · {DECISION_LABELS[decision]}</small></span>
-                    </button>
+                    <li key={issue.id}>
+                      <button aria-current={selectedIssue?.id === issue.id} onClick={() => setSelectedId(issue.id)} type="button">
+                        <span className={`severity severity-${issue.severity}`}>{SEVERITY_LABELS[issue.severity]}</span>
+                        <span><b>{stableIndex}. {issue.category}</b><small>{issue.location} · {DECISION_LABELS[decision]}</small></span>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
-              {selectedIssue ? <IssueDetail decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} workspace={workspace} /> : null}
+              </ul>
+              {selectedIssue ? <IssueDetail decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
             </>
           ) : <div className="empty-state"><strong>{result.issues.length ? '当前筛选下没有问题' : '没有发现需要逐条处理的问题'}</strong><p>{result.issues.length ? '调整筛选条件查看其他问题。' : '这不等于全文不存在科研风险，请继续进行作者核对。'}</p></div>}
         </aside>
