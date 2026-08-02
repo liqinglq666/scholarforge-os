@@ -4,6 +4,7 @@ import './globals.css';
 import './workflow.css';
 import './examples.css';
 import './project.css';
+import './revision.css';
 
 export const metadata: Metadata = {
   title: {
