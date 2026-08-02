@@ -42,15 +42,15 @@ describe('project collaboration records', () => {
       supervisorFeedback: [feedback],
       revisionComparisons: [comparison],
     });
-    const restored = parseBackupText(JSON.stringify(createBackup({ ...createPersistedWorkspace(), project })));
-    expect(restored.project?.supervisorFeedback[0].status).toBe('completed');
-    expect(restored.project?.revisionComparisons[0].changes[0].feedbackId).toBe('feedback-1');
+    const restored = parseBackupText(JSON.stringify(createBackup({ ...createPersistedWorkspace(), projects: [project], activeProjectId: project.id })));
+    expect(restored.projects[0].supervisorFeedback[0].status).toBe('completed');
+    expect(restored.projects[0].revisionComparisons[0].changes[0].feedbackId).toBe('feedback-1');
   });
 
   it('drops invalid chapter and feedback references without dropping the record', () => {
     const parsed = parsePersistedWorkspace({
       ...createPersistedWorkspace(),
-      project: {
+      projects: [{
         id: 'project-1',
         name: 'Project',
         chapters: [{ id: 'chapter-1', title: 'Methods', sectionType: 'methods', taskType: 'precheck', text: 'A'.repeat(80) }],
@@ -65,10 +65,11 @@ describe('project collaboration records', () => {
           revisedText: 'New sentence.',
           changes: [{ id: 'change-1', kind: 'modified', before: 'Old sentence.', after: 'New sentence.', source: 'supervisor', reason: '', feedbackId: 'missing-feedback' }],
         }],
-      },
+      }],
+      activeProjectId: 'project-1',
     });
-    expect(parsed.project?.supervisorFeedback[0].chapterId).toBeUndefined();
-    expect(parsed.project?.revisionComparisons[0].chapterId).toBeUndefined();
-    expect(parsed.project?.revisionComparisons[0].changes[0].feedbackId).toBeUndefined();
+    expect(parsed.projects[0].supervisorFeedback[0].chapterId).toBeUndefined();
+    expect(parsed.projects[0].revisionComparisons[0].chapterId).toBeUndefined();
+    expect(parsed.projects[0].revisionComparisons[0].changes[0].feedbackId).toBeUndefined();
   });
 });

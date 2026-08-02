@@ -17,7 +17,7 @@ const issue: ReviewIssue = {
 
 describe('workspace backup validation', () => {
   it('rejects unknown formats', () => {
-    expect(() => parseBackupText(JSON.stringify({ format: 'other', version: 2 }))).toThrow(/受支持/);
+    expect(() => parseBackupText(JSON.stringify({ format: 'other', version: 4 }))).toThrow(/受支持/);
   });
 
   it('rebuilds applied edits from current issues and ignores tampered offsets/text', () => {

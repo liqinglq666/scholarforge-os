@@ -49,17 +49,18 @@ export function SettingsManager() {
   function confirmImport() {
     if (!importPreview) return;
     const next = {
-      version: 2 as const,
+      version: 3 as const,
       current: importPreview.current,
       history: importPreview.history,
-      project: importPreview.project || null,
+      projects: importPreview.projects,
+      ...(importPreview.activeProjectId ? { activeProjectId: importPreview.activeProjectId } : {}),
       preferences: importPreview.preferences,
       updatedAt: new Date().toISOString(),
     };
     try {
       writeWorkspaceData(next);
       replaceData(next);
-      setMessage('备份验证并导入成功。论文项目、导师意见、版本记录、个性化偏好和工作区已恢复；不可信编辑偏移已重新定位。');
+      setMessage('备份验证并导入成功。全部论文项目、意见、版本记录、个性化偏好和工作区已恢复；不可信编辑偏移已重新定位。');
       setImportPreview(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '备份写入失败。当前工作区没有改变。');
@@ -131,7 +132,7 @@ export function SettingsManager() {
         <ul className="limit-list">
           <li>账户登录只同步个性化偏好，不提供论文项目云同步或团队协作。</li>
           <li>不开放任意系统提示词；用户规则不能覆盖数值、引用、证据边界和不编造内容等安全约束。</li>
-          <li>论文项目最多 12 个章节，每个章节最多 12,000 个字符；不会自动把整篇论文发送给模型。</li>
+          <li>最多保存 12 个本地论文项目；每个项目最多 12 个章节，每章最多 12,000 个字符。</li>
           <li>不支持 PDF、扫描 OCR、旧版 DOC、公式和表格结构解析，也不验证参考文献真实性或统计正确性。</li>
           <li>浏览器数据可能因清理站点数据、无痕模式或换设备而丢失，请定期导出完整备份。</li>
         </ul>
@@ -141,7 +142,7 @@ export function SettingsManager() {
       <dialog className="confirm-dialog" ref={importRef}>
         <form method="dialog">
           <span className="eyebrow">导入预览</span><h2>确认替换当前本地数据？</h2>
-          <p>备份包含“{importPreview?.current.draft.projectName || '未命名任务'}”、{importPreview?.history.length || 0} 条历史，以及{importPreview?.project ? `论文项目“${importPreview.project.name || '未命名项目'}”的 ${importPreview.project.chapters.length} 个章节` : '不包含论文项目'}。个性化偏好也会一并替换。</p>
+          <p>备份包含“{importPreview?.current.draft.projectName || '未命名任务'}”、{importPreview?.history.length || 0} 条历史，以及 {importPreview?.projects.length || 0} 个论文项目。个性化偏好也会一并替换。</p>
           <div className="responsibility-note"><strong>安全恢复</strong><span>篡改、越界、冲突或无法根据当前问题重新定位的编辑会被丢弃。</span></div>
           <div className="dialog-actions"><button value="cancel">取消</button><button className="primary-button" onClick={confirmImport} value="confirm">确认导入</button></div>
         </form>
@@ -150,7 +151,7 @@ export function SettingsManager() {
       <dialog className="confirm-dialog" ref={clearRef}>
         <form method="dialog">
           <span className="eyebrow">不可撤销操作</span><h2>清除此浏览器中的全部数据？</h2>
-          <p>论文项目、章节、导师意见、版本记录、当前草稿、分析结果、历史和本地偏好都会被删除。账户中的云端偏好与已下载文件不受影响。</p>
+          <p>全部论文项目、章节、意见、版本记录、当前草稿、分析结果、历史和本地偏好都会被删除。账户中的云端偏好与已下载文件不受影响。</p>
           <div className="dialog-actions"><button value="cancel">保留数据</button><button className="danger-button" onClick={confirmClear} value="confirm">确认清除</button></div>
         </form>
       </dialog>

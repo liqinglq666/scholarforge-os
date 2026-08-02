@@ -3,6 +3,7 @@ import {
   LEGACY_HISTORY_KEY,
   MAX_BACKUP_BYTES,
   MAX_HISTORY_ENTRIES,
+  MAX_PROJECTS,
   MAX_SOURCE_CHARACTERS,
 } from '@/lib/config';
 import type {
@@ -60,12 +61,12 @@ function isoDate(value: unknown, fallback = new Date().toISOString()) {
 
 function createDefaultChapterTemplate(): ChapterTemplateItem[] {
   return [
-    { id: crypto.randomUUID(), title: '摘要', sectionType: 'abstract', taskType: 'precheck' },
-    { id: crypto.randomUUID(), title: '引言', sectionType: 'introduction', taskType: 'polish' },
-    { id: crypto.randomUUID(), title: '方法', sectionType: 'methods', taskType: 'precheck' },
-    { id: crypto.randomUUID(), title: '结果', sectionType: 'results', taskType: 'precheck' },
-    { id: crypto.randomUUID(), title: '讨论', sectionType: 'discussion', taskType: 'polish' },
-    { id: crypto.randomUUID(), title: '结论', sectionType: 'conclusion', taskType: 'precheck' },
+    { id: crypto.randomUUID(), title: '摘要', sectionType: 'abstract' },
+    { id: crypto.randomUUID(), title: '引言', sectionType: 'introduction' },
+    { id: crypto.randomUUID(), title: '方法', sectionType: 'methods' },
+    { id: crypto.randomUUID(), title: '结果', sectionType: 'results' },
+    { id: crypto.randomUUID(), title: '讨论', sectionType: 'discussion' },
+    { id: crypto.randomUUID(), title: '结论', sectionType: 'conclusion' },
   ];
 }
 
@@ -122,7 +123,6 @@ export function createManuscriptChapter(overrides: Partial<ManuscriptChapter> = 
     id: overrides.id || crypto.randomUUID(),
     title: overrides.title || '未命名章节',
     sectionType: overrides.sectionType || 'general',
-    taskType: overrides.taskType || 'precheck',
     text: overrides.text || '',
     createdAt: overrides.createdAt || now,
     updatedAt: overrides.updatedAt || now,
@@ -164,7 +164,7 @@ export function createRevisionComparison(overrides: Partial<RevisionComparison> 
 
 export function createManuscriptProject(overrides: Partial<ManuscriptProject> = {}): ManuscriptProject {
   const now = new Date().toISOString();
-  const chapters = overrides.chapters || [createManuscriptChapter({ title: '摘要', sectionType: 'abstract', taskType: 'precheck' })];
+  const chapters = overrides.chapters || [createManuscriptChapter({ title: '摘要', sectionType: 'abstract' })];
   return {
     id: overrides.id || crypto.randomUUID(),
     name: overrides.name || '',
@@ -196,10 +196,10 @@ export function createWorkspaceState(draft = createDraft()): WorkspaceState {
 export function createPersistedWorkspace(): PersistedWorkspace {
   const preferences = createUserPreferences();
   return {
-    version: 2,
+    version: 3,
     current: createWorkspaceState(createDraftFromPreferences(preferences)),
     history: [],
-    project: null,
+    projects: [],
     preferences,
     updatedAt: new Date().toISOString(),
   };
@@ -230,7 +230,6 @@ function parseChapterTemplate(value: unknown): ChapterTemplateItem[] {
       id: cleanSingleLine(item.id, 80) || `template-${index + 1}`,
       title,
       sectionType: SECTIONS.has(item.sectionType as SectionType) ? item.sectionType as SectionType : 'general',
-      taskType: TASKS.has(item.taskType as TaskType) ? item.taskType as TaskType : 'precheck',
     }];
   });
   return items.length ? items : createDefaultChapterTemplate();
@@ -304,7 +303,6 @@ function parseChapter(value: unknown, index: number): ManuscriptChapter | null {
     id: cleanSingleLine(value.id, 80) || `chapter-${index + 1}`,
     title: cleanSingleLine(value.title, 120) || `章节 ${index + 1}`,
     sectionType: SECTIONS.has(value.sectionType as SectionType) ? value.sectionType as SectionType : 'general',
-    taskType: TASKS.has(value.taskType as TaskType) ? value.taskType as TaskType : 'precheck',
     text: cleanText(value.text, MAX_SOURCE_CHARACTERS),
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt),
@@ -531,56 +529,72 @@ function parseHistory(value: unknown): HistoryEntry[] {
 }
 
 export function parsePersistedWorkspace(value: unknown): PersistedWorkspace {
-  if (!isRecord(value) || value.version !== 2) return createPersistedWorkspace();
+  if (!isRecord(value) || (value.version !== 2 && value.version !== 3)) return createPersistedWorkspace();
+  const projects = value.version === 3 && Array.isArray(value.projects)
+    ? value.projects.map(parseProject).filter((project): project is ManuscriptProject => project !== null).slice(0, MAX_PROJECTS)
+    : (() => {
+        const legacyProject = parseProject(value.project);
+        return legacyProject ? [legacyProject] : [];
+      })();
+  const requestedActiveProjectId = cleanSingleLine(value.activeProjectId, 80);
+  const activeProjectId = projects.some((project) => project.id === requestedActiveProjectId)
+    ? requestedActiveProjectId
+    : projects[0]?.id;
   return {
-    version: 2,
+    version: 3,
     current: sanitizeWorkspaceState(value.current),
     history: parseHistory(value.history),
-    project: parseProject(value.project),
+    projects,
+    ...(activeProjectId ? { activeProjectId } : {}),
     preferences: parseUserPreferences(value.preferences),
     updatedAt: isoDate(value.updatedAt),
   };
 }
 
 export function parseBackupText(text: string): WorkspaceBackup {
-  if (new Blob([text]).size > MAX_BACKUP_BYTES) throw new Error('备份文件超过 2 MB 限制。');
+  if (new Blob([text]).size > MAX_BACKUP_BYTES) throw new Error('备份文件超过 8 MB 限制。');
   let raw: unknown;
   try {
     raw = JSON.parse(text) as unknown;
   } catch {
     throw new Error('备份文件不是有效 JSON。');
   }
-  if (!isRecord(raw) || raw.format !== 'scholarforge-workspace' || raw.version !== 2) {
+  if (!isRecord(raw) || raw.format !== 'scholarforge-workspace' || (raw.version !== 2 && raw.version !== 3)) {
     throw new Error('这不是受支持的 ScholarForge 工作区备份。');
   }
   const parsed = parsePersistedWorkspace({
-    version: 2,
+    version: raw.version,
     current: raw.current,
     history: raw.history,
     project: raw.project,
+    projects: raw.projects,
+    activeProjectId: raw.activeProjectId,
     preferences: raw.preferences,
     updatedAt: raw.exportedAt,
   });
   return {
     format: 'scholarforge-workspace',
-    version: 2,
+    version: 3,
     exportedAt: isoDate(raw.exportedAt),
     current: parsed.current,
     history: parsed.history,
-    project: parsed.project || null,
+    projects: parsed.projects,
+    ...(parsed.activeProjectId ? { activeProjectId: parsed.activeProjectId } : {}),
     preferences: parsed.preferences,
   };
 }
 
 export function createBackup(data: PersistedWorkspace): WorkspaceBackup {
+  const parsed = parsePersistedWorkspace(data);
   return {
     format: 'scholarforge-workspace',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
-    current: sanitizeWorkspaceState(data.current),
-    history: parseHistory(data.history),
-    project: parseProject(data.project),
-    preferences: parseUserPreferences(data.preferences),
+    current: parsed.current,
+    history: parsed.history,
+    projects: parsed.projects,
+    ...(parsed.activeProjectId ? { activeProjectId: parsed.activeProjectId } : {}),
+    preferences: parsed.preferences,
   };
 }
 
@@ -616,10 +630,10 @@ export function migrateLegacyWorkspace(storage: LegacyStorageReader): PersistedW
     terminologyLocks: parseLocks(legacyDraft.lockedTerms),
   });
   return {
-    version: 2,
+    version: 3,
     current: createWorkspaceState(draft),
     history: [],
-    project: null,
+    projects: [],
     preferences,
     updatedAt: new Date().toISOString(),
   };

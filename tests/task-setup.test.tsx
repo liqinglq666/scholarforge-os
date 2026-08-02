@@ -15,16 +15,17 @@ describe('TaskSetup', () => {
   it('explains and disables analysis when the service is not configured', () => {
     render(<TaskSetup analyzing={false} draft={createDraft({ sourceText: 'A'.repeat(60) })} onAnalyze={vi.fn()} onChange={vi.fn()} service={unavailable} serviceLoading={false} />);
     expect(screen.getByText('分析服务未配置', { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '检查发送内容' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '开始分析' })).toBeDisabled();
   });
 
-  it('reports draft changes to the unified workspace owner', async () => {
+  it('keeps task selection in the primary flow and advanced metadata collapsed', async () => {
     const onChange = vi.fn();
     render(<TaskSetup analyzing={false} draft={createDraft()} onAnalyze={vi.fn()} onChange={onChange} service={unavailable} serviceLoading={false} />);
-    await userEvent.type(screen.getByLabelText('项目名称'), 'My paper');
-    expect(onChange).toHaveBeenCalledWith({ projectName: 'M' });
-    await userEvent.click(screen.getByText('科研中译英', { selector: 'b' }));
+    await userEvent.click(screen.getByText('科研中译英', { selector: 'strong' }));
     expect(onChange).toHaveBeenCalledWith({ taskType: 'translate' });
+    await userEvent.click(screen.getByText('高级设置与 DOCX 导入'));
+    await userEvent.type(screen.getByLabelText('任务名称（可选）'), 'My paper');
+    expect(onChange).toHaveBeenCalledWith({ projectName: 'M' });
   });
 
   it('loads a complete example without sending it for analysis', async () => {
@@ -32,6 +33,7 @@ describe('TaskSetup', () => {
     const onAnalyze = vi.fn();
     render(<TaskSetup analyzing={false} draft={createDraft()} onAnalyze={onAnalyze} onChange={onChange} service={unavailable} serviceLoading={false} />);
 
+    await userEvent.click(screen.getByText('第一次使用？载入示例'));
     await userEvent.click(screen.getByRole('button', { name: /使用示例：材料与工程/ }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({

@@ -10,21 +10,21 @@ const projectSteps = [
     number: '01',
     title: '建立论文项目',
     description: '把章节、目标期刊和术语规则放进同一个本地项目，先建立稳定的写作上下文。',
-    href: '/project',
+    href: '/projects',
     linkLabel: '创建本地项目',
   },
   {
     number: '02',
     title: '选择一个章节审校',
     description: '每次只处理作者明确选择的内容，未选章节不会随页面打开而发送。',
-    href: '/workspace',
-    linkLabel: '打开审校工作台',
+    href: '/projects',
+    linkLabel: '选择项目章节',
   },
   {
     number: '03',
     title: '逐条决定并回写',
     description: '接受、保留或稍后处理每条建议，确认后再把作者稿保存回论文项目。',
-    href: '/project',
+    href: '/projects',
     linkLabel: '查看项目工作流',
   },
 ];
@@ -42,7 +42,7 @@ export default function Home() {
             <h1>AI 提建议，<br />作者做决定。</h1>
             <p>ScholarForge 把论文项目、多个章节、共享术语和逐条审校放在一个清晰工作流中。它帮助你改善表达，但不会替你编写整篇论文或确认科研事实。</p>
             <div className="hero-actions">
-              <Link className="primary-link" href="/project">创建论文项目</Link>
+              <Link className="primary-link" href="/projects">创建论文项目</Link>
               <Link className="secondary-link" href="/workspace">单段落审校</Link>
             </div>
             <ol aria-label="核心使用流程" className="hero-flow">
@@ -72,7 +72,7 @@ export default function Home() {
             <span className="eyebrow">面向整篇论文的工作方式</span>
             <h2 id="project-title">从论文结构开始，而不是从一个空白聊天框开始</h2>
           </div>
-          <p>目标期刊、章节任务和术语规则先形成项目上下文；需要 AI 时，再把一个明确章节送入工作台。</p>
+          <p>目标期刊、章节结构和术语规则先形成项目上下文；需要 AI 时，再为当前章节选择一次明确任务。</p>
         </div>
         <div className="home-task-grid project-step-grid">
           {projectSteps.map((step) => (
@@ -132,7 +132,7 @@ export default function Home() {
         <div className="responsibility-copy">
           <p>所有数值、单位、样本数量、实验参数、统计结果、引用、方法、因果关系、期刊要求和结论强度都必须由作者最终核对。</p>
           <div className="responsibility-actions">
-            <Link className="primary-link" href="/project">开始建立论文项目</Link>
+            <Link className="primary-link" href="/projects">开始建立论文项目</Link>
             <Link className="secondary-link" href="/settings">查看数据处理与限制</Link>
           </div>
         </div>

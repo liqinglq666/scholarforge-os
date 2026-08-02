@@ -27,7 +27,6 @@ export interface ChapterTemplateItem {
   id: string;
   title: string;
   sectionType: SectionType;
-  taskType: TaskType;
 }
 
 export interface UserPreferences {
@@ -82,7 +81,6 @@ export interface ManuscriptChapter {
   id: string;
   title: string;
   sectionType: SectionType;
-  taskType: TaskType;
   text: string;
   createdAt: string;
   updatedAt: string;
@@ -233,21 +231,23 @@ export interface HistoryEntry {
 }
 
 export interface PersistedWorkspace {
-  version: 2;
+  version: 3;
   current: WorkspaceState;
   history: HistoryEntry[];
-  project?: ManuscriptProject | null;
+  projects: ManuscriptProject[];
+  activeProjectId?: string;
   preferences: UserPreferences;
   updatedAt: string;
 }
 
 export interface WorkspaceBackup {
   format: 'scholarforge-workspace';
-  version: 2;
+  version: 3;
   exportedAt: string;
   current: WorkspaceState;
   history: HistoryEntry[];
-  project?: ManuscriptProject | null;
+  projects: ManuscriptProject[];
+  activeProjectId?: string;
   preferences: UserPreferences;
 }
 

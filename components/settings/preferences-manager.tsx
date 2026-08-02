@@ -111,7 +111,6 @@ export function PreferencesManager() {
         id: crypto.randomUUID(),
         title: `章节 ${draft.chapterTemplate.length + 1}`,
         sectionType: 'general',
-        taskType: draft.defaultTaskType,
       }],
     });
   }
@@ -214,14 +213,13 @@ export function PreferencesManager() {
 
       <section className="settings-section" aria-labelledby="template-title">
         <div className="preferences-section-heading"><div><span className="step-number">04</span><h2 id="template-title">新论文项目章节模板</h2></div><div><button onClick={resetTemplate} type="button">恢复标准模板</button><button disabled={draft.chapterTemplate.length >= 12} onClick={addTemplateItem} type="button">添加章节</button></div></div>
-        <p>创建新论文项目时按此顺序生成章节。已有项目不会随模板变化。</p>
+        <p>创建新论文项目时按此顺序生成章节。审校任务会在每次处理章节时选择，不再固化到章节模板。已有项目不会随模板变化。</p>
         <ol className="chapter-template-list">
           {draft.chapterTemplate.map((item, index) => (
             <li key={item.id}>
               <span>{index + 1}</span>
               <input aria-label={`模板章节 ${index + 1} 名称`} maxLength={120} onChange={(event) => updateTemplate(item.id, { title: event.target.value })} value={item.title} />
               <select aria-label={`模板章节 ${index + 1} 类型`} onChange={(event) => updateTemplate(item.id, { sectionType: event.target.value as SectionType })} value={item.sectionType}>{SECTION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select aria-label={`模板章节 ${index + 1} 任务`} onChange={(event) => updateTemplate(item.id, { taskType: event.target.value as TaskType })} value={item.taskType}>{TASKS.map((task) => <option key={task} value={task}>{TASK_LABELS[task]}</option>)}</select>
               <button disabled={draft.chapterTemplate.length <= 1} onClick={() => patch({ chapterTemplate: draft.chapterTemplate.filter((chapter) => chapter.id !== item.id) })} type="button">删除</button>
             </li>
           ))}

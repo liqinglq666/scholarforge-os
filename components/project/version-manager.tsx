@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
+import { getProject, upsertProject } from '@/lib/project/workspace';
 import { exportRevisionReport } from '@/lib/project/reports';
 import { compareRevisionTexts, revisionChangeCounts } from '@/lib/project/revisions';
 import type {
@@ -23,9 +24,9 @@ const SOURCE_LABELS: Record<RevisionChangeSource, string> = {
 
 const KIND_LABELS = { added: '新增', removed: '删除', modified: '修改' } as const;
 
-export function VersionManager() {
+export function VersionManager({ projectId }: { projectId: string }) {
   const { data, ready, saveState, saveMessage, replaceData } = useWorkspace();
-  const project = data.project || null;
+  const project = getProject(data, projectId);
   const [selectedId, setSelectedId] = useState('');
   const [title, setTitle] = useState('');
   const [chapterId, setChapterId] = useState('');
@@ -39,11 +40,7 @@ export function VersionManager() {
   const counts = useMemo(() => revisionChangeCounts(changes), [changes]);
 
   function commitProject(nextProject: ManuscriptProject) {
-    replaceData({
-      ...data,
-      project: { ...nextProject, updatedAt: new Date().toISOString() },
-      updatedAt: new Date().toISOString(),
-    });
+    replaceData(upsertProject(data, { ...nextProject, updatedAt: new Date().toISOString() }));
   }
 
   function resetEditor() {
@@ -165,7 +162,7 @@ export function VersionManager() {
         <span className="eyebrow">版本比较与修改说明</span>
         <h1>先创建论文项目</h1>
         <p>版本记录保存在论文项目中，并可关联章节和导师意见。</p>
-        <Link className="primary-link" href="/project">创建论文项目</Link>
+        <Link className="primary-link" href="/projects">创建论文项目</Link>
       </div>
     );
   }

@@ -5,20 +5,18 @@ import { usePathname } from 'next/navigation';
 import { AccountMenu } from '@/components/account/account-menu';
 
 const primaryNavigation = [
-  { href: '/project', label: '论文项目' },
-  { href: '/workspace', label: '审校工作台' },
-  { href: '/history', label: '最近任务' },
+  { href: '/projects', label: '项目' },
+  { href: '/workspace', label: '快速审校' },
 ];
 
 const utilityNavigation = [
-  { href: '/preferences', label: '个性化' },
-  { href: '/settings', label: '设置' },
+  { href: '/preferences', label: '偏好' },
+  { href: '/settings', label: '数据与隐私' },
 ];
 
-const projectPaths = new Set(['/project', '/feedback', '/versions']);
-
 function isActivePath(pathname: string, href: string) {
-  return pathname === href || (href === '/project' && projectPaths.has(pathname));
+  if (href === '/projects') return pathname === '/projects' || pathname.startsWith('/projects/');
+  return pathname === href;
 }
 
 export function AppHeader() {
@@ -39,16 +37,7 @@ export function AppHeader() {
           <nav aria-label="主要工作区" className="primary-nav">
             {primaryNavigation.map((item) => {
               const active = isActivePath(pathname, item.href);
-              return (
-                <Link
-                  aria-current={active ? 'page' : undefined}
-                  className={active ? 'nav-link active' : 'nav-link'}
-                  href={item.href}
-                  key={item.href}
-                >
-                  {item.label}
-                </Link>
-              );
+              return <Link aria-current={active ? 'page' : undefined} className={active ? 'nav-link active' : 'nav-link'} href={item.href} key={item.href}>{item.label}</Link>;
             })}
           </nav>
 
@@ -56,16 +45,7 @@ export function AppHeader() {
             <nav aria-label="偏好与设置" className="utility-nav">
               {utilityNavigation.map((item) => {
                 const active = isActivePath(pathname, item.href);
-                return (
-                  <Link
-                    aria-current={active ? 'page' : undefined}
-                    className={active ? 'nav-link active' : 'nav-link'}
-                    href={item.href}
-                    key={item.href}
-                  >
-                    {item.label}
-                  </Link>
-                );
+                return <Link aria-current={active ? 'page' : undefined} className={active ? 'nav-link active' : 'nav-link'} href={item.href} key={item.href}>{item.label}</Link>;
               })}
             </nav>
             <AccountMenu />
@@ -85,8 +65,9 @@ export function AppFooter() {
           <p><strong>AI 提建议，作者做决定。</strong><span>科研事实、引用、统计结果和最终文本由作者核对。</span></p>
         </div>
         <nav aria-label="页脚导航">
-          <Link href="/preferences">个性化偏好</Link>
-          <Link href="/settings">数据与限制</Link>
+          <Link href="/projects">我的项目</Link>
+          <Link href="/preferences">偏好设置</Link>
+          <Link href="/settings">数据与隐私</Link>
           <a href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">GitHub</a>
         </nav>
       </div>
