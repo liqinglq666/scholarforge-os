@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navigation = [
-  { href: '/workspace', label: '工作台' },
+  { href: '/project', label: '论文项目' },
+  { href: '/workspace', label: '审校工作台' },
   { href: '/history', label: '最近任务' },
   { href: '/settings', label: '数据与设置' },
 ];
