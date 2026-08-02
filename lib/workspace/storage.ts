@@ -64,6 +64,7 @@ export function persistCurrentWorkspace(data: PersistedWorkspace, current: Works
     version: 2,
     current: { ...current, savedAt: now },
     history: data.history,
+    project: data.project || null,
     updatedAt: now,
   };
   writeWorkspaceData(next);
@@ -73,7 +74,13 @@ export function persistCurrentWorkspace(data: PersistedWorkspace, current: Works
 export function archiveWorkspace(data: PersistedWorkspace, current: WorkspaceState) {
   const entry = createHistoryEntry(current);
   const history = [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES);
-  const next = { version: 2 as const, current: { ...current, savedAt: entry.savedAt }, history, updatedAt: entry.savedAt };
+  const next: PersistedWorkspace = {
+    version: 2,
+    current: { ...current, savedAt: entry.savedAt },
+    history,
+    project: data.project || null,
+    updatedAt: entry.savedAt,
+  };
   writeWorkspaceData(next);
   return next;
 }

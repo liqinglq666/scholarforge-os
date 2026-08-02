@@ -47,7 +47,7 @@ test.beforeEach(async ({ page }) => {
 test('new task → analysis → author decision → apply → undo/redo → export → history', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /AI 提建议/ })).toBeVisible();
-  await page.getByRole('link', { name: '开始新任务' }).click();
+  await page.getByRole('link', { name: '单段落审校' }).click();
 
   await expect(page.getByRole('heading', { name: '准备需要核对的科研文本' })).toBeVisible();
   await page.getByLabel('项目名称').fill('E2E manuscript');
@@ -74,6 +74,30 @@ test('new task → analysis → author decision → apply → undo/redo → expo
   await page.getByRole('link', { name: '最近任务' }).click();
   await expect(page.getByRole('heading', { name: 'E2E manuscript' })).toBeVisible();
   await expect(page.getByText(/0 条待处理/)).toBeVisible();
+});
+
+test('manuscript project manages chapters, checks consistency, and round-trips to workspace', async ({ page }) => {
+  await page.goto('/project');
+  await page.getByRole('button', { name: '创建本地论文项目' }).click();
+  await page.getByLabel('论文或课题名称').fill('E2E thesis');
+  await page.getByLabel('章节名称').fill('Methods');
+  await page.getByLabel('章节正文').fill('A total of 126 participants were included. The compressive strength was 42.5 MPa after 28 days.');
+
+  await page.getByRole('button', { name: '添加章节' }).click();
+  await page.getByLabel('章节名称').fill('Results');
+  await page.getByLabel('章节正文').fill('The final analysis used n = 118. The compressive strength was 45.0 MPa after 28 days.');
+  await page.getByRole('button', { name: '运行本地检查' }).click();
+  await expect(page.getByText(/多个样本量候选值/)).toBeVisible();
+  await expect(page.getByText(/42.5 mpa/)).toBeVisible();
+
+  await page.getByRole('button', { name: /Methods/ }).click();
+  await page.getByRole('button', { name: '在审校工作台打开' }).click();
+  await expect(page.getByText('来自论文项目：Methods')).toBeVisible();
+  await expect(page.getByLabel('英文论文原文')).toHaveValue(/126 participants/);
+  await page.getByRole('button', { name: '保存当前文本回项目' }).click();
+  await expect(page.getByText(/已把当前草稿保存回/)).toBeVisible();
+  await page.getByRole('link', { name: '返回论文项目' }).click();
+  await expect(page.getByText(/最近回写/)).toBeVisible();
 });
 
 test('homepage examples switch disciplines and load a complete local draft', async ({ page }) => {

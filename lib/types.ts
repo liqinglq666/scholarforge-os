@@ -35,8 +35,49 @@ export interface WorkspaceDraft {
   sourceText: string;
   terminologyLocks: TerminologyLock[];
   importedDocument?: ImportedDocument;
+  linkedProjectId?: string;
+  linkedChapterId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ManuscriptChapter {
+  id: string;
+  title: string;
+  sectionType: SectionType;
+  taskType: TaskType;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+  lastReviewedAt?: string;
+}
+
+export interface ManuscriptProject {
+  id: string;
+  name: string;
+  targetJournal: string;
+  terminologyLocks: TerminologyLock[];
+  chapters: ManuscriptChapter[];
+  activeChapterId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ConsistencyIssueType = 'sample-size' | 'metric-value' | 'abbreviation' | 'terminology';
+
+export interface ConsistencyOccurrence {
+  chapterId: string;
+  chapterTitle: string;
+  excerpt: string;
+}
+
+export interface ConsistencyIssue {
+  id: string;
+  type: ConsistencyIssueType;
+  severity: IssueSeverity;
+  title: string;
+  description: string;
+  occurrences: ConsistencyOccurrence[];
 }
 
 export interface ReviewIssue {
@@ -108,6 +149,7 @@ export interface PersistedWorkspace {
   version: 2;
   current: WorkspaceState;
   history: HistoryEntry[];
+  project?: ManuscriptProject | null;
   updatedAt: string;
 }
 
@@ -117,6 +159,7 @@ export interface WorkspaceBackup {
   exportedAt: string;
   current: WorkspaceState;
   history: HistoryEntry[];
+  project?: ManuscriptProject | null;
 }
 
 export interface ReviewRequest {
