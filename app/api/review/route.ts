@@ -1,125 +1,91 @@
-import { NextResponse } from 'next/server';
-import { reviewWithBailian } from '@/lib/bailian';
-import { createDemoReview } from '@/lib/demo-review';
-import type {
-  ReviewMode,
-  ReviewRequest,
-  ReviewSection,
-  TerminologyLock,
-  WorkspaceTask,
-} from '@/lib/types';
+import { MAX_REQUEST_BYTES } from '@/lib/config';
+import { reviewWithModel } from '@/lib/review/model';
+import { parseReviewRequest, ValidationError } from '@/lib/review/validation';
+import { checkRateLimit, RATE_LIMITS, releaseRateLimitSlot } from '@/lib/security/rate-limit';
+import type { ApiErrorPayload } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const VALID_TASKS = new Set<WorkspaceTask>(['translate', 'polish', 'precheck', 'review-response']);
-const VALID_SECTIONS = new Set<ReviewSection>([
-  'general',
-  'abstract',
-  'introduction',
-  'methods',
-  'results',
-  'discussion',
-  'conclusion',
-]);
-const VALID_MODES = new Set<ReviewMode>(['conservative', 'balanced', 'deep']);
-
-function sanitizeLocks(value: unknown): TerminologyLock[] {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, 12).flatMap((item, index) => {
-    if (!item || typeof item !== 'object') return [];
-    const record = item as Record<string, unknown>;
-    const source = typeof record.source === 'string' ? record.source.trim().slice(0, 120) : '';
-    const preferred = typeof record.preferred === 'string' ? record.preferred.trim().slice(0, 160) : '';
-    const note = typeof record.note === 'string' ? record.note.trim().slice(0, 240) : '';
-    if (!source || !preferred) return [];
-    return [{ id: typeof record.id === 'string' ? record.id.slice(0, 80) : `lock-${index + 1}`, source, preferred, note }];
+function json(payload: unknown, status: number, headers: Record<string, string> = {}) {
+  return Response.json(payload, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+      'X-Content-Type-Options': 'nosniff',
+      ...headers,
+    },
   });
 }
 
-function noStoreJson(payload: unknown, status: number) {
-  return NextResponse.json(payload, {
-    status,
-    headers: { 'Cache-Control': 'no-store' },
-  });
+function errorPayload(error: string, code: string, requestId: string, detail?: string): ApiErrorPayload {
+  return { error, code, requestId, ...(detail ? { detail } : {}) };
 }
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
-  let body: Partial<ReviewRequest>;
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return json(errorPayload('请求内容超过 80 KB 限制。你的浏览器草稿未受影响。', 'REQUEST_TOO_LARGE', requestId), 413);
+  }
 
+  let body: unknown;
   try {
-    body = await request.json() as Partial<ReviewRequest>;
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
+      return json(errorPayload('请求内容超过 80 KB 限制。你的浏览器草稿未受影响。', 'REQUEST_TOO_LARGE', requestId), 413);
+    }
+    body = JSON.parse(raw) as unknown;
   } catch {
-    return noStoreJson({ error: 'The request body must be valid JSON.', requestId }, 400);
+    return json(errorPayload('请求正文必须是有效 JSON。', 'INVALID_JSON', requestId), 400);
+  }
+
+  let parsed;
+  try {
+    parsed = parseReviewRequest(body);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return json(errorPayload(error.message, error.code, requestId), error.status);
+    }
+    return json(errorPayload('请求校验失败。', 'INVALID_REQUEST', requestId), 400);
+  }
+
+  if (!process.env.DASHSCOPE_API_KEY) {
+    return json(errorPayload('分析服务未配置。你的正文没有发送给模型，草稿仍保存在浏览器中。', 'SERVICE_NOT_CONFIGURED', requestId), 503);
+  }
+
+  const limit = checkRateLimit(request);
+  if (!limit.allowed) {
+    const message = limit.reason === 'budget'
+      ? '今日分析预算已达到上限，请联系部署管理员或明日重试。'
+      : limit.reason === 'concurrency'
+        ? '当前分析任务过多，请稍后重试。'
+        : '请求过于频繁，请稍后重试。';
+    return json(
+      { ...errorPayload(message, 'RATE_LIMITED', requestId), retryAfter: limit.retryAfter },
+      429,
+      { 'Retry-After': String(limit.retryAfter), 'X-RateLimit-Remaining': '0' },
+    );
   }
 
   try {
-    const taskType = VALID_TASKS.has(body.taskType as WorkspaceTask)
-      ? body.taskType as WorkspaceTask
-      : 'precheck';
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
-    const projectTitle = typeof body.projectTitle === 'string' ? body.projectTitle.trim().slice(0, 120) : '';
-    const targetJournal = typeof body.targetJournal === 'string' ? body.targetJournal.trim().slice(0, 160) : '';
-    const supportingContext = typeof body.supportingContext === 'string' ? body.supportingContext.trim().slice(0, 6_000) : '';
-    const responseLocation = typeof body.responseLocation === 'string' ? body.responseLocation.trim().slice(0, 240) : '';
-    const lockedTerms = sanitizeLocks(body.lockedTerms);
-    const sectionType = VALID_SECTIONS.has(body.sectionType as ReviewSection)
-      ? body.sectionType as ReviewSection
-      : 'general';
-    const reviewMode = VALID_MODES.has(body.reviewMode as ReviewMode)
-      ? body.reviewMode as ReviewMode
-      : 'balanced';
-    const minimumLength = taskType === 'review-response' ? 20 : 40;
-
-    if (text.length < minimumLength) {
-      return noStoreJson(
-        { error: `Please provide at least ${minimumLength} characters for this task.`, requestId },
-        400,
-      );
-    }
-
-    if (text.length > 12_000) {
-      return noStoreJson(
-        { error: 'The current workspace supports up to 12,000 characters in the primary input.', requestId },
-        400,
-      );
-    }
-
-    const options: Partial<ReviewRequest> = {
-      projectTitle,
-      taskType,
-      targetJournal,
-      sectionType,
-      reviewMode,
-      supportingContext,
-      responseLocation,
-      lockedTerms,
-    };
-    const result = process.env.DASHSCOPE_API_KEY
-      ? await reviewWithBailian(text, options)
-      : createDemoReview(text, options);
-
-    return NextResponse.json({ ...result, requestId }, {
-      headers: {
-        'Cache-Control': 'no-store',
-        'X-ScholarForge-Workflow': result.workflowVersion,
-        'X-ScholarForge-Task': taskType,
-        'X-ScholarForge-Section': sectionType,
-        'X-ScholarForge-Mode': reviewMode,
-      },
+    const result = await reviewWithModel(parsed);
+    return json({ result, requestId }, 200, {
+      'X-RateLimit-Limit': String(RATE_LIMITS.requestsPerWindow),
+      'X-RateLimit-Remaining': String(limit.remaining),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown review error.';
-    console.error(`[ScholarForge:${requestId}] review failed:`, message);
-
-    return noStoreJson(
-      {
-        error: 'The live multi-agent workflow failed. Check the service configuration and deployment logs.',
-        detail: process.env.NODE_ENV === 'development' ? message : undefined,
-        requestId,
-      },
+    if (error instanceof ValidationError) {
+      const headers: Record<string, string> = error.status === 429 ? { 'Retry-After': '30' } : {};
+      return json(errorPayload(error.message, error.code, requestId), error.status, headers);
+    }
+    console.error(`[ScholarForge:${requestId}] review failed`, error);
+    return json(
+      errorPayload('分析失败。你的正文仍安全保存在浏览器中，可以稍后重试。', 'REVIEW_FAILED', requestId),
       502,
     );
+  } finally {
+    releaseRateLimitSlot();
   }
 }
