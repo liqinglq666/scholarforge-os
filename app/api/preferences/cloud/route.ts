@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   applyAuthCookies,
   assertSameOrigin,
+  clearAuthCookies,
   readSupabaseError,
   resolveAuthSession,
   supabaseRequest,
@@ -9,14 +10,16 @@ import {
 import { parseUserPreferences } from '@/lib/workspace/schema';
 import { isRecord } from '@/lib/validation/common';
 
-function unauthorized() {
-  return NextResponse.json({ error: '请先登录账户。' }, { status: 401 });
+function unauthorized(clearCookies = false) {
+  const response = NextResponse.json({ error: '请先登录账户。' }, { status: 401 });
+  if (clearCookies) clearAuthCookies(response);
+  return response;
 }
 
 export async function GET() {
   const session = await resolveAuthSession();
   if (!session.configured) return NextResponse.json({ error: '账户服务未配置。' }, { status: 503 });
-  if (!session.user || !session.accessToken) return unauthorized();
+  if (!session.user || !session.accessToken) return unauthorized(true);
 
   const path = `/rest/v1/user_preferences?user_id=eq.${encodeURIComponent(session.user.id)}&select=preferences,updated_at&limit=1`;
   const upstream = await supabaseRequest(path, { method: 'GET' }, session.accessToken);
@@ -42,7 +45,7 @@ export async function PUT(request: Request) {
   }
   const session = await resolveAuthSession();
   if (!session.configured) return NextResponse.json({ error: '账户服务未配置。' }, { status: 503 });
-  if (!session.user || !session.accessToken) return unauthorized();
+  if (!session.user || !session.accessToken) return unauthorized(true);
 
   let body: unknown;
   try {

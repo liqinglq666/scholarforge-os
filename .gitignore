@@ -28,6 +28,9 @@ Thumbs.db
 # Vercel
 .vercel
 
+# Supabase CLI local link state
+/supabase/.temp
+
 # TypeScript
 *.tsbuildinfo
 
