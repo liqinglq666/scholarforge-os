@@ -26,15 +26,17 @@ test('global navigation keeps primary workspaces distinct from settings', async 
   const primaryNavigation = page.getByRole('navigation', { name: '主要工作区' });
   const utilityNavigation = page.getByRole('navigation', { name: '偏好与设置' });
 
-  await expect(primaryNavigation.getByRole('link', { name: '论文项目' })).toBeVisible();
-  await expect(primaryNavigation.getByRole('link', { name: '审校工作台' })).toBeVisible();
-  await expect(primaryNavigation.getByRole('link', { name: '最近任务' })).toBeVisible();
-  await expect(utilityNavigation.getByRole('link', { name: '个性化' })).toBeVisible();
-  await expect(utilityNavigation.getByRole('link', { name: '设置' })).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: '论文项目', exact: true })).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: '审校工作台', exact: true })).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: '最近任务', exact: true })).toBeVisible();
+  await expect(utilityNavigation.getByRole('link', { name: '个性化', exact: true })).toBeVisible();
+  await expect(utilityNavigation.getByRole('link', { name: '设置', exact: true })).toBeVisible();
 
-  await primaryNavigation.getByRole('link', { name: '论文项目' }).click();
+  await primaryNavigation.getByRole('link', { name: '论文项目', exact: true }).click();
   await expect(page).toHaveURL(/\/project$/);
-  await expect(page.getByRole('link', { name: '论文项目' })).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('navigation', { name: '主要工作区' }).getByRole('link', { name: '论文项目', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expectNoHorizontalOverflow(page);
 });
 
