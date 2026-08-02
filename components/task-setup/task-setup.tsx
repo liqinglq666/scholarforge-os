@@ -73,7 +73,6 @@ export function TaskSetup({
     }
     onChange({
       projectName: draft.projectName || importResult.title,
-      taskType: importResult.suggestedTask,
       sectionType: section.sectionType,
       sourceText: section.text,
       importedDocument: {
@@ -142,7 +141,12 @@ export function TaskSetup({
         {importResult ? (
           <div className="import-preview" aria-live="polite">
             <div><strong>已在浏览器中提取：{importResult.fileName}</strong><button onClick={() => setImportResult(null)} type="button">取消导入</button></div>
-            <p>请选择一个章节进入当前任务；导入前请核对文字顺序。</p>
+            <p>
+              请选择一个章节进入当前任务；导入不会覆盖你已选择的任务。
+              {importResult.suggestedTask !== draft.taskType ? (
+                <> 系统根据文本语言建议“{TASK_LABELS[importResult.suggestedTask]}”。<button onClick={() => onChange({ taskType: importResult.suggestedTask })} type="button">采用建议</button></>
+              ) : null}
+            </p>
             <div className="section-list">
               {importResult.sections.map((section, index) => (
                 <button key={section.id} onClick={() => selectSection(index)} type="button">
