@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ExampleShowcase } from '@/components/home/example-showcase';
 import { TASK_DESCRIPTIONS, TASK_LABELS } from '@/lib/config';
 import type { TaskType } from '@/lib/types';
 
@@ -16,14 +17,7 @@ export default function Home() {
             <div className="hero-actions"><Link className="primary-link" href="/workspace">开始新任务</Link><Link className="secondary-link" href="/history">恢复最近任务</Link></div>
             <div className="hero-trust"><span>原始文件不上传</span><span>未配置时不模拟</span><span>不批量应用建议</span></div>
           </div>
-          <div className="hero-paper" aria-label="产品工作方式示意">
-            <div className="paper-header"><span>Author workspace</span><span>Draft 01</span></div>
-            <p className="paper-label">原文</p>
-            <p>The results can well prove that the pore structure became much denser after curing.</p>
-            <div className="paper-issue"><span>证据边界 · 一般问题</span><strong>“prove” 的结论强度可能超过现有证据。</strong><p>建议：The results indicate that…</p></div>
-            <div aria-hidden="true" className="paper-decision"><span>拒绝</span><span>待定</span><span className="selected">接受并核对</span></div>
-            <small>这条修改尚未进入作者工作稿。</small>
-          </div>
+          <ExampleShowcase />
         </div>
       </section>
 
