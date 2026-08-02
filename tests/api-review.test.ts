@@ -51,12 +51,13 @@ describe('POST /api/review', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ summary: 'Checked.', suggestedText: validBody.text, issues: [] }) } }],
     })));
-    const response = await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'a' }));
+    const response = await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'api-test-session' }));
     const payload = await response.json();
     expect(response.status).toBe(200);
     expect(payload.result.summary).toBe('Checked.');
+    expect(payload.result.safetyGate.status).toBe('passed');
     expect(payload.result).not.toHaveProperty('agentRuns');
-    expect(response.headers.get('x-ratelimit-remaining')).toBe('5');
+    expect(response.headers.get('x-ratelimit-remaining')).toBe('7');
   });
 
   it('rejects truncated model output', async () => {
@@ -75,21 +76,24 @@ describe('POST /api/review', () => {
     expect((await response.json()).code).toBe('INVALID_MODEL_JSON');
   });
 
-  it('returns 422 when deterministic scientific checks fail', async () => {
+  it('returns an explainable quarantined result when scientific checks fail', async () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ summary: 'Unsafe.', suggestedText: validBody.text.replace('42.5', '45.0'), issues: [] }) } }] })));
     const response = await POST(request(JSON.stringify(validBody)));
-    expect(response.status).toBe(422);
-    expect((await response.json()).code).toBe('SAFETY_CHECK_FAILED');
+    const payload = await response.json();
+    expect(response.status).toBe(200);
+    expect(payload.result.safetyGate.status).toBe('quarantined');
+    expect(payload.result.safetyGate.blockedCount).toBeGreaterThan(0);
+    expect(payload.result.warnings.join(' ')).toMatch(/数值/);
   });
 
-  it('enforces client rate limits and Retry-After', async () => {
+  it('enforces per-session rate limits and Retry-After', async () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ summary: 'Checked.', suggestedText: validBody.text, issues: [] }) } }] })));
-    for (let index = 0; index < 6; index += 1) {
-      expect((await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'same-client' }))).status).toBe(200);
+    for (let index = 0; index < 8; index += 1) {
+      expect((await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'same-client-session' }))).status).toBe(200);
     }
-    const limited = await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'same-client' }));
+    const limited = await POST(request(JSON.stringify(validBody), { 'x-scholarforge-session': 'same-client-session' }));
     expect(limited.status).toBe(429);
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
   });
