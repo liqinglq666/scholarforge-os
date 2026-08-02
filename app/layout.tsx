@@ -5,6 +5,7 @@ import './workflow.css';
 import './examples.css';
 import './project.css';
 import './revision.css';
+import './preferences.css';
 
 export const metadata: Metadata = {
   title: {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   },
   description: '面向科研中译英、英文保守润色和投稿前检查的作者控制工作台。逐条核对 AI 建议，安全应用，并保留可恢复的本地工作区。',
   applicationName: 'ScholarForge OS',
-  keywords: ['科研英语', '学术翻译', '英文润色', '投稿前检查', '作者核对', 'DOCX 正文提取'],
+  keywords: ['科研英语', '学术翻译', '英文润色', '投稿前检查', '作者核对', '论文项目', '个性化写作偏好'],
   icons: { icon: '/icon.svg', shortcut: '/icon.svg', apple: '/icon.svg' },
   openGraph: {
     title: 'ScholarForge OS｜作者控制的科研英语工作台',
