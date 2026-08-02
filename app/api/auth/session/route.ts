@@ -21,6 +21,7 @@ export async function GET() {
     : { configured: false, authenticated: false, user: null, message: '账户服务未配置，当前使用游客本地模式。' };
   const response = NextResponse.json(payload);
   if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+  else if (session.configured && !session.user) clearAuthCookies(response);
   return response;
 }
 

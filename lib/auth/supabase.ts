@@ -20,10 +20,24 @@ export interface ResolvedAuthSession {
   refreshedSession?: SupabaseAuthSession;
 }
 
+export function isSafePublishableKey(value: string) {
+  if (value.startsWith('sb_secret_') || value.startsWith('service_role')) return false;
+  if (value.startsWith('sb_publishable_')) return value.length >= 32;
+
+  const parts = value.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as unknown;
+    return isRecord(payload) && payload.role === 'anon';
+  } catch {
+    return false;
+  }
+}
+
 export function getSupabaseConfig() {
   const rawUrl = process.env.SUPABASE_URL?.trim();
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
-  if (!rawUrl || !publishableKey) return null;
+  if (!rawUrl || !publishableKey || !isSafePublishableKey(publishableKey)) return null;
   try {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:' && process.env.NODE_ENV === 'production') return null;
@@ -34,10 +48,26 @@ export function getSupabaseConfig() {
 }
 
 export function assertSameOrigin(request: Request) {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite === 'cross-site') throw new Error('跨站请求已拒绝。');
+
   const origin = request.headers.get('origin');
-  if (!origin) return;
-  const host = request.headers.get('host');
-  if (!host || new URL(origin).host !== host) throw new Error('跨站请求已拒绝。');
+  if (!origin) throw new Error('缺少请求来源，操作已拒绝。');
+
+  try {
+    const requestUrl = new URL(request.url);
+    const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    const forwardedProtocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const expectedHost = forwardedHost || request.headers.get('host') || requestUrl.host;
+    const expectedProtocol = forwardedProtocol || requestUrl.protocol.replace(':', '');
+    const originUrl = new URL(origin);
+    if (originUrl.host !== expectedHost || originUrl.protocol !== `${expectedProtocol}:`) {
+      throw new Error('跨站请求已拒绝。');
+    }
+  } catch (error) {
+    if (error instanceof Error && /请求已拒绝/.test(error.message)) throw error;
+    throw new Error('请求来源无效，操作已拒绝。');
+  }
 }
 
 export async function supabaseRequest(
@@ -88,6 +118,7 @@ export function applyAuthCookies(response: NextResponse, session: SupabaseAuthSe
     secure,
     path: '/',
     maxAge: session.expiresIn,
+    priority: 'high',
   });
   response.cookies.set(REFRESH_COOKIE, session.refreshToken, {
     httpOnly: true,
@@ -95,12 +126,21 @@ export function applyAuthCookies(response: NextResponse, session: SupabaseAuthSe
     secure,
     path: '/',
     maxAge: 60 * 60 * 24 * 30,
+    priority: 'high',
   });
 }
 
 export function clearAuthCookies(response: NextResponse) {
-  response.cookies.set(ACCESS_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 0 });
-  response.cookies.set(REFRESH_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 0 });
+  const options = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+    priority: 'high' as const,
+  };
+  response.cookies.set(ACCESS_COOKIE, '', options);
+  response.cookies.set(REFRESH_COOKIE, '', options);
 }
 
 export async function resolveAuthSession(): Promise<ResolvedAuthSession> {

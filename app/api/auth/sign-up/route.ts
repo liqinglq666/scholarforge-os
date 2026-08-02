@@ -43,7 +43,10 @@ export async function POST(request: Request) {
     }),
   });
   if (!upstream.ok) {
-    const error = await readSupabaseError(upstream, '注册失败，请稍后重试。');
+    await readSupabaseError(upstream, '注册失败，请稍后重试。');
+    const error = upstream.status === 429
+      ? '注册请求过于频繁，请稍后重试。'
+      : '无法完成注册。如果该邮箱已注册，请直接登录；否则请稍后重试。';
     return NextResponse.json({ error }, { status: upstream.status === 429 ? 429 : 400 });
   }
 
