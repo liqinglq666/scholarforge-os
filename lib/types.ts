@@ -204,7 +204,7 @@ export interface ReviewResult {
   suggestedText: string;
   issues: ReviewIssue[];
   warnings: string[];
-  safetyGate: SafetyGateReport;
+  safetyGate?: SafetyGateReport;
   generatedAt: string;
 }
 
