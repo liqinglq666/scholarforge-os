@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
@@ -55,7 +55,6 @@ export function ProjectManager({ projectId }: { projectId: string }) {
   const [report, setReport] = useState<ConsistencyIssue[] | null>(null);
   const [reviewTask, setReviewTask] = useState<TaskType>(data.preferences.defaultTaskType);
   const project = getProject(data, projectId);
-  useEffect(() => { setReviewTask(data.preferences.defaultTaskType); }, [data.preferences.defaultTaskType, projectId]);
   const activeChapter = useMemo(() => {
     if (!project) return null;
     return project.chapters.find((chapter) => chapter.id === project.activeChapterId) || project.chapters[0] || null;
