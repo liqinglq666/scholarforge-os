@@ -65,6 +65,7 @@ export function persistCurrentWorkspace(data: PersistedWorkspace, current: Works
     current: { ...current, savedAt: now },
     history: data.history,
     project: data.project || null,
+    preferences: data.preferences,
     updatedAt: now,
   };
   writeWorkspaceData(next);
@@ -79,6 +80,7 @@ export function archiveWorkspace(data: PersistedWorkspace, current: WorkspaceSta
     current: { ...current, savedAt: entry.savedAt },
     history,
     project: data.project || null,
+    preferences: data.preferences,
     updatedAt: entry.savedAt,
   };
   writeWorkspaceData(next);
