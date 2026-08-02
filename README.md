@@ -20,14 +20,16 @@ ScholarForge OS 面向需要处理中英文科研段落的研究生、科研人�
 
 ## 核心流程
 
-1. 在欢迎页理解产品能力、数据处理方式和 AI 边界。
+1. 在欢迎页理解产品能力，或从材料、生命医学、计算机、社会科学、环境和教育等示例开始体验。
 2. 粘贴文本，或在浏览器中提取 DOCX 正文并选择章节。
 3. 选择任务与章节，可添加目标期刊语境和术语锁。
 4. 在发送前确认具体文本和设置；原始 DOCX 文件不会上传。
 5. 查看原文、AI 建议稿、作者工作稿和问题列表。
 6. 对每条问题做作者决定；安全应用前重新检查当前锚点。
-7. 撤销或重做已应用修改，导出 TXT、Markdown 报告、清洁 DOCX 或工作区备份。
+7. 撤销、重做或单独撤回已应用修改，导出 TXT、Markdown 报告、清洁 DOCX 或工作区备份。
 8. 从唯一的最近任务页恢复本地历史。
+
+示例只会填入本地草稿，不会自动发送给模型。已有草稿在载入示例前会得到明确提示。
 
 ## 科研安全边界
 
@@ -53,13 +55,13 @@ ScholarForge OS 面向需要处理中英文科研段落的研究生、科研人�
 - 自动保存失败时页面会明确提示，当前内存内容不会被清空。
 - 备份导入有大小、格式和版本验证。备份中的编辑偏移与替换文本不受信任；系统只按当前 Issue ID 重新定位并重建安全修改。
 
-更多说明见 [产品说明](docs/product.md)、[架构](docs/ARCHITECTURE.md)、[技术与安全](docs/technical.md)、[隐私说明](docs/PRIVACY.md) 和 [部署说明](docs/DEPLOYMENT.md)。
+更多说明见 [产品说明](docs/product.md)、[研究生产品路线图](docs/GRADUATE_STUDENT_ROADMAP.md)、[架构](docs/ARCHITECTURE.md)、[技术与安全](docs/technical.md)、[隐私说明](docs/PRIVACY.md) 和 [部署说明](docs/DEPLOYMENT.md)。
 
 ## 技术架构
 
 ```text
 Next.js 16 App Router + React 19 + TypeScript
-├─ 欢迎页 / 工作台 / 最近任务 / 数据与设置
+├─ 欢迎页 / 跨学科示例 / 工作台 / 最近任务 / 数据与设置
 ├─ 浏览器 DOCX 正文提取（Mammoth）
 ├─ POST /api/review
 │  ├─ 请求验证、大小限制、限流、并发、超时、预算熔断
@@ -106,7 +108,7 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-单元与组件测试覆盖请求验证、确定性安全检查、安全应用、撤销/重做、工作区恢复、篡改备份、DOCX 边界、服务未配置和 API 限流。Playwright 覆盖完整核心流程与移动端布局。
+单元与组件测试覆盖请求验证、跨学科示例、确定性安全检查、安全应用、单条撤回、撤销/重做、工作区恢复、篡改备份、DOCX 边界、服务未配置和 API 限流。Playwright 覆盖完整核心流程与移动端布局。
 
 ## 部署
 
