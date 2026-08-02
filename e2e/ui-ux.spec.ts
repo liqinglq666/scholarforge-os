@@ -16,6 +16,15 @@ test('homepage presents one clear scientific-safety proposition', async ({ page 
 });
 
 test('public evaluator entry loads a real quick-review case without sending it automatically', async ({ page }) => {
+  await page.route('**/api/health', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      configured: true,
+      model: 'test-model',
+      message: '分析服务已配置。',
+      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 },
+    }),
+  }));
   await page.goto('/try');
   await expect(page.getByRole('heading', { name: '无需登录，直接体验核心功能' })).toBeVisible();
   await page.getByRole('link', { name: '载入推荐案例并开始' }).click();
