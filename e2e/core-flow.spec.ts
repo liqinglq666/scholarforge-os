@@ -84,7 +84,7 @@ test('homepage examples switch disciplines and load a complete local draft', asy
   await page.getByRole('link', { name: '在工作台使用此示例' }).click();
 
   await expect(page.getByLabel('项目名称')).toHaveValue(/城市河流微塑料研究/);
-  await expect(page.getByLabel('中文科研原文')).toContainText('共采集36个样品');
+  await expect(page.getByLabel('中文科研原文')).toHaveValue(/共采集36个样品/);
   await expect(page.getByRole('radio', { name: /科研中译英/ })).toBeChecked();
   await expect(page.getByText('必须使用：microplastics')).toBeVisible();
 });
