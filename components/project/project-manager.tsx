@@ -179,21 +179,21 @@ export function ProjectManager() {
       <div className="project-grid">
         <aside className="chapter-sidebar" aria-label="项目章节">
           <div className="chapter-sidebar-heading"><div><span className="step-number">02</span><h2>章节</h2></div><button disabled={project.chapters.length >= 12} onClick={addChapter} type="button">添加章节</button></div>
-          <div className="chapter-list" role="list">
+          <ul className="chapter-list">
             {project.chapters.map((chapter) => (
-              <button
-                aria-current={chapter.id === activeChapter?.id ? 'true' : undefined}
-                className={chapter.id === activeChapter?.id ? 'selected' : ''}
-                key={chapter.id}
-                onClick={() => updateProject({ activeChapterId: chapter.id })}
-                role="listitem"
-                type="button"
-              >
-                <strong>{chapter.title}</strong>
-                <span>{chapter.text.length.toLocaleString()} 字符 · {chapter.lastReviewedAt ? '已回写' : '未回写'}</span>
-              </button>
+              <li key={chapter.id}>
+                <button
+                  aria-current={chapter.id === activeChapter?.id ? 'true' : undefined}
+                  className={chapter.id === activeChapter?.id ? 'selected' : ''}
+                  onClick={() => updateProject({ activeChapterId: chapter.id })}
+                  type="button"
+                >
+                  <strong>{chapter.title}</strong>
+                  <span>{chapter.text.length.toLocaleString()} 字符 · {chapter.lastReviewedAt ? '已回写' : '未回写'}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
           <small>最多 12 个章节。建议按摘要、引言、方法、结果、讨论和结论组织。</small>
         </aside>
 
