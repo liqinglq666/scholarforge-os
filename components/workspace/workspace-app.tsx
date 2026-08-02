@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { StatusBanner } from '@/components/feedback/status-banner';
@@ -27,8 +28,15 @@ export function WorkspaceApp() {
   const [serviceLoading, setServiceLoading] = useState(true);
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null);
   const [pageError, setPageError] = useState('');
+  const [projectMessage, setProjectMessage] = useState('');
   const analysisControllerRef = useRef<AbortController | null>(null);
   const entryParamAppliedRef = useRef(false);
+  const linkedChapter = useMemo(() => {
+    const project = data.project;
+    const draft = data.current.draft;
+    if (!project || draft.linkedProjectId !== project.id || !draft.linkedChapterId) return null;
+    return project.chapters.find((chapter) => chapter.id === draft.linkedChapterId) || null;
+  }, [data.current.draft, data.project]);
 
   useEffect(() => {
     let active = true;
@@ -77,7 +85,7 @@ export function WorkspaceApp() {
         terminologyLocks: requestedExample.terminologyLocks.map((term) => ({ ...term })),
       });
       const nextData = {
-        version: 2 as const,
+        ...data,
         current: createWorkspaceState(draft),
         history,
         updatedAt: new Date().toISOString(),
@@ -107,6 +115,40 @@ export function WorkspaceApp() {
       lastError: undefined,
     }));
     setPageError('');
+    setProjectMessage('');
+  }
+
+  function saveBackToProject() {
+    const project = data.project;
+    const chapterId = data.current.draft.linkedChapterId;
+    if (!project || data.current.draft.linkedProjectId !== project.id || !chapterId) return;
+    const chapter = project.chapters.find((item) => item.id === chapterId);
+    if (!chapter) {
+      setProjectMessage('关联章节已不存在，无法回写。当前工作台内容仍然保留。');
+      return;
+    }
+    const now = new Date().toISOString();
+    const text = data.current.currentResult ? data.current.workingText : data.current.draft.sourceText;
+    const nextProject = {
+      ...project,
+      activeChapterId: chapterId,
+      chapters: project.chapters.map((item) => item.id === chapterId
+        ? {
+            ...item,
+            title: item.title || data.current.draft.projectName,
+            sectionType: data.current.draft.sectionType,
+            taskType: data.current.draft.taskType,
+            text,
+            updatedAt: now,
+            lastReviewedAt: now,
+          }
+        : item),
+      updatedAt: now,
+    };
+    const nextData = { ...data, project: nextProject, updatedAt: now };
+    replaceData(nextData);
+    saveNow(nextData);
+    setProjectMessage(`已把当前${data.current.currentResult ? '作者工作稿' : '草稿'}保存回“${chapter.title}”。`);
   }
 
   async function analyze() {
@@ -161,7 +203,7 @@ export function WorkspaceApp() {
       };
       const entry = createHistoryEntry(completed);
       const nextData = {
-        version: 2 as const,
+        ...data,
         current: completed,
         history: [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES),
         updatedAt: new Date().toISOString(),
@@ -195,7 +237,7 @@ export function WorkspaceApp() {
       ? [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES)
       : data.history;
     const nextData = {
-      version: 2 as const,
+      ...data,
       current: createWorkspaceState(createDraft()),
       history,
       updatedAt: new Date().toISOString(),
@@ -203,6 +245,7 @@ export function WorkspaceApp() {
     replaceData(nextData);
     saveNow(nextData);
     setPageError('');
+    setProjectMessage('');
   }
 
   if (!ready) {
@@ -230,6 +273,13 @@ export function WorkspaceApp() {
   return (
     <main className="shell page-main workspace-main">
       <div className={`save-indicator save-${saveState}`} aria-live="polite"><span aria-hidden="true" />{saveMessage}</div>
+      {linkedChapter ? (
+        <div className="linked-project-banner">
+          <div><strong>来自论文项目：{linkedChapter.title}</strong><span>工作台修改不会自动覆盖项目章节。完成核对后请明确保存回项目。</span></div>
+          <div className="linked-project-actions"><Link className="secondary-link" href="/project">返回论文项目</Link><button className="primary-button" onClick={saveBackToProject} type="button">保存当前文本回项目</button></div>
+        </div>
+      ) : null}
+      {projectMessage ? <StatusBanner tone="success" title="论文项目已更新">{projectMessage}</StatusBanner> : null}
       {pageError ? <StatusBanner tone="danger" title="分析未完成">{pageError} 原文和任务设置仍保存在此浏览器中，请检查服务状态、缩短输入或稍后重试。</StatusBanner> : null}
       {data.current.currentResult
         ? <ReviewWorkbench onStartNew={startNew} onUpdate={updateCurrent} workspace={data.current} />
