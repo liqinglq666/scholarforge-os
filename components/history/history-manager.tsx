@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { SECTION_LABELS, TASK_LABELS } from '@/lib/config';
 import { exportReviewReport } from '@/lib/exports/files';
+import { createHistoryEntry } from '@/lib/workspace/schema';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -18,26 +19,22 @@ export function HistoryManager() {
 
   function restore(id: string) {
     const entry = data.history.find((item) => item.id === id);
-    if (!entry || !window.confirm(`恢复“${entry.projectName}”会替换当前工作区。当前任务仍会保留在最近任务中。确定继续吗？`)) return;
+    if (!entry) return;
+    const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
+    const message = hasCurrentWork
+      ? `恢复“${entry.projectName}”会替换当前工作区。当前草稿或结果会先保存到最近任务。确定继续吗？`
+      : `恢复“${entry.projectName}”到当前工作区？`;
+    if (!window.confirm(message)) return;
+
+    const preservedCurrent = hasCurrentWork ? createHistoryEntry(data.current) : null;
+    const history = [
+      ...(preservedCurrent && preservedCurrent.id !== id ? [preservedCurrent] : []),
+      ...data.history.filter((item) => item.id !== id && item.id !== preservedCurrent?.id),
+    ].slice(0, 12);
     const next = {
       ...data,
       current: entry.workspace,
-      history: data.current.currentResult
-        ? [
-            {
-              id: data.current.currentResult.id,
-              projectName: data.current.draft.projectName || '未命名任务',
-              taskType: data.current.draft.taskType,
-              sectionType: data.current.draft.sectionType,
-              sourceCharacterCount: data.current.draft.sourceText.length,
-              issueCount: data.current.currentResult.issues.length,
-              resolvedIssueCount: data.current.currentResult.issues.filter((issue) => (data.current.decisions[issue.id] || 'pending') !== 'pending').length,
-              savedAt: new Date().toISOString(),
-              workspace: data.current,
-            },
-            ...data.history.filter((item) => item.id !== id && item.id !== data.current.currentResult?.id),
-          ].slice(0, 12)
-        : data.history,
+      history,
       updatedAt: new Date().toISOString(),
     };
     replaceData(next);
@@ -57,7 +54,7 @@ export function HistoryManager() {
     <div className="history-content">
       <div className="page-heading">
         <div><span className="eyebrow">本地历史</span><h1>恢复最近任务</h1></div>
-        <p>历史记录只保存在当前浏览器，最多 12 条。恢复前会保留当前已分析任务，不会静默覆盖。</p>
+        <p>历史记录只保存在当前浏览器，最多 12 条。恢复前会保存当前有内容的草稿或分析结果，不会静默覆盖。</p>
       </div>
       {data.history.length ? (
         <div className="history-list">
@@ -70,7 +67,7 @@ export function HistoryManager() {
                 <p>{entry.sourceCharacterCount.toLocaleString()} 字符 · {entry.issueCount} 条问题 · {pending} 条待处理 · {entry.workspace.appliedEdits.length} 条已应用</p>
                 <div className="history-actions">
                   <button className="primary-button" onClick={() => restore(entry.id)} type="button">恢复到工作台</button>
-                  <button onClick={() => exportReviewReport(entry.workspace)} type="button">导出报告</button>
+                  {entry.workspace.currentResult ? <button onClick={() => exportReviewReport(entry.workspace)} type="button">导出报告</button> : null}
                   <button className="danger-button" onClick={() => remove(entry.id)} type="button">删除</button>
                 </div>
               </article>
@@ -78,7 +75,7 @@ export function HistoryManager() {
           })}
         </div>
       ) : (
-        <div className="empty-state large"><strong>还没有已完成的任务</strong><p>完成一次分析后，结果和作者决定会出现在这里。</p><button className="primary-button" onClick={() => router.push('/workspace')} type="button">开始新任务</button></div>
+        <div className="empty-state large"><strong>还没有最近任务</strong><p>开始输入后可导出备份；完成一次分析后，结果和作者决定会出现在这里。</p><button className="primary-button" onClick={() => router.push('/workspace')} type="button">开始新任务</button></div>
       )}
     </div>
   );
