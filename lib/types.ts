@@ -12,12 +12,49 @@ export type SectionType =
 export type IssueSeverity = 'major' | 'minor' | 'suggestion';
 export type IssueDecision = 'pending' | 'accepted' | 'rejected' | 'deferred';
 export type WorkspaceStatus = 'draft' | 'analyzing' | 'reviewing' | 'error';
+export type AcademicStage = 'masters' | 'doctoral' | 'postgraduate' | 'researcher' | 'other';
+export type EnglishVariant = 'us' | 'uk';
+export type ExplanationLevel = 'brief' | 'balanced' | 'detailed';
 
 export interface TerminologyLock {
   id: string;
   source: string;
   preferred: string;
   note?: string;
+}
+
+export interface ChapterTemplateItem {
+  id: string;
+  title: string;
+  sectionType: SectionType;
+  taskType: TaskType;
+}
+
+export interface UserPreferences {
+  displayName: string;
+  discipline: string;
+  academicStage: AcademicStage;
+  englishVariant: EnglishVariant;
+  explanationLevel: ExplanationLevel;
+  defaultTaskType: TaskType;
+  defaultSectionType: SectionType;
+  defaultTargetJournal: string;
+  customWritingRules: TerminologyLock[];
+  chapterTemplate: ChapterTemplateItem[];
+  updatedAt: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  displayName?: string;
+}
+
+export interface AuthStatus {
+  configured: boolean;
+  authenticated: boolean;
+  user: AuthUser | null;
+  message: string;
 }
 
 export interface ImportedDocument {
@@ -200,6 +237,7 @@ export interface PersistedWorkspace {
   current: WorkspaceState;
   history: HistoryEntry[];
   project?: ManuscriptProject | null;
+  preferences: UserPreferences;
   updatedAt: string;
 }
 
@@ -210,6 +248,7 @@ export interface WorkspaceBackup {
   current: WorkspaceState;
   history: HistoryEntry[];
   project?: ManuscriptProject | null;
+  preferences: UserPreferences;
 }
 
 export interface ReviewRequest {
@@ -220,6 +259,10 @@ export interface ReviewRequest {
   targetJournal: string;
   text: string;
   terminologyLocks: TerminologyLock[];
+  discipline: string;
+  academicStage: AcademicStage;
+  englishVariant: EnglishVariant;
+  explanationLevel: ExplanationLevel;
 }
 
 export interface ReviewServiceStatus {

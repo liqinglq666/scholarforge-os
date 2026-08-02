@@ -6,6 +6,10 @@ import {
   MAX_SOURCE_CHARACTERS,
 } from '@/lib/config';
 import type {
+  AcademicStage,
+  ChapterTemplateItem,
+  EnglishVariant,
+  ExplanationLevel,
   HistoryEntry,
   ImportedDocument,
   IssueDecision,
@@ -24,6 +28,7 @@ import type {
   SupervisorFeedbackStatus,
   TaskType,
   TerminologyLock,
+  UserPreferences,
   WorkspaceBackup,
   WorkspaceDraft,
   WorkspaceState,
@@ -33,12 +38,17 @@ import { cleanSingleLine, cleanText, isRecord } from '@/lib/validation/common';
 const TASKS = new Set<TaskType>(['translate', 'polish', 'precheck']);
 const SECTIONS = new Set<SectionType>(['general', 'abstract', 'introduction', 'methods', 'results', 'discussion', 'conclusion']);
 const DECISIONS = new Set<IssueDecision>(['pending', 'accepted', 'rejected', 'deferred']);
+const ACADEMIC_STAGES = new Set<AcademicStage>(['masters', 'doctoral', 'postgraduate', 'researcher', 'other']);
+const ENGLISH_VARIANTS = new Set<EnglishVariant>(['us', 'uk']);
+const EXPLANATION_LEVELS = new Set<ExplanationLevel>(['brief', 'balanced', 'detailed']);
 const FEEDBACK_STATUSES = new Set<SupervisorFeedbackStatus>(['pending', 'in_progress', 'completed', 'needs_clarification', 'not_adopted']);
 const FEEDBACK_PRIORITIES = new Set<SupervisorFeedbackPriority>(['high', 'normal', 'low']);
 const REVISION_KINDS = new Set<RevisionChangeKind>(['added', 'removed', 'modified']);
 const REVISION_SOURCES = new Set<RevisionChangeSource>(['author', 'ai', 'supervisor', 'unknown']);
 const MAX_PROJECT_CHAPTERS = 12;
 const MAX_PROJECT_TERMS = 20;
+const MAX_CUSTOM_RULES = 30;
+const MAX_CHAPTER_TEMPLATE_ITEMS = 12;
 const MAX_SUPERVISOR_FEEDBACK = 120;
 const MAX_REVISION_COMPARISONS = 20;
 const MAX_REVISION_CHANGES = 300;
@@ -46,6 +56,33 @@ const MAX_REVISION_CHANGES = 300;
 function isoDate(value: unknown, fallback = new Date().toISOString()) {
   if (typeof value !== 'string') return fallback;
   return Number.isNaN(new Date(value).getTime()) ? fallback : value;
+}
+
+function createDefaultChapterTemplate(): ChapterTemplateItem[] {
+  return [
+    { id: crypto.randomUUID(), title: '摘要', sectionType: 'abstract', taskType: 'precheck' },
+    { id: crypto.randomUUID(), title: '引言', sectionType: 'introduction', taskType: 'polish' },
+    { id: crypto.randomUUID(), title: '方法', sectionType: 'methods', taskType: 'precheck' },
+    { id: crypto.randomUUID(), title: '结果', sectionType: 'results', taskType: 'precheck' },
+    { id: crypto.randomUUID(), title: '讨论', sectionType: 'discussion', taskType: 'polish' },
+    { id: crypto.randomUUID(), title: '结论', sectionType: 'conclusion', taskType: 'precheck' },
+  ];
+}
+
+export function createUserPreferences(overrides: Partial<UserPreferences> = {}): UserPreferences {
+  return {
+    displayName: overrides.displayName || '',
+    discipline: overrides.discipline || '',
+    academicStage: overrides.academicStage || 'masters',
+    englishVariant: overrides.englishVariant || 'us',
+    explanationLevel: overrides.explanationLevel || 'balanced',
+    defaultTaskType: overrides.defaultTaskType || 'polish',
+    defaultSectionType: overrides.defaultSectionType || 'general',
+    defaultTargetJournal: overrides.defaultTargetJournal || '',
+    customWritingRules: overrides.customWritingRules || [],
+    chapterTemplate: overrides.chapterTemplate?.length ? overrides.chapterTemplate : createDefaultChapterTemplate(),
+    updatedAt: overrides.updatedAt || new Date().toISOString(),
+  };
 }
 
 export function createDraft(overrides: Partial<WorkspaceDraft> = {}): WorkspaceDraft {
@@ -64,6 +101,19 @@ export function createDraft(overrides: Partial<WorkspaceDraft> = {}): WorkspaceD
     createdAt: overrides.createdAt || now,
     updatedAt: overrides.updatedAt || now,
   };
+}
+
+export function createDraftFromPreferences(
+  preferences: UserPreferences,
+  overrides: Partial<WorkspaceDraft> = {},
+): WorkspaceDraft {
+  return createDraft({
+    taskType: preferences.defaultTaskType,
+    sectionType: preferences.defaultSectionType,
+    targetJournal: preferences.defaultTargetJournal,
+    terminologyLocks: preferences.customWritingRules.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    ...overrides,
+  });
 }
 
 export function createManuscriptChapter(overrides: Partial<ManuscriptChapter> = {}): ManuscriptChapter {
@@ -144,7 +194,15 @@ export function createWorkspaceState(draft = createDraft()): WorkspaceState {
 }
 
 export function createPersistedWorkspace(): PersistedWorkspace {
-  return { version: 2, current: createWorkspaceState(), history: [], project: null, updatedAt: new Date().toISOString() };
+  const preferences = createUserPreferences();
+  return {
+    version: 2,
+    current: createWorkspaceState(createDraftFromPreferences(preferences)),
+    history: [],
+    project: null,
+    preferences,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function parseLocks(value: unknown, limit = 20): TerminologyLock[] {
@@ -159,6 +217,49 @@ function parseLocks(value: unknown, limit = 20): TerminologyLock[] {
     seen.add(key);
     const note = cleanSingleLine(item.note, 240);
     return [{ id: cleanSingleLine(item.id, 80) || `term-${index + 1}`, source, preferred, ...(note ? { note } : {}) }];
+  });
+}
+
+function parseChapterTemplate(value: unknown): ChapterTemplateItem[] {
+  if (!Array.isArray(value)) return createDefaultChapterTemplate();
+  const items = value.slice(0, MAX_CHAPTER_TEMPLATE_ITEMS).flatMap((item, index) => {
+    if (!isRecord(item)) return [];
+    const title = cleanSingleLine(item.title, 120);
+    if (!title) return [];
+    return [{
+      id: cleanSingleLine(item.id, 80) || `template-${index + 1}`,
+      title,
+      sectionType: SECTIONS.has(item.sectionType as SectionType) ? item.sectionType as SectionType : 'general',
+      taskType: TASKS.has(item.taskType as TaskType) ? item.taskType as TaskType : 'precheck',
+    }];
+  });
+  return items.length ? items : createDefaultChapterTemplate();
+}
+
+export function parseUserPreferences(value: unknown): UserPreferences {
+  if (!isRecord(value)) return createUserPreferences();
+  return createUserPreferences({
+    displayName: cleanSingleLine(value.displayName, 80),
+    discipline: cleanSingleLine(value.discipline, 100),
+    academicStage: ACADEMIC_STAGES.has(value.academicStage as AcademicStage)
+      ? value.academicStage as AcademicStage
+      : 'masters',
+    englishVariant: ENGLISH_VARIANTS.has(value.englishVariant as EnglishVariant)
+      ? value.englishVariant as EnglishVariant
+      : 'us',
+    explanationLevel: EXPLANATION_LEVELS.has(value.explanationLevel as ExplanationLevel)
+      ? value.explanationLevel as ExplanationLevel
+      : 'balanced',
+    defaultTaskType: TASKS.has(value.defaultTaskType as TaskType)
+      ? value.defaultTaskType as TaskType
+      : 'polish',
+    defaultSectionType: SECTIONS.has(value.defaultSectionType as SectionType)
+      ? value.defaultSectionType as SectionType
+      : 'general',
+    defaultTargetJournal: cleanSingleLine(value.defaultTargetJournal, 160),
+    customWritingRules: parseLocks(value.customWritingRules, MAX_CUSTOM_RULES),
+    chapterTemplate: parseChapterTemplate(value.chapterTemplate),
+    updatedAt: isoDate(value.updatedAt),
   });
 }
 
@@ -361,8 +462,6 @@ export function sanitizeWorkspaceState(value: unknown): WorkspaceState {
   const result = parseResult(value.currentResult, draft.id);
   const decisions = parseDecisions(value.decisions, result?.issues || []);
 
-  // Applied edit offsets and replacement text from imported JSON are never trusted. Only the
-  // referenced issue IDs are considered, and every edit is rebuilt from the current issue data.
   let workingText = draft.sourceText;
   const rebuiltEdits: WorkspaceState['appliedEdits'] = [];
   const requestedAppliedIds = new Set(
@@ -438,6 +537,7 @@ export function parsePersistedWorkspace(value: unknown): PersistedWorkspace {
     current: sanitizeWorkspaceState(value.current),
     history: parseHistory(value.history),
     project: parseProject(value.project),
+    preferences: parseUserPreferences(value.preferences),
     updatedAt: isoDate(value.updatedAt),
   };
 }
@@ -458,6 +558,7 @@ export function parseBackupText(text: string): WorkspaceBackup {
     current: raw.current,
     history: raw.history,
     project: raw.project,
+    preferences: raw.preferences,
     updatedAt: raw.exportedAt,
   });
   return {
@@ -467,6 +568,7 @@ export function parseBackupText(text: string): WorkspaceBackup {
     current: parsed.current,
     history: parsed.history,
     project: parsed.project || null,
+    preferences: parsed.preferences,
   };
 }
 
@@ -478,6 +580,7 @@ export function createBackup(data: PersistedWorkspace): WorkspaceBackup {
     current: sanitizeWorkspaceState(data.current),
     history: parseHistory(data.history),
     project: parseProject(data.project),
+    preferences: parseUserPreferences(data.preferences),
   };
 }
 
@@ -503,6 +606,7 @@ export function migrateLegacyWorkspace(storage: LegacyStorageReader): PersistedW
   const oldTask = legacyDraft.taskType;
   const taskType: TaskType = oldTask === 'translate' || oldTask === 'precheck' ? oldTask : 'polish';
   const sectionType = SECTIONS.has(legacyDraft.sectionType as SectionType) ? legacyDraft.sectionType as SectionType : 'general';
+  const preferences = createUserPreferences({ defaultTaskType: taskType, defaultSectionType: sectionType });
   const draft = createDraft({
     projectName: cleanSingleLine(legacyDraft.projectTitle, 120),
     taskType,
@@ -511,5 +615,12 @@ export function migrateLegacyWorkspace(storage: LegacyStorageReader): PersistedW
     sourceText: cleanText(legacyDraft.sourceText, MAX_SOURCE_CHARACTERS),
     terminologyLocks: parseLocks(legacyDraft.lockedTerms),
   });
-  return { version: 2, current: createWorkspaceState(draft), history: [], project: null, updatedAt: new Date().toISOString() };
+  return {
+    version: 2,
+    current: createWorkspaceState(draft),
+    history: [],
+    project: null,
+    preferences,
+    updatedAt: new Date().toISOString(),
+  };
 }

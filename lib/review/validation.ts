@@ -5,6 +5,9 @@ import {
   MIN_SOURCE_CHARACTERS,
 } from '@/lib/config';
 import type {
+  AcademicStage,
+  EnglishVariant,
+  ExplanationLevel,
   IssueSeverity,
   ReviewIssue,
   ReviewRequest,
@@ -18,6 +21,9 @@ import { cleanSingleLine, cleanText, hasDangerousPlaceholder, isRecord, uniqueSt
 const TASKS = new Set<TaskType>(['translate', 'polish', 'precheck']);
 const SECTIONS = new Set<SectionType>(['general', 'abstract', 'introduction', 'methods', 'results', 'discussion', 'conclusion']);
 const SEVERITIES = new Set<IssueSeverity>(['major', 'minor', 'suggestion']);
+const ACADEMIC_STAGES = new Set<AcademicStage>(['masters', 'doctoral', 'postgraduate', 'researcher', 'other']);
+const ENGLISH_VARIANTS = new Set<EnglishVariant>(['us', 'uk']);
+const EXPLANATION_LEVELS = new Set<ExplanationLevel>(['brief', 'balanced', 'detailed']);
 
 export class ValidationError extends Error {
   constructor(message: string, public readonly code: string, public readonly status = 400) {
@@ -63,6 +69,16 @@ export function parseReviewRequest(value: unknown): ReviewRequest {
     targetJournal: cleanSingleLine(value.targetJournal, 160),
     text,
     terminologyLocks: sanitizeTerminologyLocks(value.terminologyLocks),
+    discipline: cleanSingleLine(value.discipline, 100),
+    academicStage: ACADEMIC_STAGES.has(value.academicStage as AcademicStage)
+      ? value.academicStage as AcademicStage
+      : 'masters',
+    englishVariant: ENGLISH_VARIANTS.has(value.englishVariant as EnglishVariant)
+      ? value.englishVariant as EnglishVariant
+      : 'us',
+    explanationLevel: EXPLANATION_LEVELS.has(value.explanationLevel as ExplanationLevel)
+      ? value.explanationLevel as ExplanationLevel
+      : 'balanced',
   };
 }
 
