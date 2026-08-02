@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { AppFooter, AppHeader } from '@/components/app-shell/app-header';
 import './globals.css';
 import './workflow.css';
+import './examples.css';
 
 export const metadata: Metadata = {
   title: {
