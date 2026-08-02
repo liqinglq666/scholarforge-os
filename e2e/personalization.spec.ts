@@ -22,7 +22,7 @@ test('personal preferences create a tailored manuscript project', async ({ page 
   await page.getByRole('button', { name: '保存本地偏好' }).click();
   await expect(page.getByText('个性化偏好已保存到此浏览器')).toBeVisible();
 
-  await page.getByRole('link', { name: '项目', exact: true }).click();
+  await page.getByRole('link', { name: '论文项目', exact: true }).click();
   await page.getByRole('button', { name: '创建第一个项目' }).click();
   await expect(page.getByRole('button', { name: /Structured Abstract/ })).toBeVisible();
   await expect(page.getByLabel('目标期刊（可选）')).toHaveValue('Water Research');
