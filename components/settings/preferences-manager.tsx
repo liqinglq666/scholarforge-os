@@ -51,8 +51,10 @@ export function PreferencesManager() {
   const [ruleNote, setRuleNote] = useState('');
 
   useEffect(() => {
-    if (ready) setDraft(clonePreferences(data.preferences));
-  }, [ready]);
+    if (!ready) return;
+    const timer = window.setTimeout(() => setDraft(clonePreferences(data.preferences)), 0);
+    return () => window.clearTimeout(timer);
+  }, [data.preferences, ready]);
 
   useEffect(() => {
     fetch('/api/auth/session', { cache: 'no-store' })
