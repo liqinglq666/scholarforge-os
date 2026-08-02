@@ -26,4 +26,21 @@ describe('TaskSetup', () => {
     await userEvent.click(screen.getByText('科研中译英', { selector: 'b' }));
     expect(onChange).toHaveBeenCalledWith({ taskType: 'translate' });
   });
+
+  it('loads a complete example without sending it for analysis', async () => {
+    const onChange = vi.fn();
+    const onAnalyze = vi.fn();
+    render(<TaskSetup analyzing={false} draft={createDraft()} onAnalyze={onAnalyze} onChange={onChange} service={unavailable} serviceLoading={false} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /使用示例：材料与工程/ }));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      taskType: 'polish',
+      sectionType: 'results',
+      projectName: expect.stringContaining('孔结构'),
+      sourceText: expect.stringContaining('42.5 MPa'),
+    }));
+    expect(onAnalyze).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('示例已载入');
+  });
 });
