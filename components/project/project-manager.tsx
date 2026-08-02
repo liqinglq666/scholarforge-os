@@ -179,7 +179,7 @@ export function ProjectManager() {
         <span className="eyebrow">论文项目 · v2.3</span>
         <h1>从你的章节模板开始一篇新论文</h1>
         <p>新项目会使用个性化页面中的章节结构、目标期刊和术语规则。项目仍保存在当前浏览器，章节不会被自动发送给模型。</p>
-        <button className="primary-button" onClick={createProject} type="button">按我的模板创建论文项目</button>
+        <button className="primary-button" onClick={createProject} type="button">创建本地论文项目</button>
       </div>
     );
   }
