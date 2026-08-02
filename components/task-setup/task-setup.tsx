@@ -88,7 +88,7 @@ export function TaskSetup({
   }
 
   function loadExample(example: ResearchExample) {
-    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和任务设置。当前草稿已自动保存在此浏览器中，确定继续吗？')) return;
+    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和任务设置。未分析草稿不会进入最近任务，建议先复制文本或导出备份。确定继续吗？')) return;
     onChange({
       projectName: example.projectName,
       taskType: example.taskType,
