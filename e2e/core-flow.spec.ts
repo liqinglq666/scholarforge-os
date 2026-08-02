@@ -100,6 +100,41 @@ test('manuscript project manages chapters, checks consistency, and round-trips t
   await expect(page.getByText(/最近回写/)).toBeVisible();
 });
 
+test('supervisor feedback links to a saved version comparison and exports a revision report', async ({ page }) => {
+  await page.goto('/project');
+  await page.getByRole('button', { name: '创建本地论文项目' }).click();
+  await page.getByLabel('论文或课题名称').fill('Feedback thesis');
+  await page.getByLabel('章节名称').fill('Discussion');
+  await page.getByLabel('章节正文').fill('The results support the hypothesis. A possible mechanism is improved transport efficiency.');
+
+  await page.getByRole('link', { name: /导师意见/ }).click();
+  await page.getByLabel('批量导师意见').fill('1. 讨论部分需要解释可能机制。\n2. 请说明本研究的局限性。');
+  await page.getByRole('button', { name: '拆分并保存' }).click();
+  await expect(page.getByText(/已拆分并保存 2 条导师意见/)).toBeVisible();
+  await page.getByLabel('作者处理说明').first().fill('在 Discussion 第二句增加了可能机制解释。');
+  await page.getByLabel('处理状态').first().selectOption('completed');
+  await expect(page.getByText('作者标记已完成')).toBeVisible();
+
+  await page.getByRole('link', { name: /版本比较/ }).click();
+  await page.getByLabel('比较名称').fill('Discussion after supervisor feedback');
+  await page.getByLabel('关联章节').selectOption({ label: 'Discussion' });
+  await page.getByLabel('修改前版本').fill('The results support the hypothesis.');
+  await page.getByLabel('修改后版本').fill('The results support the hypothesis. A possible mechanism is improved transport efficiency.');
+  await page.getByRole('button', { name: '运行本地比较' }).click();
+  await expect(page.getByText('差异 1')).toBeVisible();
+  await page.getByLabel('关联导师意见').selectOption({ index: 1 });
+  await page.getByLabel('修改原因或处理说明').fill('根据导师意见补充机制解释。');
+  await page.getByRole('button', { name: '保存到论文项目' }).click();
+  await expect(page.getByText('版本比较已保存到论文项目。')).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出修改说明' }).click();
+  expect((await downloadPromise).suggestedFilename()).toContain('revision-report.md');
+
+  const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+});
+
 test('homepage examples switch disciplines and load a complete local draft', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('tab')).toHaveCount(6);
