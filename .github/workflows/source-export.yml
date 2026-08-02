@@ -14,10 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Archive source
-        run: tar --exclude=.git -czf scholarforge-source.tar.gz .
+        run: tar --exclude=.git -czf "$RUNNER_TEMP/scholarforge-source.tar.gz" .
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
           name: scholarforge-source
-          path: scholarforge-source.tar.gz
+          path: ${{ runner.temp }}/scholarforge-source.tar.gz
           retention-days: 1
