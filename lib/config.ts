@@ -1,7 +1,7 @@
 import type { SectionType, TaskType } from '@/lib/types';
 
 export const APP_NAME = 'ScholarForge OS';
-export const APP_VERSION = '2.3.0';
+export const APP_VERSION = '3.0.0';
 export const WORKSPACE_STORAGE_KEY = 'scholarforge.workspace.v2';
 export const LEGACY_DRAFT_KEY = 'scholarforge-os-paperlens-draft-v1';
 export const LEGACY_HISTORY_KEY = 'scholarforge-os-paperlens-history-v1';
@@ -10,7 +10,8 @@ export const MIN_SOURCE_CHARACTERS = 40;
 export const MAX_REQUEST_BYTES = 80_000;
 export const MAX_MODEL_OUTPUT_CHARACTERS = 100_000;
 export const MAX_HISTORY_ENTRIES = 12;
-export const MAX_BACKUP_BYTES = 2_000_000;
+export const MAX_PROJECTS = 12;
+export const MAX_BACKUP_BYTES = 8_000_000;
 export const MAX_DOCX_BYTES = 8_000_000;
 export const MAX_TERMINOLOGY_LOCKS = 20;
 export const MODEL_TIMEOUT_MS = 55_000;

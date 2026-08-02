@@ -37,7 +37,7 @@ describe('user personalization', () => {
         { id: 'one', source: 'micro plastic', preferred: 'microplastic' },
         { id: 'two', source: 'micro plastic', preferred: 'duplicate' },
       ],
-      chapterTemplate: [{ id: 'methods', title: 'Methods', sectionType: 'methods', taskType: 'precheck' }],
+      chapterTemplate: [{ id: 'methods', title: 'Methods', sectionType: 'methods' }],
     });
     expect(preferences.englishVariant).toBe('uk');
     expect(preferences.customWritingRules).toHaveLength(1);

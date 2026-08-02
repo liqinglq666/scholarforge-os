@@ -1,15 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { StatusBanner } from '@/components/feedback/status-banner';
+import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
-import { MAX_HISTORY_ENTRIES } from '@/lib/config';
+import { MAX_HISTORY_ENTRIES, TASK_LABELS } from '@/lib/config';
 import { findResearchExample } from '@/lib/examples';
+import { compareRevisionTexts } from '@/lib/project/revisions';
+import { getProject, upsertProject } from '@/lib/project/workspace';
 import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createDraft, createDraftFromPreferences, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
+import { createDraft, createDraftFromPreferences, createHistoryEntry, createRevisionComparison, createWorkspaceState } from '@/lib/workspace/schema';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
@@ -22,7 +26,8 @@ const STAGE_LABELS: Record<AnalysisStage, { title: string; description: string }
 const TASK_TYPES = new Set<TaskType>(['translate', 'polish', 'precheck']);
 const CLIENT_ANALYSIS_TIMEOUT_MS = 65_000;
 
-export function WorkspaceApp() {
+export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
+  const router = useRouter();
   const { data, ready, saveState, saveMessage, updateCurrent, replaceData, saveNow } = useWorkspace();
   const [service, setService] = useState<ReviewServiceStatus | null>(null);
   const [serviceLoading, setServiceLoading] = useState(true);
@@ -31,8 +36,9 @@ export function WorkspaceApp() {
   const [projectMessage, setProjectMessage] = useState('');
   const analysisControllerRef = useRef<AbortController | null>(null);
   const entryParamAppliedRef = useRef(false);
+  const routeProject = projectId ? getProject(data, projectId) : null;
   const linkedChapter = (() => {
-    const project = data.project;
+    const project = projectId ? routeProject : getProject(data, data.current.draft.linkedProjectId);
     const draft = data.current.draft;
     if (!project || draft.linkedProjectId !== project.id || !draft.linkedChapterId) return null;
     return project.chapters.find((chapter) => chapter.id === draft.linkedChapterId) || null;
@@ -59,7 +65,7 @@ export function WorkspaceApp() {
   }, []);
 
   useEffect(() => {
-    if (!ready || entryParamAppliedRef.current) return;
+    if (projectId || !ready || entryParamAppliedRef.current) return;
     entryParamAppliedRef.current = true;
     const params = new URLSearchParams(window.location.search);
     const requestedExample = findResearchExample(params.get('example'));
@@ -103,7 +109,7 @@ export function WorkspaceApp() {
       }));
     }
     if (requestedTask) window.history.replaceState(null, '', '/workspace');
-  }, [data, ready, replaceData, saveNow, updateCurrent]);
+  }, [data, projectId, ready, replaceData, saveNow, updateCurrent]);
 
   useEffect(() => () => analysisControllerRef.current?.abort(), []);
 
@@ -119,7 +125,7 @@ export function WorkspaceApp() {
   }
 
   function saveBackToProject() {
-    const project = data.project;
+    const project = getProject(data, data.current.draft.linkedProjectId || projectId);
     const chapterId = data.current.draft.linkedChapterId;
     if (!project || data.current.draft.linkedProjectId !== project.id || !chapterId) return;
     const chapter = project.chapters.find((item) => item.id === chapterId);
@@ -129,6 +135,26 @@ export function WorkspaceApp() {
     }
     const now = new Date().toISOString();
     const text = data.current.currentResult ? data.current.workingText : data.current.draft.sourceText;
+    const changes = chapter.text === text
+      ? []
+      : compareRevisionTexts(chapter.text, text).map((change) => ({
+          ...change,
+          source: data.current.currentResult ? 'ai' as const : 'author' as const,
+          reason: data.current.currentResult
+            ? `作者在“${TASK_LABELS[data.current.draft.taskType]}”流程中确认后保存。`
+            : '作者从项目审校页面保存了新文本。',
+        }));
+    const comparison = changes.length ? createRevisionComparison({
+      title: `${chapter.title} · ${TASK_LABELS[data.current.draft.taskType]} · ${new Date(now).toLocaleDateString('zh-CN')}`,
+      chapterId,
+      baseLabel: '保存前',
+      revisedLabel: '作者确认后',
+      baseText: chapter.text,
+      revisedText: text,
+      changes,
+      createdAt: now,
+      updatedAt: now,
+    }) : null;
     const nextProject = {
       ...project,
       activeChapterId: chapterId,
@@ -137,18 +163,22 @@ export function WorkspaceApp() {
             ...item,
             title: item.title || data.current.draft.projectName,
             sectionType: data.current.draft.sectionType,
-            taskType: data.current.draft.taskType,
             text,
             updatedAt: now,
-            lastReviewedAt: now,
+            lastReviewedAt: data.current.currentResult ? now : item.lastReviewedAt,
           }
         : item),
+      revisionComparisons: comparison
+        ? [comparison, ...project.revisionComparisons].slice(0, 20)
+        : project.revisionComparisons,
       updatedAt: now,
     };
-    const nextData = { ...data, project: nextProject, updatedAt: now };
+    const nextData = upsertProject(data, nextProject);
     replaceData(nextData);
     saveNow(nextData);
-    setProjectMessage(`已把当前${data.current.currentResult ? '作者工作稿' : '草稿'}保存回“${chapter.title}”。`);
+    setProjectMessage(comparison
+      ? `已保存回“${chapter.title}”，并自动生成一条版本记录。`
+      : `“${chapter.title}”没有文本变化，已更新审校时间。`);
   }
 
   async function analyze() {
@@ -250,15 +280,46 @@ export function WorkspaceApp() {
     saveNow(nextData);
     setPageError('');
     setProjectMessage('');
+    if (projectId) router.push(`/projects/${projectId}`);
   }
 
   if (!ready) {
     return <main className="shell page-main"><div className="loading-state" role="status"><span className="spinner" /><strong>正在恢复本地工作区</strong><p>不会上传任何文本。</p></div></main>;
   }
 
+
+  if (projectId && !routeProject) {
+    return (
+      <main className="shell page-main workspace-main">
+        <ProjectToolNav projectId={projectId} />
+        <div className="project-empty compact-empty">
+          <span className="eyebrow">项目不存在或已删除</span>
+          <h1>无法打开这个项目的审校</h1>
+          <p>当前链接指向的项目不在此浏览器中。返回项目列表选择可用项目。</p>
+          <Link className="primary-link" href="/projects">查看我的项目</Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (projectId && data.current.draft.linkedProjectId !== projectId) {
+    return (
+      <main className="shell page-main workspace-main">
+        <ProjectToolNav projectId={projectId} />
+        <div className="project-empty compact-empty">
+          <span className="eyebrow">当前项目 · 审校</span>
+          <h1>先从章节中选择本次处理内容</h1>
+          <p>任务类型属于一次审校操作，而不是章节的永久属性。返回章节列表，选择章节和本次要完成的任务。</p>
+          <Link className="primary-link" href={`/projects/${projectId}`}>选择项目章节</Link>
+        </div>
+      </main>
+    );
+  }
+
   if (analysisStage) {
     return (
-      <main className="shell page-main">
+      <main className="shell page-main workspace-main">
+        {projectId ? <ProjectToolNav projectId={projectId} /> : null}
         <div className="analysis-state" aria-live="polite">
           <span className="spinner large" />
           <span className="eyebrow">分析进行中</span>
@@ -276,11 +337,12 @@ export function WorkspaceApp() {
 
   return (
     <main className="shell page-main workspace-main">
+      {projectId ? <ProjectToolNav projectId={projectId} /> : null}
       <div className={`save-indicator save-${saveState}`} aria-live="polite"><span aria-hidden="true" />{saveMessage}</div>
       {linkedChapter ? (
         <div className="linked-project-banner">
           <div><strong>来自论文项目：{linkedChapter.title}</strong><span>工作台修改不会自动覆盖项目章节。完成核对后请明确保存回项目。</span></div>
-          <div className="linked-project-actions"><Link className="secondary-link" href="/project">返回论文项目</Link><button className="primary-button" onClick={saveBackToProject} type="button">保存当前文本回项目</button></div>
+          <div className="linked-project-actions"><Link className="secondary-link" href={`/projects/${data.current.draft.linkedProjectId}`}>返回项目</Link><button className="primary-button" onClick={saveBackToProject} type="button">保存当前文本回项目</button></div>
         </div>
       ) : null}
       {projectMessage ? <StatusBanner tone="success" title="论文项目已更新">{projectMessage}</StatusBanner> : null}

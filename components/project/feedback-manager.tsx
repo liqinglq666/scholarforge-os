@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
+import { getProject, upsertProject } from '@/lib/project/workspace';
 import { splitSupervisorFeedback } from '@/lib/project/feedback';
 import { exportSupervisorFeedback } from '@/lib/project/reports';
 import type {
@@ -28,13 +29,13 @@ const PRIORITY_LABELS: Record<SupervisorFeedbackPriority, string> = {
   low: '低优先级',
 };
 
-export function FeedbackManager() {
+export function FeedbackManager({ projectId }: { projectId: string }) {
   const { data, ready, saveState, saveMessage, replaceData } = useWorkspace();
   const [bulkText, setBulkText] = useState('');
   const [defaultChapterId, setDefaultChapterId] = useState('');
   const [filter, setFilter] = useState<'all' | SupervisorFeedbackStatus>('all');
   const [message, setMessage] = useState('');
-  const project = data.project || null;
+  const project = getProject(data, projectId);
 
   const visibleItems = useMemo(() => {
     if (!project) return [];
@@ -44,11 +45,7 @@ export function FeedbackManager() {
   }, [filter, project]);
 
   function commitProject(nextProject: ManuscriptProject) {
-    replaceData({
-      ...data,
-      project: { ...nextProject, updatedAt: new Date().toISOString() },
-      updatedAt: new Date().toISOString(),
-    });
+    replaceData(upsertProject(data, { ...nextProject, updatedAt: new Date().toISOString() }));
   }
 
   function addBulkFeedback() {
@@ -119,7 +116,7 @@ export function FeedbackManager() {
         <span className="eyebrow">导师意见处理器</span>
         <h1>先创建论文项目</h1>
         <p>导师意见需要关联论文项目和章节，才能形成可追踪的处理记录与修改说明。</p>
-        <Link className="primary-link" href="/project">创建论文项目</Link>
+        <Link className="primary-link" href="/projects">创建论文项目</Link>
       </div>
     );
   }
