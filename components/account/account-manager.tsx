@@ -25,7 +25,16 @@ export function AccountManager() {
     }
   }
 
-  useEffect(() => { void loadStatus(); }, []);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<AuthStatus>)
+      .then((payload) => { if (active) setStatus(payload); })
+      .catch(() => {
+        if (active) setStatus({ configured: false, authenticated: false, user: null, message: '暂时无法读取账户状态，仍可使用游客本地模式。' });
+      });
+    return () => { active = false; };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
