@@ -15,6 +15,17 @@ test('homepage presents one clear scientific-safety proposition', async ({ page 
   await expectNoHorizontalOverflow(page);
 });
 
+test('public evaluator entry loads a real quick-review case without sending it automatically', async ({ page }) => {
+  await page.goto('/try');
+  await expect(page.getByRole('heading', { name: '无需登录，直接体验核心功能' })).toBeVisible();
+  await page.getByRole('link', { name: '载入推荐案例并开始' }).click();
+
+  await expect(page).toHaveURL(/\/workspace$/);
+  await expect(page.getByLabel(/粘贴英文论文原文/)).toHaveValue(/Participants who slept less than 6 h/);
+  await expect(page.getByRole('radio', { name: /投稿前检查/ })).toBeChecked();
+  await expect(page.getByRole('button', { name: '开始分析' })).toBeEnabled();
+});
+
 test('global navigation exposes evaluation and product workspaces', async ({ page }) => {
   await page.goto('/');
   const primaryNavigation = page.getByRole('navigation', { name: '主要工作区' });
