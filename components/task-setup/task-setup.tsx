@@ -8,6 +8,7 @@ import {
   TASK_DESCRIPTIONS,
   TASK_LABELS,
 } from '@/lib/config';
+import { RESEARCH_EXAMPLES, type ResearchExample } from '@/lib/examples';
 import { extractDocx, type DocxImportResult } from '@/lib/documents/docx';
 import type { ReviewServiceStatus, TaskType, TerminologyLock, WorkspaceDraft } from '@/lib/types';
 import { StatusBanner } from '@/components/feedback/status-banner';
@@ -35,6 +36,7 @@ export function TaskSetup({
   const [importError, setImportError] = useState('');
   const [termSource, setTermSource] = useState('');
   const [termPreferred, setTermPreferred] = useState('');
+  const [loadedExampleId, setLoadedExampleId] = useState('');
 
   const textLength = draft.sourceText.length;
   const inputValid = textLength >= MIN_SOURCE_CHARACTERS && textLength <= MAX_SOURCE_CHARACTERS;
@@ -81,7 +83,24 @@ export function TaskSetup({
         warnings: importResult.warnings,
       },
     });
+    setLoadedExampleId('');
     setImportResult(null);
+  }
+
+  function loadExample(example: ResearchExample) {
+    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和任务设置。未分析草稿不会进入最近任务，建议先复制文本或导出备份。确定继续吗？')) return;
+    onChange({
+      projectName: example.projectName,
+      taskType: example.taskType,
+      sectionType: example.sectionType,
+      targetJournal: example.targetJournal,
+      sourceText: example.sourceText,
+      terminologyLocks: example.terminologyLocks.map((term) => ({ ...term })),
+      importedDocument: undefined,
+    });
+    setImportResult(null);
+    setImportError('');
+    setLoadedExampleId(example.id);
   }
 
   function addTerm() {
@@ -121,12 +140,36 @@ export function TaskSetup({
         </div>
       </section>
 
+      <section aria-labelledby="example-library-title" className="panel workspace-example-library">
+        <header>
+          <div><span className="eyebrow">可选</span><h2 id="example-library-title">用跨学科示例体验完整流程</h2></div>
+          <p>示例只会填入本地草稿，不会自动发送给模型。</p>
+        </header>
+        <div className="workspace-example-grid">
+          {RESEARCH_EXAMPLES.map((example) => (
+            <button
+              aria-label={`使用示例：${example.discipline}，${example.title}`}
+              className="workspace-example-card"
+              key={example.id}
+              onClick={() => loadExample(example)}
+              type="button"
+            >
+              <span>{example.discipline} · {TASK_LABELS[example.taskType]}</span>
+              <strong>{example.title}</strong>
+              <small>{example.focus}</small>
+              <b>载入此示例</b>
+            </button>
+          ))}
+        </div>
+        {loadedExampleId ? <p className="example-loaded-message" role="status">示例已载入。你可以直接修改文本和设置，再决定是否开始分析。</p> : null}
+      </section>
+
       <section aria-labelledby="source-title" className="panel input-panel">
         <div className="panel-heading"><div><span className="step-number">02</span><h2 id="source-title">输入材料</h2></div><p>支持粘贴文本或提取 DOCX 正文。</p></div>
         <div className="form-grid two-columns">
-          <label><span>项目名称</span><input maxLength={120} onChange={(event) => onChange({ projectName: event.target.value })} placeholder="例如：低场核磁共振论文 · Methods" value={draft.projectName} /></label>
+          <label><span>项目名称</span><input maxLength={120} onChange={(event) => onChange({ projectName: event.target.value })} placeholder="例如：硕士论文 · Methods" value={draft.projectName} /></label>
           <label><span>章节类型</span><select onChange={(event) => onChange({ sectionType: event.target.value as WorkspaceDraft['sectionType'] })} value={draft.sectionType}>{SECTION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="full-width"><span>目标期刊（可选，仅作写作语境，不验证期刊规则）</span><input maxLength={160} onChange={(event) => onChange({ targetJournal: event.target.value })} placeholder="例如：Construction and Building Materials" value={draft.targetJournal} /></label>
+          <label className="full-width"><span>目标期刊（可选，仅作写作语境，不验证期刊规则）</span><input maxLength={160} onChange={(event) => onChange({ targetJournal: event.target.value })} placeholder="例如：你的目标期刊名称" value={draft.targetJournal} /></label>
         </div>
 
         <div className="source-toolbar">
@@ -163,7 +206,10 @@ export function TaskSetup({
           <textarea
             aria-describedby="character-status"
             id="source-text"
-            onChange={(event) => onChange({ sourceText: event.target.value, importedDocument: undefined })}
+            onChange={(event) => {
+              setLoadedExampleId('');
+              onChange({ sourceText: event.target.value, importedDocument: undefined });
+            }}
             placeholder={draft.taskType === 'translate' ? '粘贴需要翻译的中文摘要、方法、结果或讨论段落…' : 'Paste the manuscript passage that needs careful review…'}
             spellCheck={draft.taskType !== 'translate'}
             value={draft.sourceText}
@@ -178,13 +224,13 @@ export function TaskSetup({
       <section aria-labelledby="terms-title" className="panel terms-panel">
         <div className="panel-heading"><div><span className="step-number">03</span><h2 id="terms-title">术语锁（可选）</h2></div><p>代码会验证建议稿是否使用指定表达。</p></div>
         <div className="term-entry">
-          <label><span>原词</span><input maxLength={120} onChange={(event) => setTermSource(event.target.value)} placeholder="低场核磁共振" value={termSource} /></label>
-          <label><span>指定表达</span><input maxLength={160} onChange={(event) => setTermPreferred(event.target.value)} placeholder="low-field nuclear magnetic resonance (LF-NMR)" value={termPreferred} /></label>
+          <label><span>原词</span><input maxLength={120} onChange={(event) => setTermSource(event.target.value)} placeholder="例如：学术写作自我效能" value={termSource} /></label>
+          <label><span>指定表达</span><input maxLength={160} onChange={(event) => setTermPreferred(event.target.value)} placeholder="例如：academic writing self-efficacy" value={termPreferred} /></label>
           <button disabled={!termSource.trim() || !termPreferred.trim() || draft.terminologyLocks.length >= 20} onClick={addTerm} type="button">添加术语</button>
         </div>
         {draft.terminologyLocks.length ? (
           <ul className="term-list">{draft.terminologyLocks.map((term) => <li key={term.id}><span><b>{term.source}</b><small>必须使用：{term.preferred}</small></span><button aria-label={`删除术语 ${term.source}`} onClick={() => onChange({ terminologyLocks: draft.terminologyLocks.filter((item) => item.id !== term.id) })} type="button">删除</button></li>)}</ul>
-        ) : <p className="empty-inline">尚未添加术语锁。常用材料名、缩写和样本编号适合锁定。</p>}
+        ) : <p className="empty-inline">尚未添加术语锁。常用材料名、缩写、变量名和量表名称适合锁定。</p>}
       </section>
 
       <div className="analysis-bar">

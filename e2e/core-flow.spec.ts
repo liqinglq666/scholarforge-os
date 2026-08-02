@@ -76,6 +76,19 @@ test('new task → analysis → author decision → apply → undo/redo → expo
   await expect(page.getByText(/0 条待处理/)).toBeVisible();
 });
 
+test('homepage examples switch disciplines and load a complete local draft', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('tab')).toHaveCount(6);
+  await page.getByRole('tab', { name: /环境与生态/ }).click();
+  await expect(page.getByRole('heading', { name: '中译英：保留数值和证据边界' })).toBeVisible();
+  await page.getByRole('link', { name: '在工作台使用此示例' }).click();
+
+  await expect(page.getByLabel('项目名称')).toHaveValue(/城市河流微塑料研究/);
+  await expect(page.getByLabel('中文科研原文')).toHaveValue(/共采集36个样品/);
+  await expect(page.getByRole('radio', { name: /科研中译英/ })).toBeChecked();
+  await expect(page.getByText('必须使用：microplastics')).toBeVisible();
+});
+
 test('unconfigured service is explicit and never offers analysis', async ({ page }) => {
   await page.unroute('**/api/health');
   await page.route('**/api/health', (route) => route.fulfill({
