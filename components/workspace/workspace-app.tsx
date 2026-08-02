@@ -6,6 +6,7 @@ import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { MAX_HISTORY_ENTRIES } from '@/lib/config';
+import { findResearchExample } from '@/lib/examples';
 import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, TaskType, WorkspaceDraft } from '@/lib/types';
 import { createDraft, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
 
@@ -27,7 +28,7 @@ export function WorkspaceApp() {
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null);
   const [pageError, setPageError] = useState('');
   const analysisControllerRef = useRef<AbortController | null>(null);
-  const taskParamAppliedRef = useRef(false);
+  const entryParamAppliedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -50,18 +51,50 @@ export function WorkspaceApp() {
   }, []);
 
   useEffect(() => {
-    if (!ready || taskParamAppliedRef.current) return;
-    taskParamAppliedRef.current = true;
-    const requestedTask = new URLSearchParams(window.location.search).get('task') as TaskType | null;
-    if (!requestedTask || !TASK_TYPES.has(requestedTask)) return;
-    if (!data.current.currentResult && !data.current.draft.sourceText.trim()) {
+    if (!ready || entryParamAppliedRef.current) return;
+    entryParamAppliedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const requestedExample = findResearchExample(params.get('example'));
+    const requestedTask = params.get('task') as TaskType | null;
+
+    if (requestedExample) {
+      const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
+      if (hasCurrentWork && !window.confirm('载入示例会开始一个新任务。当前已分析任务会保留在最近任务中，未分析草稿仍可通过浏览器自动保存恢复。确定继续吗？')) {
+        window.history.replaceState(null, '', '/workspace');
+        return;
+      }
+      const entry = data.current.currentResult ? createHistoryEntry(data.current) : null;
+      const history = entry
+        ? [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES)
+        : data.history;
+      const draft = createDraft({
+        projectName: requestedExample.projectName,
+        taskType: requestedExample.taskType,
+        sectionType: requestedExample.sectionType,
+        targetJournal: requestedExample.targetJournal,
+        sourceText: requestedExample.sourceText,
+        terminologyLocks: requestedExample.terminologyLocks.map((term) => ({ ...term })),
+      });
+      const nextData = {
+        version: 2 as const,
+        current: createWorkspaceState(draft),
+        history,
+        updatedAt: new Date().toISOString(),
+      };
+      replaceData(nextData);
+      saveNow(nextData);
+      window.history.replaceState(null, '', '/workspace');
+      return;
+    }
+
+    if (requestedTask && TASK_TYPES.has(requestedTask) && !data.current.currentResult && !data.current.draft.sourceText.trim()) {
       updateCurrent((current) => ({
         ...current,
         draft: { ...current.draft, taskType: requestedTask, updatedAt: new Date().toISOString() },
       }));
     }
-    window.history.replaceState(null, '', '/workspace');
-  }, [data, ready, updateCurrent]);
+    if (requestedTask) window.history.replaceState(null, '', '/workspace');
+  }, [data, ready, replaceData, saveNow, updateCurrent]);
 
   useEffect(() => () => analysisControllerRef.current?.abort(), []);
 
