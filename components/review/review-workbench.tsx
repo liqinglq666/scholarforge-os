@@ -6,6 +6,7 @@ import { analyzeIssueAnchor, applyIssueToWorkspace, redoWorkspace, removeApplied
 import { exportCleanDocx, exportReviewReport, exportWorkingText } from '@/lib/exports/files';
 import type { IssueDecision, IssueSeverity, ReviewIssue, WorkspaceState } from '@/lib/types';
 import { StatusBanner } from '@/components/feedback/status-banner';
+import { SafetyGatePanel } from '@/components/review/safety-gate-panel';
 
 type TextView = 'author' | 'suggested' | 'original';
 type DecisionFilter = 'all' | IssueDecision;
@@ -50,7 +51,7 @@ function IssueDetail({
       </div>
       <h2 id={`issue-title-${issue.id}`}>{issue.location}</h2>
       <div className="evidence-block original"><span>原文证据</span><p>{issue.original || '没有可定位的原文证据。'}</p></div>
-      <div className="evidence-block revised"><span>建议文本</span><p>{issue.revised || '这是一项作者待补信息，没有可直接应用的文本。'}</p></div>
+      <div className="evidence-block revised"><span>AI 候选修改</span><p>{issue.revised || '这是一项作者待补信息，没有可直接应用的文本。'}</p></div>
       <div className="reason-block"><span>为什么提出这条建议</span><p>{issue.reason}</p></div>
       <div className={issue.meaningChanged ? 'meaning-warning danger' : 'meaning-warning'}>
         <strong>{issue.meaningChanged ? '可能改变科学含义' : '未标记科学含义变化'}</strong>
@@ -65,7 +66,7 @@ function IssueDetail({
       </fieldset>
 
       <div className={applied || canApply ? 'apply-status safe' : 'apply-status blocked'}>
-        <strong>{applied ? '已应用到作者工作稿' : canApply ? '可以安全定位' : '不能自动应用'}</strong><span>{anchor.message}</span>
+        <strong>{applied ? '已应用到作者工作稿' : canApply ? '代码允许安全定位' : '已阻止自动应用'}</strong><span>{anchor.message}</span>
       </div>
       {applied ? (
         <button className="secondary-button full-button" onClick={onRemove} type="button">从作者工作稿撤回这一条</button>
@@ -133,13 +134,14 @@ export function ReviewWorkbench({
     setMessage('已从作者工作稿撤回这一条建议，作者决定仍保留为“接受”。');
   }
 
+  const candidateQuarantined = result.safetyGate?.status === 'quarantined';
   const displayedText = textView === 'original' ? workspace.draft.sourceText : textView === 'suggested' ? result.suggestedText : workspace.workingText;
 
   return (
     <div className="review-page">
       <div className="review-header">
         <div>
-          <span className="eyebrow">审校工作台 · 第 2 步，共 2 步</span>
+          <span className="eyebrow">审校工作台 · 作者控制阶段</span>
           <h1>{workspace.draft.projectName || '未命名任务'}</h1>
           <p>{TASK_LABELS[workspace.draft.taskType]} · {SECTION_LABELS[workspace.draft.sectionType]}{workspace.draft.targetJournal ? ` · ${workspace.draft.targetJournal}` : ''}</p>
         </div>
@@ -150,13 +152,21 @@ export function ReviewWorkbench({
         </div>
       </div>
 
-      <StatusBanner tone="warning" title="这是 AI 建议，不是最终科研结论">
-        数值与术语已通过确定性检查，但作者仍须核对事实、引用、统计结果、方法描述、因果边界和期刊要求。
-      </StatusBanner>
+      {candidateQuarantined ? (
+        <StatusBanner tone="danger" title="AI 候选稿已被安全门隔离">
+          系统发现候选稿违反科研事实硬性规则。作者工作稿保持原文不变，所有自动应用权限均已关闭；你仍可查看问题说明和隔离证据。
+        </StatusBanner>
+      ) : (
+        <StatusBanner tone="warning" title="通过代码检查不等于科学正确">
+          安全门只覆盖当前规则范围。作者仍须核对事实、引用、统计结果、方法描述、因果边界和期刊要求。
+        </StatusBanner>
+      )}
       {message ? <p className="live-message" role="status">{message}</p> : null}
 
+      <SafetyGatePanel report={result.safetyGate} />
+
       <section className="review-summary" aria-labelledby="summary-title">
-        <div><span className="eyebrow">分析摘要</span><h2 id="summary-title">{result.summary}</h2></div>
+        <div><span className="eyebrow">AI 分析摘要</span><h2 id="summary-title">{result.summary}</h2></div>
         <dl>
           <div><dt>问题</dt><dd>{result.issues.length}</dd></div>
           <div><dt>已处理</dt><dd>{processed}</dd></div>
@@ -168,15 +178,21 @@ export function ReviewWorkbench({
       <div className="workbench-grid">
         <section className="document-panel" aria-labelledby="document-title">
           <div className="document-toolbar">
-            <div><span className="eyebrow">文档视图</span><h2 id="document-title">{textView === 'author' ? '作者工作稿' : textView === 'suggested' ? 'AI 建议稿' : '原始文本'}</h2></div>
+            <div><span className="eyebrow">文档视图</span><h2 id="document-title">{textView === 'author' ? '作者工作稿' : textView === 'suggested' ? (candidateQuarantined ? '已隔离的 AI 候选稿' : 'AI 候选稿') : '原始文本'}</h2></div>
             <div className="segmented-control" role="tablist" aria-label="文本版本">
               <button aria-selected={textView === 'author'} onClick={() => setTextView('author')} role="tab" type="button">作者工作稿</button>
-              <button aria-selected={textView === 'suggested'} onClick={() => setTextView('suggested')} role="tab" type="button">AI 建议稿</button>
+              <button aria-selected={textView === 'suggested'} onClick={() => setTextView('suggested')} role="tab" type="button">AI 候选稿</button>
               <button aria-selected={textView === 'original'} onClick={() => setTextView('original')} role="tab" type="button">原文</button>
             </div>
           </div>
-          <div className="version-explanation">
-            {textView === 'author' ? '只包含作者逐条应用的安全修改，可撤销、重做和导出。' : textView === 'suggested' ? '模型生成的完整建议稿，仅供对照，不会自动覆盖作者工作稿。' : '分析时提交的只读原始文本，始终保留。'}
+          <div className={candidateQuarantined && textView === 'suggested' ? 'version-explanation quarantined' : 'version-explanation'}>
+            {textView === 'author'
+              ? '只包含作者逐条应用的安全修改，可撤销、重做和导出。'
+              : textView === 'suggested'
+                ? candidateQuarantined
+                  ? '该候选稿触发安全规则，仅供理解模型风险，不会覆盖作者工作稿，也不能自动应用。'
+                  : '模型生成的完整候选稿仅供对照，不会自动覆盖作者工作稿。'
+                : '分析时提交的只读原始文本，始终保留。'}
           </div>
           <pre className="manuscript-text" tabIndex={0}>{displayedText}</pre>
         </section>
@@ -209,7 +225,7 @@ export function ReviewWorkbench({
       </div>
 
       <section className="export-panel" aria-labelledby="export-title">
-        <div><span className="eyebrow">导出前复核</span><h2 id="export-title">保留作者决定和可恢复工作区</h2><p>{pending ? `仍有 ${pending} 条问题待处理。可以导出，但应在提交或发表前逐条核对。` : '所有问题都已有作者决定。仍需进行最终事实、引用和版式核对。'}</p></div>
+        <div><span className="eyebrow">导出前复核</span><h2 id="export-title">只导出作者确认后的工作稿</h2><p>{pending ? `仍有 ${pending} 条问题待处理。可以导出，但应在提交或发表前逐条核对。` : '所有问题都已有作者决定。仍需进行最终事实、引用和版式核对。'}</p></div>
         <div className="export-actions">
           <button onClick={() => exportWorkingText(workspace)} type="button">作者工作稿 TXT</button>
           <button onClick={() => exportReviewReport(workspace)} type="button">审校报告 Markdown</button>
