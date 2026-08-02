@@ -4,9 +4,11 @@ interface Bucket {
 }
 
 const WINDOW_MS = 10 * 60 * 1000;
-const REQUESTS_PER_WINDOW = 6;
-const MAX_CONCURRENT = 4;
-const buckets = new Map<string, Bucket>();
+const REQUESTS_PER_SESSION = 8;
+const REQUESTS_PER_IP = 40;
+const MAX_CONCURRENT = 6;
+const sessionBuckets = new Map<string, Bucket>();
+const ipBuckets = new Map<string, Bucket>();
 let activeRequests = 0;
 let budgetDay = new Date().toISOString().slice(0, 10);
 let dailyRequests = 0;
@@ -18,9 +20,14 @@ export interface RateLimitDecision {
   reason?: 'client' | 'concurrency' | 'budget';
 }
 
-function clientKey(request: Request) {
+function ipKey(request: Request) {
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return forwarded || request.headers.get('x-real-ip') || request.headers.get('x-scholarforge-session') || 'anonymous';
+  return forwarded || request.headers.get('x-real-ip') || 'anonymous-ip';
+}
+
+function sessionKey(request: Request) {
+  const value = request.headers.get('x-scholarforge-session')?.trim();
+  return value && /^[A-Za-z0-9_-]{8,100}$/.test(value) ? value : '';
 }
 
 function refreshBudgetDay(now: number) {
@@ -29,6 +36,21 @@ function refreshBudgetDay(now: number) {
     budgetDay = currentDay;
     dailyRequests = 0;
   }
+}
+
+function consumeBucket(map: Map<string, Bucket>, key: string, limit: number, now: number) {
+  const current = map.get(key);
+  const bucket = !current || current.resetAt <= now ? { count: 0, resetAt: now + WINDOW_MS } : current;
+  if (bucket.count >= limit) {
+    return {
+      allowed: false,
+      retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+      remaining: 0,
+    };
+  }
+  bucket.count += 1;
+  map.set(key, bucket);
+  return { allowed: true, retryAfter: 0, remaining: limit - bucket.count };
 }
 
 export function checkRateLimit(request: Request, now = Date.now()): RateLimitDecision {
@@ -41,22 +63,23 @@ export function checkRateLimit(request: Request, now = Date.now()): RateLimitDec
     return { allowed: false, retryAfter: 15, remaining: 0, reason: 'concurrency' };
   }
 
-  const key = clientKey(request);
-  const current = buckets.get(key);
-  const bucket = !current || current.resetAt <= now ? { count: 0, resetAt: now + WINDOW_MS } : current;
-  if (bucket.count >= REQUESTS_PER_WINDOW) {
-    return {
-      allowed: false,
-      retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
-      remaining: 0,
-      reason: 'client',
-    };
+  const session = sessionKey(request);
+  const sessionDecision = consumeBucket(
+    session ? sessionBuckets : ipBuckets,
+    session || ipKey(request),
+    REQUESTS_PER_SESSION,
+    now,
+  );
+  if (!sessionDecision.allowed) return { ...sessionDecision, reason: 'client' };
+
+  if (session) {
+    const ipDecision = consumeBucket(ipBuckets, ipKey(request), REQUESTS_PER_IP, now);
+    if (!ipDecision.allowed) return { ...ipDecision, reason: 'client' };
   }
-  bucket.count += 1;
-  buckets.set(key, bucket);
+
   dailyRequests += 1;
   activeRequests += 1;
-  return { allowed: true, retryAfter: 0, remaining: REQUESTS_PER_WINDOW - bucket.count };
+  return sessionDecision;
 }
 
 export function releaseRateLimitSlot() {
@@ -64,13 +87,15 @@ export function releaseRateLimitSlot() {
 }
 
 export const RATE_LIMITS = {
-  requestsPerWindow: REQUESTS_PER_WINDOW,
+  requestsPerWindow: REQUESTS_PER_SESSION,
   windowMinutes: WINDOW_MS / 60_000,
   maxConcurrent: MAX_CONCURRENT,
+  requestsPerIpWindow: REQUESTS_PER_IP,
 };
 
 export function resetRateLimitForTests() {
-  buckets.clear();
+  sessionBuckets.clear();
+  ipBuckets.clear();
   activeRequests = 0;
   dailyRequests = 0;
 }
