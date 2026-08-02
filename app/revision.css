@@ -1,0 +1,213 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.project-tool-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 30px;
+}
+.project-tool-nav a {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: var(--paper);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+.project-tool-nav a:hover,
+.project-tool-nav a.active {
+  border-color: #a8c9bd;
+  background: var(--brand-soft);
+}
+.project-tool-nav strong { font-family: Georgia, "Times New Roman", serif; font-size: 17px; }
+.project-tool-nav span { color: var(--muted); font-size: 12px; }
+
+.compact-empty { min-height: 440px; }
+.feedback-content,
+.version-content { position: relative; max-width: 1180px; margin-inline: auto; }
+
+.feedback-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.feedback-summary article {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.feedback-summary strong { font: 500 32px/1 Georgia, "Times New Roman", serif; }
+.feedback-summary span { margin-top: 7px; color: var(--muted); font-size: 12px; }
+
+.feedback-import > textarea {
+  width: 100%;
+  min-height: 170px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: white;
+  line-height: 1.7;
+}
+.feedback-import-actions {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 12px;
+}
+.feedback-import-actions label { flex: 1; max-width: 420px; display: flex; flex-direction: column; gap: 6px; }
+.feedback-import-actions label span,
+.feedback-fields label > span,
+.revision-change-fields label > span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.feedback-import-actions select,
+.feedback-toolbar select { min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding-inline: 11px; background: white; }
+
+.feedback-list-heading { align-items: flex-end; }
+.feedback-toolbar { display: flex; align-items: center; gap: 8px; }
+.feedback-toolbar button { min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding-inline: 14px; background: white; cursor: pointer; }
+.feedback-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.feedback-card {
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  padding: 20px;
+  background: white;
+}
+.feedback-card.feedback-status-pending { border-left-color: var(--minor); }
+.feedback-card.feedback-status-in_progress { border-left-color: var(--info); }
+.feedback-card.feedback-status-completed { border-left-color: var(--success); }
+.feedback-card.feedback-status-needs_clarification { border-left-color: #795aa6; }
+.feedback-card.feedback-status-not_adopted { border-left-color: var(--muted); }
+.feedback-card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.feedback-card-header > div { display: flex; align-items: center; gap: 9px; }
+.feedback-card-header span { border-radius: 999px; padding: 3px 9px; background: var(--canvas); color: var(--muted); font-size: 11px; font-weight: 800; }
+.feedback-card-header strong { font-family: Georgia, "Times New Roman", serif; }
+.feedback-card > label { display: flex; flex-direction: column; gap: 6px; }
+.feedback-card textarea,
+.feedback-fields input,
+.feedback-fields select,
+.feedback-fields textarea {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  background: white;
+}
+.feedback-card > label textarea { min-height: 94px; resize: vertical; font-family: Georgia, "Times New Roman", serif; line-height: 1.7; }
+.feedback-fields { margin-top: 14px; }
+.feedback-fields label { display: flex; flex-direction: column; gap: 6px; }
+.feedback-fields textarea { min-height: 110px; resize: vertical; }
+.feedback-card > small { display: block; margin-top: 12px; color: var(--muted); }
+.form-grid.three-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.revision-layout { display: grid; grid-template-columns: minmax(230px, 0.26fr) minmax(0, 0.74fr); align-items: start; gap: 16px; }
+.revision-saved {
+  position: sticky;
+  top: 90px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.revision-saved > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.revision-saved h2 { margin: 0; font-size: 20px; }
+.revision-saved > div button { min-height: 38px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: white; cursor: pointer; }
+.revision-saved > p { color: var(--muted); font-size: 13px; }
+.revision-saved ul { display: grid; gap: 7px; margin: 16px 0 0; padding: 0; list-style: none; }
+.revision-saved li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.revision-saved li > button:first-child { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 10px; background: transparent; text-align: left; cursor: pointer; }
+.revision-saved li > button:first-child:hover,
+.revision-saved li > button:first-child.selected { border-color: #bdd6cc; background: var(--brand-soft); }
+.revision-saved li strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.revision-saved li span { color: var(--muted); font-size: 11px; }
+.revision-saved .danger-button { min-height: 38px; padding-inline: 9px; }
+
+.revision-editor { min-width: 0; }
+.revision-editor .project-section:first-child { margin-top: 0; }
+.revision-text-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.revision-text-grid label { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.revision-text-grid label > span { color: var(--muted); font-size: 12px; font-weight: 750; }
+.revision-text-grid textarea { width: 100%; min-height: 330px; resize: vertical; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 14px; background: white; font-family: Georgia, "Times New Roman", serif; line-height: 1.75; }
+.revision-actions,
+.revision-save-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.revision-actions button,
+.revision-save-actions button { min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding-inline: 14px; background: white; cursor: pointer; font-weight: 700; }
+.revision-actions .primary-button,
+.revision-save-actions .primary-button { border-color: var(--brand); background: var(--brand); color: white; }
+
+.revision-result-heading { align-items: center; }
+.revision-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.revision-counts span { border-radius: 999px; padding: 4px 9px; background: var(--canvas); color: var(--muted); font-size: 11px; font-weight: 750; }
+.revision-change-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.revision-change { border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius-md); padding: 18px; background: white; }
+.revision-kind-added { border-left-color: var(--success); }
+.revision-kind-removed { border-left-color: var(--major); }
+.revision-kind-modified { border-left-color: var(--info); }
+.revision-change-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.revision-change-heading span { border-radius: 999px; padding: 3px 8px; background: var(--canvas); color: var(--muted); font-size: 11px; font-weight: 800; }
+.revision-change-heading strong { font-family: Georgia, "Times New Roman", serif; }
+.revision-fragment { margin-top: 8px; border-radius: var(--radius-sm); padding: 11px 13px; }
+.revision-fragment.before { background: var(--major-soft); }
+.revision-fragment.after { background: var(--success-soft); }
+.revision-fragment small { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.revision-fragment p { margin: 4px 0 0; font-family: Georgia, "Times New Roman", serif; line-height: 1.65; }
+.revision-change-fields { margin-top: 14px; }
+.revision-change-fields label { display: flex; flex-direction: column; gap: 6px; }
+.revision-change-fields select,
+.revision-change-fields textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 10px 11px; background: white; }
+.revision-change-fields textarea { min-height: 90px; resize: vertical; }
+
+@media (max-width: 960px) {
+  .feedback-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .revision-layout { grid-template-columns: 1fr; }
+  .revision-saved { position: static; }
+  .revision-saved ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-grid.three-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .project-tool-nav { grid-template-columns: 1fr; }
+  .project-tool-nav a { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .feedback-summary { grid-template-columns: 1fr 1fr; }
+  .feedback-import-actions,
+  .feedback-list-heading,
+  .feedback-toolbar,
+  .revision-result-heading { align-items: stretch; flex-direction: column; }
+  .feedback-import-actions label { max-width: none; }
+  .feedback-import-actions button,
+  .feedback-toolbar button,
+  .revision-actions button,
+  .revision-save-actions button { width: 100%; }
+  .form-grid.three-columns,
+  .revision-text-grid { grid-template-columns: 1fr; }
+  .revision-text-grid textarea { min-height: 260px; }
+  .revision-saved ul { grid-template-columns: 1fr; }
+  .revision-change { padding: 15px; }
+}
+
+@media (max-width: 430px) {
+  .feedback-summary { grid-template-columns: 1fr; }
+  .feedback-card-header { align-items: stretch; flex-direction: column; }
+  .feedback-card-header .danger-button { width: 100%; }
+  .project-tool-nav a { align-items: flex-start; flex-direction: column; }
+}
