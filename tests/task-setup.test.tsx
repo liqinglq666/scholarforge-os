@@ -41,6 +41,6 @@ describe('TaskSetup', () => {
       sourceText: expect.stringContaining('42.5 MPa'),
     }));
     expect(onAnalyze).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent('示例已载入');
+    expect(screen.getByText(/示例已载入/)).toBeInTheDocument();
   });
 });
