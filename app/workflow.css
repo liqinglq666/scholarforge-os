@@ -1,0 +1,37 @@
+.issue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue-list > li > button {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 15px;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-list > li:last-child > button {
+  border-bottom: 0;
+}
+
+.issue-list > li > button[aria-current="true"] {
+  background: var(--brand-soft);
+}
+
+.issue-list > li > button > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-state > .secondary-button {
+  margin-top: 22px;
+}
