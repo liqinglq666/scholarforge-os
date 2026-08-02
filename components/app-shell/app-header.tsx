@@ -10,6 +10,8 @@ const navigation = [
   { href: '/settings', label: '数据与设置' },
 ];
 
+const projectPaths = new Set(['/project', '/feedback', '/versions']);
+
 export function AppHeader() {
   const pathname = usePathname();
   return (
@@ -21,7 +23,7 @@ export function AppHeader() {
         </Link>
         <nav aria-label="主要导航">
           {navigation.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || (item.href === '/project' && projectPaths.has(pathname));
             return <Link aria-current={active ? 'page' : undefined} href={item.href} key={item.href} style={active ? { background: 'var(--brand-soft)', color: 'var(--brand-dark)' } : undefined}>{item.label}</Link>;
           })}
         </nav>
