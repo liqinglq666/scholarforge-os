@@ -20,7 +20,18 @@ jobs:
 
       - name: Rebuild and verify patch
         run: |
-          cat .github/refactor-binary/part-* > "$RUNNER_TEMP/refactor.patch.gz"
+          cat \
+            .github/refactor-binary/part-00 \
+            .github/refactor-binary/part-01 \
+            .github/refactor-binary/part-02 \
+            .github/refactor-binary/part-03 \
+            .github/refactor-binary/part-04 \
+            > "$RUNNER_TEMP/refactor.patch.gz"
+          cat .github/refactor-b64/part-05-* | base64 -d >> "$RUNNER_TEMP/refactor.patch.gz"
+          cat \
+            .github/refactor-binary/part-06 \
+            .github/refactor-binary/part-07 \
+            >> "$RUNNER_TEMP/refactor.patch.gz"
           gzip -dc "$RUNNER_TEMP/refactor.patch.gz" > "$RUNNER_TEMP/refactor.patch"
           echo 'ce717f9a6e197bf0c8aa7c35f174339fddfa229dabcbeeef79ad78487d096778  '"$RUNNER_TEMP/refactor.patch" | sha256sum -c -
           git apply --check "$RUNNER_TEMP/refactor.patch"
@@ -28,7 +39,7 @@ jobs:
       - name: Apply structural refactor
         run: |
           git apply "$RUNNER_TEMP/refactor.patch"
-          rm -rf .github/refactor-binary .github/patch .github/patch-text .github/refactor-patch
+          rm -rf .github/refactor-binary .github/refactor-b64 .github/patch .github/patch-text .github/refactor-patch
           rm -f .github/workflows/source-export.yml
 
       - name: Commit verified source
