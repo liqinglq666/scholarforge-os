@@ -6,6 +6,7 @@ import './examples.css';
 import './project.css';
 import './revision.css';
 import './preferences.css';
+import './login.css';
 
 export const metadata: Metadata = {
   title: {
