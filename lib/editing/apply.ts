@@ -100,13 +100,15 @@ function frameFrom(state: WorkspaceState): UndoFrame {
   return { workingText: state.workingText, appliedEdits: state.appliedEdits };
 }
 
-export function applyIssueToWorkspace(state: WorkspaceState, issue: ReviewIssue): WorkspaceState {
-  const analysis = analyzeIssueAnchor(state.workingText, issue, state.appliedEdits);
+function applyIssueWithoutHistory(
+  workingText: string,
+  appliedEdits: AppliedEdit[],
+  issue: ReviewIssue,
+): { workingText: string; appliedEdits: AppliedEdit[] } | null {
+  const analysis = analyzeIssueAnchor(workingText, issue, appliedEdits);
   if ((analysis.state !== 'safe-exact' && analysis.state !== 'safe-whitespace')
     || analysis.start === undefined
-    || analysis.end === undefined) {
-    throw new Error(analysis.message);
-  }
+    || analysis.end === undefined) return null;
 
   const edit: AppliedEdit = {
     id: crypto.randomUUID(),
@@ -117,12 +119,47 @@ export function applyIssueToWorkspace(state: WorkspaceState, issue: ReviewIssue)
     revised: issue.revised,
     appliedAt: new Date().toISOString(),
   };
+  return {
+    workingText: `${workingText.slice(0, analysis.start)}${issue.revised}${workingText.slice(analysis.end)}`,
+    appliedEdits: [...appliedEdits, edit],
+  };
+}
+
+export function applyIssueToWorkspace(state: WorkspaceState, issue: ReviewIssue): WorkspaceState {
+  const next = applyIssueWithoutHistory(state.workingText, state.appliedEdits, issue);
+  if (!next) {
+    throw new Error(analyzeIssueAnchor(state.workingText, issue, state.appliedEdits).message);
+  }
 
   return {
     ...state,
-    workingText: `${state.workingText.slice(0, analysis.start)}${issue.revised}${state.workingText.slice(analysis.end)}`,
-    appliedEdits: [...state.appliedEdits, edit],
+    ...next,
     decisions: { ...state.decisions, [issue.id]: 'accepted' },
+    undoStack: [...state.undoStack.slice(-24), frameFrom(state)],
+    redoStack: [],
+  };
+}
+
+export function removeAppliedIssueFromWorkspace(state: WorkspaceState, issueId: string): WorkspaceState {
+  if (!state.appliedEdits.some((edit) => edit.issueId === issueId)) return state;
+  const issues = new Map((state.currentResult?.issues || []).map((issue) => [issue.id, issue]));
+  const retainedIssueIds = state.appliedEdits.map((edit) => edit.issueId).filter((id) => id !== issueId);
+  let workingText = state.draft.sourceText;
+  let appliedEdits: AppliedEdit[] = [];
+
+  for (const retainedId of retainedIssueIds) {
+    const issue = issues.get(retainedId);
+    if (!issue) continue;
+    const replayed = applyIssueWithoutHistory(workingText, appliedEdits, issue);
+    if (!replayed) continue;
+    workingText = replayed.workingText;
+    appliedEdits = replayed.appliedEdits;
+  }
+
+  return {
+    ...state,
+    workingText,
+    appliedEdits,
     undoStack: [...state.undoStack.slice(-24), frameFrom(state)],
     redoStack: [],
   };
