@@ -24,16 +24,15 @@ function isActivePath(pathname: string, href: string) {
 
 export function AppHeader() {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => setMobileOpen(false), [pathname]);
+  const [mobileOpenPath, setMobileOpenPath] = useState<string | null>(null);
+  const mobileOpen = mobileOpenPath === pathname;
 
   useEffect(() => {
     if (!mobileOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileOpen(false);
+      if (event.key === 'Escape') setMobileOpenPath(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -87,7 +86,7 @@ export function AppHeader() {
           aria-expanded={mobileOpen}
           aria-label={mobileOpen ? '关闭导航菜单' : '打开导航菜单'}
           className={mobileOpen ? 'mobile-menu-toggle open' : 'mobile-menu-toggle'}
-          onClick={() => setMobileOpen((value) => !value)}
+          onClick={() => setMobileOpenPath(mobileOpen ? null : pathname)}
           type="button"
         >
           <span />
@@ -98,11 +97,11 @@ export function AppHeader() {
 
       {mobileOpen ? (
         <div className="mobile-navigation-layer" id="mobile-navigation">
-          <button aria-label="关闭导航菜单" className="mobile-navigation-backdrop" onClick={() => setMobileOpen(false)} type="button" />
+          <button aria-label="关闭导航菜单" className="mobile-navigation-backdrop" onClick={() => setMobileOpenPath(null)} type="button" />
           <div aria-modal="true" className="mobile-navigation-drawer" role="dialog">
             <div className="mobile-navigation-heading">
               <div><strong>ScholarForge</strong><span>选择下一步</span></div>
-              <button aria-label="关闭导航菜单" onClick={() => setMobileOpen(false)} type="button">关闭</button>
+              <button aria-label="关闭导航菜单" onClick={() => setMobileOpenPath(null)} type="button">关闭</button>
             </div>
             <nav aria-label="开始使用" className="mobile-primary-links">
               <span>开始使用</span>
