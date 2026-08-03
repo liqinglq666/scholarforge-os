@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { AccountMenu } from '@/components/account/account-menu';
 
 const primaryNavigation = [
   { href: '/try', label: '直接体验' },
   { href: '/projects', label: '论文项目' },
   { href: '/workspace', label: '快速审校' },
+  { href: '/trust', label: '安全说明' },
 ];
 
-const utilityNavigation = [
-  { href: '/trust', label: '安全与测试' },
+const secondaryNavigation = [
   { href: '/guide', label: '使用手册' },
   { href: '/settings', label: '数据与隐私' },
 ];
@@ -23,6 +24,23 @@ function isActivePath(pathname: string, href: string) {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => setMobileOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileOpen]);
 
   return (
     <header className="app-header">
@@ -31,29 +49,77 @@ export function AppHeader() {
           <span aria-hidden="true" className="brand-mark">SF</span>
           <span className="brand-copy">
             <b>ScholarForge</b>
-            <small>科研事实安全审校工作台</small>
+            <small>科研事实安全审校</small>
           </span>
         </Link>
 
-        <div className="header-actions">
+        <div className="desktop-navigation">
           <nav aria-label="主要工作区" className="primary-nav">
             {primaryNavigation.map((item) => {
               const active = isActivePath(pathname, item.href);
-              return <Link aria-current={active ? 'page' : undefined} className={active ? 'nav-link active' : 'nav-link'} href={item.href} key={item.href}>{item.label}</Link>;
+              return (
+                <Link
+                  aria-current={active ? 'page' : undefined}
+                  className={active ? 'nav-link active' : 'nav-link'}
+                  href={item.href}
+                  key={item.href}
+                >
+                  {item.label}
+                </Link>
+              );
             })}
           </nav>
+          <details className="header-more">
+            <summary aria-label="打开更多导航">更多</summary>
+            <div className="header-more-panel">
+              <nav aria-label="帮助与设置">
+                {secondaryNavigation.map((item) => (
+                  <Link aria-current={isActivePath(pathname, item.href) ? 'page' : undefined} href={item.href} key={item.href}>{item.label}</Link>
+                ))}
+              </nav>
+              <AccountMenu />
+            </div>
+          </details>
+        </div>
 
-          <div className="utility-navigation">
-            <nav aria-label="帮助与设置" className="utility-nav">
-              {utilityNavigation.map((item) => {
-                const active = isActivePath(pathname, item.href);
-                return <Link aria-current={active ? 'page' : undefined} className={active ? 'nav-link active' : 'nav-link'} href={item.href} key={item.href}>{item.label}</Link>;
-              })}
+        <button
+          aria-controls="mobile-navigation"
+          aria-expanded={mobileOpen}
+          aria-label={mobileOpen ? '关闭导航菜单' : '打开导航菜单'}
+          className={mobileOpen ? 'mobile-menu-toggle open' : 'mobile-menu-toggle'}
+          onClick={() => setMobileOpen((value) => !value)}
+          type="button"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </div>
+
+      {mobileOpen ? (
+        <div className="mobile-navigation-layer" id="mobile-navigation">
+          <button aria-label="关闭导航菜单" className="mobile-navigation-backdrop" onClick={() => setMobileOpen(false)} type="button" />
+          <div aria-modal="true" className="mobile-navigation-drawer" role="dialog">
+            <div className="mobile-navigation-heading">
+              <div><strong>ScholarForge</strong><span>选择下一步</span></div>
+              <button aria-label="关闭导航菜单" onClick={() => setMobileOpen(false)} type="button">关闭</button>
+            </div>
+            <nav aria-label="开始使用" className="mobile-primary-links">
+              <span>开始使用</span>
+              {primaryNavigation.map((item) => (
+                <Link aria-current={isActivePath(pathname, item.href) ? 'page' : undefined} href={item.href} key={item.href}>{item.label}</Link>
+              ))}
             </nav>
-            <AccountMenu />
+            <div className="mobile-secondary-links">
+              <span>帮助与账户</span>
+              {secondaryNavigation.map((item) => (
+                <Link aria-current={isActivePath(pathname, item.href) ? 'page' : undefined} href={item.href} key={item.href}>{item.label}</Link>
+              ))}
+              <AccountMenu />
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </header>
   );
 }
@@ -64,11 +130,11 @@ export function AppFooter() {
       <div className="shell footer-inner">
         <div className="footer-message">
           <span aria-hidden="true" className="footer-mark">SF</span>
-          <p><strong>阻止高风险 AI 修改直接进入论文。</strong><span>模型提出候选，代码检查风险，作者决定最终文本。</span></p>
+          <p><strong>让 AI 修改先通过科研事实安全门。</strong><span>模型提出候选，代码检查风险，作者决定最终文本。</span></p>
         </div>
         <nav aria-label="页脚导航">
           <Link href="/try">直接体验</Link>
-          <Link href="/trust">安全与测试</Link>
+          <Link href="/trust">安全说明</Link>
           <Link href="/guide">使用手册</Link>
           <Link href="/settings">数据与隐私</Link>
           <a href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">GitHub</a>

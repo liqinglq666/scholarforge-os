@@ -1,68 +1,69 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { TryServiceStatus } from '@/components/try/service-status';
 
 export const metadata: Metadata = {
   title: '直接体验',
-  description: '无需登录，使用公开科研案例体验真实 AI 审校、科研事实安全门和作者逐条决策。',
+  description: '无需登录，使用公开合成科研案例体验真实 AI 审校、科研事实安全门和作者逐条决策。',
 };
 
-const steps = [
-  {
-    title: '载入公开科研案例',
-    description: '推荐案例来自生命医学讨论段，包含横断面研究中常见的因果表达风险。',
-  },
-  {
-    title: '确认后调用真实模型',
-    description: '页面会明确列出发送内容。只有点击确认后，案例文本才会发送到服务端模型。',
-  },
-  {
-    title: '查看安全门逐项证据',
-    description: '检查数字、单位、引用、术语、实验声明、因果边界、结论强度和研究范围。',
-  },
-  {
-    title: '形成作者工作稿',
-    description: '接受、拒绝或暂缓每条建议；只有代码允许的局部建议才能自动应用。',
-  },
+const observations = [
+  ['因果边界', '横断面研究中的“相关”不能被改写为“导致”。'],
+  ['研究范围', '特定样本的结果不能被扩大为所有大学生。'],
 ];
 
 export default function TryPage() {
   return (
-    <main className="shell page-main experience-page" id="main-content">
-      <section className="experience-hero">
-        <div>
-          <span className="eyebrow">公开体验入口</span>
-          <h1>无需登录，直接体验核心功能</h1>
-          <p>这是正式产品的公开体验路径，不是预录演示。案例会先填入浏览器本地草稿，由你主动确认后调用真实阿里云百炼模型。</p>
-          <div className="competition-actions">
-            <Link className="primary-link" href="/workspace?example=biomed-precheck">载入推荐案例并开始</Link>
+    <main className="shell page-main try-page" id="main-content">
+      <section className="try-hero">
+        <div className="try-copy">
+          <span className="product-label">评委快速开始</span>
+          <h1>用一个公开案例体验核心安全流程</h1>
+          <p>案例会先载入当前浏览器草稿。你可以检查文本和设置，确认后再调用模型分析。</p>
+          <TryServiceStatus />
+          <div className="editorial-actions">
+            <Link className="primary-link" href="/workspace?example=biomed-precheck">载入案例并开始</Link>
             <Link className="secondary-link" href="/workspace">使用自己的文本</Link>
           </div>
+          <dl className="try-facts">
+            <div><dt>账号</dt><dd>不需要</dd></div>
+            <div><dt>API Key</dt><dd>不需要填写</dd></div>
+            <div><dt>体验步骤</dt><dd>4 步</dd></div>
+            <div><dt>案例数据</dt><dd>公开合成文本</dd></div>
+          </dl>
         </div>
-        <div className="experience-meta" aria-label="体验条件">
-          <article><strong>登录要求</strong><span>不需要账号，可全程使用游客模式</span></article>
-          <article><strong>模型密钥</strong><span>由服务端安全配置，体验者无需填写</span></article>
-          <article><strong>预计操作</strong><span>4 个步骤，可独立完成</span></article>
-          <article><strong>数据范围</strong><span>推荐案例是公开合成科研文本</span></article>
-        </div>
+
+        <article className="case-preview">
+          <header><span>推荐案例</span><strong>生命医学 · Discussion</strong></header>
+          <div className="case-preview-meta"><span>投稿前检查</span><span>横断面研究</span></div>
+          <blockquote>
+            Participants who slept less than 6 h had higher anxiety scores. Because the study was cross-sectional, temporal ordering could not be established, and the findings should not be interpreted as evidence of causation.
+          </blockquote>
+          <div className="case-observations">
+            {observations.map(([title, description]) => (
+              <section key={title}><span aria-hidden="true">!</span><div><strong>{title}</strong><p>{description}</p></div></section>
+            ))}
+          </div>
+          <footer><span>重点观察</span><strong>AI 候选是否改变证据边界</strong></footer>
+        </article>
       </section>
 
-      <section className="experience-flow" aria-label="推荐体验步骤">
-        {steps.map((step, index) => (
-          <article key={step.title}><b>0{index + 1}</b><strong>{step.title}</strong><p>{step.description}</p></article>
-        ))}
+      <section className="try-process" aria-labelledby="try-process-title">
+        <div className="section-intro compact-intro">
+          <span className="product-label">体验路径</span>
+          <h2 id="try-process-title">每一步都由体验者主动确认</h2>
+        </div>
+        <ol>
+          <li><span>01</span><div><strong>载入草稿</strong><p>公开案例只写入浏览器本地工作区。</p></div></li>
+          <li><span>02</span><div><strong>确认发送</strong><p>页面列出正文、任务和术语规则后再请求模型。</p></div></li>
+          <li><span>03</span><div><strong>查看安全证据</strong><p>先判断候选稿是否被隔离，再处理问题。</p></div></li>
+          <li><span>04</span><div><strong>形成作者稿</strong><p>接受、拒绝、应用、撤销并导出。</p></div></li>
+        </ol>
       </section>
 
-      <section className="competition-section" aria-labelledby="experience-observe-title">
-        <div className="competition-section-heading">
-          <div><span className="eyebrow">建议重点观察</span><h2 id="experience-observe-title">评估的不是“文案更漂亮”，而是修改是否仍忠实于证据</h2></div>
-          <p>推荐案例中，研究为横断面设计。系统应提醒作者不能从相关关系直接推断因果，也不能把特定样本扩大为所有大学生。</p>
-        </div>
-        <div className="competition-feature-grid">
-          <article><span>因果边界</span><h3>相关不等于因果</h3><p>观察系统如何处理 “causes” 与 “was associated with” 的差异。</p></article>
-          <article><span>研究范围</span><h3>样本不等于所有人群</h3><p>观察系统是否保留样本、研究设计和外推限制。</p></article>
-          <article><span>作者权限</span><h3>候选稿不会静默覆盖</h3><p>确认 AI 候选稿不会自动覆盖作者工作稿。</p></article>
-          <article><span>修改追踪</span><h3>每一步都可以核对</h3><p>体验逐条决定、安全应用、撤回、撤销和导出。</p></article>
-        </div>
+      <section className="try-boundary-note">
+        <div><strong>安全门通过仍需作者核对</strong><p>系统不验证原始数据、统计方法、参考文献内容、伦理合规或期刊最新规则。</p></div>
+        <Link className="text-link" href="/trust">查看完整安全边界 →</Link>
       </section>
     </main>
   );
