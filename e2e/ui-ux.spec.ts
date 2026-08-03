@@ -7,11 +7,12 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
 
 test('homepage presents one clear scientific-safety proposition', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.competition-hero h1')).toContainText('ScholarForge 阻止 AI 改错论文');
+  await expect(page.locator('.competition-hero h1')).toContainText('ScholarForge 阻止高风险修改直接进入论文');
   await expect(page.getByRole('link', { name: '立即体验科研事实安全审校' })).toBeVisible();
   await expect(page.getByRole('link', { name: '进入完整论文工作台' })).toBeVisible();
   await expect(page.locator('.risk-findings li')).toHaveCount(3);
-  await expect(page.getByText('候选稿已隔离')).toBeVisible();
+  await expect(page.locator('.risk-findings li.protected')).toContainText('作者工作稿保持原文');
+  await expect(page.getByText('安全门已成功阻断')).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -38,15 +39,21 @@ test('public evaluator entry loads a real quick-review case without sending it a
 test('global navigation exposes evaluation and product workspaces', async ({ page }) => {
   await page.goto('/');
   const primaryNavigation = page.getByRole('navigation', { name: '主要工作区' });
-  const utilityNavigation = page.getByRole('navigation', { name: '帮助与设置' });
+  const utilityNavigation = page.locator('nav[aria-label="帮助与设置"]');
+  const mobile = (page.viewportSize()?.width ?? 0) <= 720;
 
   await expect(primaryNavigation.getByRole('link', { name: '直接体验', exact: true })).toBeVisible();
   await expect(primaryNavigation.getByRole('link', { name: '论文项目', exact: true })).toBeVisible();
   await expect(primaryNavigation.getByRole('link', { name: '快速审校', exact: true })).toBeVisible();
   await expect(primaryNavigation.getByRole('link')).toHaveCount(3);
-  await expect(utilityNavigation.getByRole('link', { name: '安全与测试', exact: true })).toBeVisible();
-  await expect(utilityNavigation.getByRole('link', { name: '使用手册', exact: true })).toBeVisible();
-  await expect(utilityNavigation.getByRole('link', { name: '数据与隐私', exact: true })).toBeVisible();
+
+  if (mobile) {
+    await expect(utilityNavigation).toBeHidden();
+  } else {
+    await expect(utilityNavigation.getByRole('link', { name: '安全与测试', exact: true })).toBeVisible();
+    await expect(utilityNavigation.getByRole('link', { name: '使用手册', exact: true })).toBeVisible();
+    await expect(utilityNavigation.getByRole('link', { name: '数据与隐私', exact: true })).toBeVisible();
+  }
 
   await primaryNavigation.getByRole('link', { name: '论文项目', exact: true }).click();
   await expect(page).toHaveURL(/\/projects$/);

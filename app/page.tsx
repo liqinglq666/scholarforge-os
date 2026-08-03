@@ -24,22 +24,22 @@ const layers = [
 
 const features = [
   {
-    label: 'DETERMINISTIC',
+    label: '代码裁决',
     title: '模型不能给自己颁发安全许可',
     description: 'safeToApply 由代码重新计算。模型只能提出候选，不能决定某条修改是否可以进入作者工作稿。',
   },
   {
-    label: 'QUARANTINE',
+    label: '隔离机制',
     title: '危险候选不会变成一次普通报错',
     description: '若数字、单位、引用或主张边界发生变化，系统保留原文并展示隔离证据，让作者看见 AI 哪里出了问题。',
   },
   {
-    label: 'ANCHORING',
+    label: '文本锚点',
     title: '每条修改都要重新定位',
     description: '应用前检查原文是否仍然唯一存在，避免在文本已变化后把建议错贴到其他位置。',
   },
   {
-    label: 'LOCAL FIRST',
+    label: '本地优先',
     title: '论文项目默认保存在浏览器',
     description: '原始 DOCX 不上传；只有作者确认分析后，当前选择的文本与设置才会发送到模型服务。',
   },
@@ -52,20 +52,20 @@ export default function Home() {
         <div className="shell competition-hero-grid">
           <div className="competition-copy">
             <div className="competition-kicker">
-              <span>Scientific Fact Safety</span>
-              <span>Author-controlled AI</span>
-              <span>Built with Alibaba Cloud Model Studio</span>
+              <span>科研事实安全</span>
+              <span>作者控制</span>
+              <span>阿里云百炼</span>
             </div>
-            <h1>普通 AI 帮你改论文，<span>ScholarForge 阻止 AI 改错论文。</span></h1>
-            <p>为科研论文增加一道独立安全门。代码检查数值、单位、引用、术语、因果关系、结论强度和研究范围；AI 只提建议，最终文本始终由作者决定。</p>
+            <h1>普通 AI 帮你改论文，<span>ScholarForge 阻止高风险修改直接进入论文。</span></h1>
+            <p>在 AI 候选进入作者工作稿之前，代码独立检查数值、单位、引用、术语、因果关系、结论强度和研究范围。AI 只提建议，最终文本始终由作者决定。</p>
             <div className="competition-actions">
               <Link className="primary-link" href="/try">立即体验科研事实安全审校</Link>
               <Link className="secondary-link" href="/projects">进入完整论文工作台</Link>
             </div>
             <div className="competition-note">
               <span>无需登录</span>
-              <span>无需配置 API Key</span>
-              <span>示例使用真实模型分析</span>
+              <span>无需填写 API Key</span>
+              <span>推荐案例调用真实模型</span>
             </div>
           </div>
 
@@ -81,11 +81,11 @@ export default function Home() {
                 <p>Short sleep <del>causes</del> anxiety in <del>all university students</del>.</p>
               </div>
               <ul className="risk-findings">
-                <li><span>相关关系被升级为因果关系</span><b>Blocked</b></li>
-                <li><span>有限样本被扩大为普遍结论</span><b>Blocked</b></li>
-                <li><span>作者工作稿保持原文</span><b>Protected</b></li>
+                <li className="blocked"><span>相关关系被升级为因果关系</span><b>已阻断</b></li>
+                <li className="blocked"><span>有限样本被扩大为普遍结论</span><b>已阻断</b></li>
+                <li className="protected"><span>作者工作稿保持原文</span><b>已保护</b></li>
               </ul>
-              <div className="risk-console-result"><strong>候选稿已隔离</strong><span>自动应用权限：0</span></div>
+              <div className="risk-console-result"><strong>安全门已成功阻断</strong><span>自动应用权限：0</span></div>
             </div>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function Home() {
         <article><strong>模型与权限分离</strong><span>AI 负责提出候选，代码负责安全许可，作者负责最终决定。</span></article>
         <article><strong>科研事实硬规则</strong><span>保护数字、单位、引用、实验声明与证据边界。</span></article>
         <article><strong>完整作者闭环</strong><span>逐条核对、接受、拒绝、撤回、版本记录和导出。</span></article>
-        <article><strong>公网直接体验</strong><span>无需下载、无需部署、无需评委配置模型密钥。</span></article>
+        <article><strong>公网直接体验</strong><span>无需下载、无需部署、无需体验者配置模型密钥。</span></article>
       </section>
 
       <section className="competition-section shell" aria-labelledby="architecture-title">
@@ -118,7 +118,7 @@ export default function Home() {
       <section className="competition-section tinted" aria-labelledby="features-title">
         <div className="shell">
           <div className="competition-section-heading">
-            <div><span className="eyebrow">可验证的工程能力</span><h2 id="features-title">技术难度不藏在代码仓库里</h2></div>
+            <div><span className="eyebrow">可验证的工程能力</span><h2 id="features-title">技术难度直接呈现在结果中</h2></div>
             <p>每次分析都会把安全门结果展示给用户。评委可以直接看到哪些规则通过、哪些风险被阻断，以及为何某条建议不能自动应用。</p>
           </div>
           <div className="competition-feature-grid">
@@ -133,8 +133,8 @@ export default function Home() {
         <div className="judge-path">
           <div className="judge-path-copy">
             <span className="eyebrow">评委可独立完成</span>
-            <h2 id="experience-title">四步体验真实核心功能</h2>
-            <p>不需要注册账号，也不需要阅读复杂部署说明。推荐案例会填入公开科研文本，由评委主动确认后调用真实模型。</p>
+            <h2 id="experience-title">四步完成真实核心体验</h2>
+            <p>不需要注册账号，也不需要阅读部署说明。推荐案例会填入公开科研文本，由体验者主动确认后调用真实模型。</p>
             <div className="competition-actions">
               <Link className="primary-link" href="/try">查看推荐体验路径</Link>
               <Link className="secondary-link" href="/guide">阅读使用手册</Link>

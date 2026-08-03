@@ -30,7 +30,7 @@ export default function TryPage() {
     <main className="shell page-main experience-page" id="main-content">
       <section className="experience-hero">
         <div>
-          <span className="eyebrow">Public evaluation path</span>
+          <span className="eyebrow">公开体验入口</span>
           <h1>无需登录，直接体验核心功能</h1>
           <p>这是正式产品的公开体验路径，不是预录演示。案例会先填入浏览器本地草稿，由你主动确认后调用真实阿里云百炼模型。</p>
           <div className="competition-actions">
@@ -40,7 +40,7 @@ export default function TryPage() {
         </div>
         <div className="experience-meta" aria-label="体验条件">
           <article><strong>登录要求</strong><span>不需要账号，可全程使用游客模式</span></article>
-          <article><strong>API Key</strong><span>由服务端安全配置，体验者无需填写</span></article>
+          <article><strong>模型密钥</strong><span>由服务端安全配置，体验者无需填写</span></article>
           <article><strong>预计操作</strong><span>4 个步骤，可独立完成</span></article>
           <article><strong>数据范围</strong><span>推荐案例是公开合成科研文本</span></article>
         </div>
@@ -58,10 +58,10 @@ export default function TryPage() {
           <p>推荐案例中，研究为横断面设计。系统应提醒作者不能从相关关系直接推断因果，也不能把特定样本扩大为所有大学生。</p>
         </div>
         <div className="competition-feature-grid">
-          <article><span>BOUNDARY</span><h3>因果关系</h3><p>观察系统如何处理 “causes” 与 “was associated with” 的差异。</p></article>
-          <article><span>SCOPE</span><h3>研究范围</h3><p>观察系统是否保留样本、研究设计和外推限制。</p></article>
-          <article><span>CONTROL</span><h3>作者权限</h3><p>确认 AI 候选稿不会自动覆盖作者工作稿。</p></article>
-          <article><span>TRACEABILITY</span><h3>可追踪修改</h3><p>体验逐条决定、安全应用、撤回、撤销和导出。</p></article>
+          <article><span>因果边界</span><h3>相关不等于因果</h3><p>观察系统如何处理 “causes” 与 “was associated with” 的差异。</p></article>
+          <article><span>研究范围</span><h3>样本不等于所有人群</h3><p>观察系统是否保留样本、研究设计和外推限制。</p></article>
+          <article><span>作者权限</span><h3>候选稿不会静默覆盖</h3><p>确认 AI 候选稿不会自动覆盖作者工作稿。</p></article>
+          <article><span>修改追踪</span><h3>每一步都可以核对</h3><p>体验逐条决定、安全应用、撤回、撤销和导出。</p></article>
         </div>
       </section>
     </main>
