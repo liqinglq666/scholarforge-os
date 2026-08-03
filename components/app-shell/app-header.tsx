@@ -64,7 +64,7 @@ export function AppFooter() {
       <div className="shell footer-inner">
         <div className="footer-message">
           <span aria-hidden="true" className="footer-mark">SF</span>
-          <p><strong>普通 AI 帮助修改论文，ScholarForge 负责阻止 AI 改错论文。</strong><span>AI 提建议，作者做决定。</span></p>
+          <p><strong>阻止高风险 AI 修改直接进入论文。</strong><span>模型提出候选，代码检查风险，作者决定最终文本。</span></p>
         </div>
         <nav aria-label="页脚导航">
           <Link href="/try">直接体验</Link>

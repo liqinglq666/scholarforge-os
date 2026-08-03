@@ -1,54 +1,133 @@
 # ScholarForge OS
 
-[简体中文](README.md) · [English](README.en.md)
+[简体中文](README.md)
 
-**An author-controlled workspace for scientific English review and revision.**
+> **Stop high-risk AI edits before they enter a scientific manuscript.**  
+> The model proposes. Code checks. The author decides.
 
-ScholarForge OS serves graduate students, researchers, and academic editors working with Chinese or English scientific passages. It is not a paper generator and does not replace author judgment. AI produces explainable suggestions; the author accepts, rejects, or defers each issue. Only a single suggestion that is uniquely anchored in the current working draft and does not change scientific meaning can be applied automatically.
+ScholarForge OS is a scientific-fact safety review workspace for graduate students, researchers, and academic editors. It places an independent **ScholarForge Safety Gate** between model-generated revisions and the author's working manuscript.
 
-## Product scope
+- Public application: `https://scholarforge-os.vercel.app`
+- Recommended evaluator path: `/try`
+- Safety rules and test scope: `/trust`
+- User guide: `/guide`
 
-The product keeps three core tasks:
+The evaluator does not need to download the repository, deploy dependencies, create an account, or provide an API key.
 
-| Task | Purpose | Explicit boundary |
+## Why a safety gate is needed
+
+Language models can improve scientific writing, but they may also silently alter:
+
+- values, percentages, sample sizes, or scientific notation;
+- value-and-unit combinations;
+- author-year citations or DOI strings;
+- protected terminology, material names, scales, algorithms, and abbreviations;
+- experimental or methodological actions not present in the source;
+- association versus causation;
+- cautious versus definitive conclusions;
+- a limited sample versus a universal population.
+
+ScholarForge treats the **AI edit itself as an object that must be reviewed**.
+
+```text
+AI generates a candidate revision
+             ↓
+ScholarForge Safety Gate
+numbers | units | citations | terminology | experiments | causality | certainty | scope
+             ↓
+Author-controlled decisions
+accept | reject | defer | safely apply | undo | export
+```
+
+## Three permission layers
+
+### 1. The model only proposes candidates
+
+Alibaba Cloud Model Studio generates a complete candidate text, issue evidence, and explanations. It cannot overwrite the author working draft and cannot grant itself automatic-application permission.
+
+### 2. Code independently evaluates the candidate
+
+After model generation, application code checks scientific-fact invariants. A candidate that violates a hard rule is returned as **quarantined**, not reduced to an opaque error.
+
+While quarantined:
+
+- the immutable source remains available;
+- the author working draft remains unchanged;
+- the candidate is visible only for risk inspection;
+- all automatic application is disabled;
+- the interface shows the checks and blocking evidence.
+
+### 3. The author controls the final text
+
+Even a candidate that passes the current safety gate must be reviewed issue by issue. A local edit can be applied only when the current source fragment is uniquely anchored, remains within one paragraph, does not change protected facts or claims, and does not overlap an existing edit.
+
+## Recommended evaluator flow
+
+Open `/try` and complete the core path without signing in:
+
+1. Load the public biomedical discussion example.
+2. Choose the pre-submission check task.
+3. Confirm the exact text and settings being sent.
+4. Run the real server-configured Model Studio request.
+5. Inspect the Safety Gate evidence.
+6. Accept, reject, or defer individual suggestions.
+7. Apply only code-authorized local edits.
+8. Try undo, redo, and export.
+
+The example is synthetic public scientific text. Loading it only fills the local browser draft; it does not call the model automatically.
+
+## Core tasks
+
+| Task | Purpose | Hard boundary |
 | --- | --- | --- |
-| Scientific Chinese-to-English | Produce reviewable academic English | Preserve values, units, terminology, and claim strength |
-| Conservative English polishing | Improve grammar, syntax, wording, concision, and cohesion | Do not add facts, citations, experiments, or stronger claims |
-| Pre-submission check | Identify language, terminology, logic, reporting, and evidence-boundary issues | No readiness score, acceptance prediction, or peer-review claim |
+| Scientific Chinese-to-English | Produce reviewable academic English | Preserve values, units, terminology, citations, and claim strength |
+| Conservative English polishing | Improve grammar, syntax, concision, and cohesion | Do not add facts, experiments, citations, or stronger conclusions |
+| Pre-submission check | Identify language, reporting, logic, and evidence-boundary risks | No acceptance prediction, readiness score, or peer-review claim |
 
-PDF, OCR, automated reviewer responses, accounts, cloud sync, collaboration, original-OOXML patching, Word tracked changes, unreliable scoring, and batch apply are intentionally unsupported.
+## Full manuscript workflow
 
-## Core flow
+Beyond the public quick-review path, ScholarForge supports:
 
-1. Understand product scope, data handling, and AI limitations on the welcome page.
-2. Paste text or extract DOCX body text locally and select one section.
-3. Choose a task and section; optionally add journal context and terminology locks.
-4. Confirm the exact payload before sending. The original DOCX is never uploaded.
-5. Compare the immutable source, AI suggestion, author working draft, and issue list.
-6. Decide every issue and revalidate the current anchor before applying one suggestion.
-7. Undo or redo changes; export TXT, a Markdown report, a clean DOCX, or a workspace backup.
-8. Restore browser-local history from one canonical Recent Tasks page.
+- multiple manuscript projects and chapters;
+- target-journal context and project terminology rules;
+- browser-local cross-chapter consistency checks;
+- explicit chapter selection before AI review;
+- supervisor-feedback tracking and response notes;
+- version comparisons and recovery;
+- TXT, Markdown, clean DOCX, and JSON workspace exports.
 
-## Scientific safety boundary
+## Data and privacy
 
-After model generation, deterministic code checks numbers, scientific notation, percentages, values with units, terminology locks, invented DOI strings, empty/oversized/truncated/non-JSON output, placeholders, duplicate issue IDs, field lengths, anchor uniqueness, cross-paragraph edits, author-required content, and potential meaning changes.
+- Manuscripts, chapters, feedback, version text, analysis history, and author decisions are stored in browser `localStorage` by default.
+- DOCX body extraction happens in the browser; the original binary is not uploaded.
+- Text and settings are sent only after the user explicitly starts an analysis.
+- `DASHSCOPE_API_KEY` is read only on the server.
+- Optional Supabase authentication synchronizes validated personalization preferences only.
+- Signing in does not upload manuscript text, feedback, full versions, or analysis history.
+- When the model is not configured, analysis is disabled and `POST /api/review` returns `503`; no simulated result is created.
 
-Passing these checks does not make the output scientifically correct. The author must still verify facts, references, statistics, experimental parameters, sample counts, causality, methods, claim strength, and current journal requirements.
+## Technical architecture
 
-When the model is not configured, the workbench disables analysis and `POST /api/review` returns `503`. No simulated result is generated or saved.
-
-## Data and recovery
-
-- The draft, review result, decisions, working copy, and 12 recent tasks are stored in browser `localStorage`.
-- DOCX parsing happens in the browser. Original binary files are neither uploaded nor retained.
-- Only an author-confirmed payload is sent to the server and model.
-- Importing a backup validates size, format, and version. Stored edit offsets and replacement text are not trusted; safe edits are rebuilt from current issues.
-
-See [Product](docs/product.md), [Architecture](docs/ARCHITECTURE.md), [Technical and Security](docs/technical.md), [Privacy](docs/PRIVACY.md), and [Deployment](docs/DEPLOYMENT.md).
+```text
+Next.js 16 App Router + React 19 + TypeScript
+├─ public evaluator routes: /try /trust /guide
+├─ multi-project browser workspace
+├─ browser DOCX extraction with Mammoth
+├─ POST /api/review
+│  ├─ schema and byte-size validation
+│  ├─ session/IP rate limits, concurrency, timeout, budget fuse
+│  ├─ Alibaba Cloud Model Studio compatible endpoint
+│  ├─ strict structured-output validation
+│  └─ ScholarForge Safety Gate
+├─ code-derived automatic-application permission
+├─ unique text anchoring, overlap checks, undo and redo
+├─ cross-chapter consistency checks
+└─ TXT / Markdown / clean DOCX / JSON backup
+```
 
 ## Local development
 
-Node.js `>= 22.12.0` is required.
+Node.js `>=22.12.0` is required.
 
 ```bash
 git clone https://github.com/liqinglq666/scholarforge-os.git
@@ -58,6 +137,8 @@ cp .env.example .env.local
 npm run dev
 ```
 
+Model configuration:
+
 ```env
 DASHSCOPE_API_KEY=your_server_side_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -65,7 +146,14 @@ DASHSCOPE_MODEL=qwen-plus
 REVIEW_DAILY_REQUEST_BUDGET=0
 ```
 
-`DASHSCOPE_API_KEY` is server-only. A daily budget of `0` disables the request-count circuit breaker; production deployments should set an appropriate positive limit.
+Optional account configuration:
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+Run `supabase/migrations/202608020001_user_preferences.sql` before enabling cloud preference sync.
 
 ## Verification
 
@@ -80,8 +168,16 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-## Deployment limitations
+The final competition branch currently verifies unit, API, component, production-build, desktop-browser, and mobile-browser contracts in CI.
 
-The current rate limiter is per Node.js instance. A public multi-instance deployment should use shared rate-limit storage plus platform WAF controls, monitoring, and provider cost limits. Browser-local workspaces do not sync across devices. DOCX extraction and clean export do not preserve the source document's layout or complex objects. The product does not verify reference authenticity, statistical correctness, journal rules, or acceptance readiness.
+## Known limitations
 
-The repository currently has no standalone open-source license file. The owner should add an explicit license before public redistribution or third-party reuse.
+- Passing the Safety Gate does not prove scientific correctness.
+- The system does not verify raw data, statistics, reference content, ethics, or current journal rules.
+- Rule and model checks can produce false positives and false negatives.
+- DOCX import/export does not preserve all formulas, tables, footnotes, comments, tracked changes, or source formatting.
+- Full manuscript workspaces do not sync across devices; the optional account synchronizes preferences only.
+- The current in-memory rate limiter is per server instance and should be replaced by shared atomic storage for larger multi-instance traffic.
+- The repository currently has no standalone open-source license file.
+
+ScholarForge output is decision support, not a publication, medical, statistical, ethical, or legal guarantee. The author remains responsible for the final manuscript.

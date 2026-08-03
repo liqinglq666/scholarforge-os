@@ -18,7 +18,7 @@ export default function GuidePage() {
   return (
     <main className="shell page-main guide-page" id="main-content">
       <section className="guide-hero">
-        <span className="eyebrow">Evaluator & user guide</span>
+        <span className="eyebrow">评委与用户手册</span>
         <h1>打开网页即可完成核心体验</h1>
         <p>ScholarForge 是公网可运行的 Web 应用。评委不需要下载程序、拉取代码、配置依赖或填写 API Key。推荐从公开案例开始，再按需体验完整论文项目。</p>
         <div className="competition-actions">
@@ -45,15 +45,15 @@ export default function GuidePage() {
           <p>论文项目可以管理多个章节、共享术语、导师意见和版本记录。每次只把作者明确选择的章节送入审校，其他章节仍保存在浏览器。</p>
         </div>
         <div className="competition-feature-grid">
-          <article><span>PROJECT</span><h3>多论文项目</h3><p>每篇论文拥有独立章节、目标期刊、术语、意见和版本上下文。</p></article>
-          <article><span>CONSISTENCY</span><h3>跨章节一致性</h3><p>在浏览器中检查样本量候选、带单位指标、缩写和项目术语。</p></article>
-          <article><span>FEEDBACK</span><h3>导师意见处理</h3><p>拆分、关联、追踪意见，记录作者回复并导出修改说明。</p></article>
-          <article><span>RECOVERY</span><h3>版本与备份</h3><p>支持撤销、重做、历史任务、版本比较和完整 JSON 工作区备份。</p></article>
+          <article><span>论文项目</span><h3>多项目与多章节</h3><p>每篇论文拥有独立章节、目标期刊、术语、意见和版本上下文。</p></article>
+          <article><span>一致性检查</span><h3>跨章节核对</h3><p>在浏览器中检查样本量候选、带单位指标、缩写和项目术语。</p></article>
+          <article><span>导师意见</span><h3>处理与回复记录</h3><p>拆分、关联、追踪意见，记录作者回复并导出修改说明。</p></article>
+          <article><span>恢复能力</span><h3>版本与备份</h3><p>支持撤销、重做、历史任务、版本比较和完整 JSON 工作区备份。</p></article>
         </div>
       </section>
 
       <section className="trust-limitations" aria-labelledby="guide-data-title">
-        <span className="eyebrow">Data boundary</span>
+        <span className="eyebrow">数据边界</span>
         <h2 id="guide-data-title">论文正文默认保存在当前浏览器</h2>
         <p>DOCX 在浏览器中提取正文，原始二进制文件不上传。只有用户明确开始分析后，当前文本和设置才会发送到服务端与模型。可选账户只同步个性化偏好，不自动同步论文正文、导师意见、版本全文或分析历史。</p>
       </section>

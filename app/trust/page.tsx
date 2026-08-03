@@ -21,7 +21,7 @@ export default function TrustPage() {
   return (
     <main className="shell page-main trust-page" id="main-content">
       <section className="trust-hero">
-        <span className="eyebrow">Trust through visible boundaries</span>
+        <span className="eyebrow">可见边界建立信任</span>
         <h1>安全能力必须可解释，也必须承认边界</h1>
         <p>ScholarForge 不要求用户相信一个“更聪明的模型”。它把模型候选交给独立代码检查，并公开展示检查项、证据、阻断原因和当前未覆盖范围。</p>
         <div className="competition-actions">
@@ -32,12 +32,12 @@ export default function TrustPage() {
 
       <section className="trust-grid" aria-label="科研事实安全门检查范围">
         {checks.map(([title, description], index) => (
-          <article key={title}><span className="eyebrow">CHECK 0{index + 1}</span><h2>{title}</h2><p>{description}</p></article>
+          <article key={title}><span className="eyebrow">检查 {String(index + 1).padStart(2, '0')}</span><h2>{title}</h2><p>{description}</p></article>
         ))}
       </section>
 
       <section className="trust-limitations" aria-labelledby="limitations-title">
-        <span className="eyebrow">Known limitations</span>
+        <span className="eyebrow">已知限制</span>
         <h2 id="limitations-title">安全门通过不等于论文科学正确</h2>
         <p>当前系统不能验证原始数据真实性、统计分析正确性、参考文献内容、伦理合规、期刊最新规则或实验能否复现。规则检测也可能出现漏报和误报。作者仍需核对事实，并在必要时咨询导师、统计专家、伦理机构和期刊编辑。</p>
       </section>
@@ -45,13 +45,13 @@ export default function TrustPage() {
       <section className="competition-section" aria-labelledby="testing-title">
         <div className="competition-section-heading">
           <div><span className="eyebrow">测试方法</span><h2 id="testing-title">把安全承诺写成可重复执行的测试</h2></div>
-          <p>仓库使用单元、API、组件和端到端测试覆盖请求校验、模型异常、确定性检查、安全应用、撤销恢复、DOCX、备份、移动端和服务未配置状态。新增安全规则会配套回归用例，避免只停留在产品文案。</p>
+          <p>仓库使用单元、API、组件和浏览器测试覆盖请求校验、模型异常、确定性检查、安全应用、撤销恢复、DOCX、备份、移动端和服务未配置状态。新增安全规则会配套回归用例，避免只停留在产品文案。</p>
         </div>
         <div className="competition-feature-grid">
-          <article><span>UNIT</span><h3>确定性规则测试</h3><p>为数字、单位、引用、因果、结论强度和研究范围准备成对文本，验证阻断结果。</p></article>
-          <article><span>API</span><h3>不可信模型输出</h3><p>覆盖非 JSON、截断、空结果、重复 ID、超长字段和供应商错误。</p></article>
-          <article><span>WORKFLOW</span><h3>作者控制闭环</h3><p>验证安全应用、拒绝、撤回、撤销、重做、导出和历史恢复。</p></article>
-          <article><span>E2E</span><h3>公网体验路径</h3><p>验证桌面和移动端首次访问、公开案例、分析、结果页和无横向滚动。</p></article>
+          <article><span>规则测试</span><h3>确定性安全门</h3><p>为数字、单位、引用、因果、结论强度和研究范围准备成对文本，验证阻断结果。</p></article>
+          <article><span>接口测试</span><h3>不可信模型输出</h3><p>覆盖非 JSON、截断、空结果、重复 ID、超长字段和供应商错误。</p></article>
+          <article><span>流程测试</span><h3>作者控制闭环</h3><p>验证安全应用、拒绝、撤回、撤销、重做、导出和历史恢复。</p></article>
+          <article><span>浏览器测试</span><h3>公开入口与响应式</h3><p>在 CI 中验证桌面和移动端公开入口、核心交互和无横向滚动；生产可用性仍需部署后检查。</p></article>
         </div>
       </section>
     </main>
