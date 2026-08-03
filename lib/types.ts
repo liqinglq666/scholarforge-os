@@ -15,6 +15,8 @@ export type WorkspaceStatus = 'draft' | 'analyzing' | 'reviewing' | 'error';
 export type AcademicStage = 'masters' | 'doctoral' | 'postgraduate' | 'researcher' | 'other';
 export type EnglishVariant = 'us' | 'uk';
 export type ExplanationLevel = 'brief' | 'balanced' | 'detailed';
+export type SafetyCheckState = 'passed' | 'blocked' | 'review';
+export type SafetyGateStatus = 'passed' | 'quarantined';
 
 export interface TerminologyLock {
   id: string;
@@ -165,6 +167,22 @@ export interface ConsistencyIssue {
   occurrences: ConsistencyOccurrence[];
 }
 
+export interface SafetyCheck {
+  id: string;
+  title: string;
+  state: SafetyCheckState;
+  summary: string;
+  evidence: string[];
+}
+
+export interface SafetyGateReport {
+  status: SafetyGateStatus;
+  checks: SafetyCheck[];
+  blockedCount: number;
+  reviewCount: number;
+  checkedAt: string;
+}
+
 export interface ReviewIssue {
   id: string;
   category: string;
@@ -186,6 +204,7 @@ export interface ReviewResult {
   suggestedText: string;
   issues: ReviewIssue[];
   warnings: string[];
+  safetyGate?: SafetyGateReport;
   generatedAt: string;
 }
 

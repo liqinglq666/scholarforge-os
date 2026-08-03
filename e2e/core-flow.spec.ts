@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
       configured: true,
       model: 'test-model',
       message: '分析服务已配置。',
-      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 6, windowMinutes: 10 },
+      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 },
     }),
   }));
   await page.route('**/api/review', (route) => {
@@ -25,6 +25,16 @@ test.beforeEach(async ({ page }) => {
           summary: '发现一处结论强度问题，请作者核对。',
           suggestedText: revised,
           warnings: [],
+          safetyGate: {
+            status: 'passed',
+            blockedCount: 0,
+            reviewCount: 0,
+            checkedAt: new Date().toISOString(),
+            checks: [
+              { id: 'numbers', title: '数值与样本量', state: 'passed', summary: '已核对 3 个数值标记。', evidence: ['42.5', '28', '12%'] },
+              { id: 'claim-boundary', title: '因果、结论强度与研究范围', state: 'passed', summary: '未发现主张边界升级。', evidence: [] },
+            ],
+          },
           generatedAt: new Date().toISOString(),
           issues: [{
             id: 'e2e-issue',
@@ -46,7 +56,7 @@ test.beforeEach(async ({ page }) => {
 
 test('quick review keeps the primary path short and preserves a local history entry', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: '单段落审校' }).click();
+  await page.getByRole('link', { name: '快速审校', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: '粘贴文本，选择任务，开始分析' })).toBeVisible();
   await page.getByLabel(/粘贴英文论文原文/).fill(source);
@@ -58,6 +68,8 @@ test('quick review keeps the primary path short and preserves a local history en
   await page.getByRole('button', { name: '确认并开始分析' }).click();
 
   await expect(page.getByRole('heading', { name: 'E2E manuscript' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '科研事实安全门' })).toBeVisible();
+  await expect(page.getByText('安全门通过')).toBeVisible();
   await expect(page.getByText('发现一处结论强度问题，请作者核对。')).toBeVisible();
   await page.getByRole('button', { name: '接受' }).click();
   await page.getByRole('button', { name: '应用这一条建议' }).click();
@@ -162,7 +174,7 @@ test('unconfigured service is explicit and never offers analysis', async ({ page
   await page.route('**/api/health', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ configured: false, model: null, message: '分析服务未配置。不会生成模拟结果。', limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 6, windowMinutes: 10 } }),
+    body: JSON.stringify({ configured: false, model: null, message: '分析服务未配置。不会生成模拟结果。', limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 } }),
   }));
   await page.goto('/workspace');
   await page.getByLabel(/粘贴英文论文原文/).fill(source);
