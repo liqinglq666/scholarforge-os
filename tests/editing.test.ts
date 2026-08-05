@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeIssueAnchor, applyIssueToWorkspace, redoWorkspace, removeAppliedIssueFromWorkspace, undoWorkspace } from '@/lib/editing/apply';
-import type { ReviewIssue, ReviewResult } from '@/lib/types';
+import type { ReviewIssue, ReviewResult, SafetyGateReport } from '@/lib/types';
 import { createDraft, createWorkspaceState } from '@/lib/workspace/schema';
 
 const issue: ReviewIssue = {
@@ -14,6 +14,14 @@ const issue: ReviewIssue = {
   meaningChanged: false,
   authorActionRequired: false,
   safeToApply: true,
+};
+
+const passedSafetyGate: SafetyGateReport = {
+  status: 'passed',
+  checks: [],
+  blockedCount: 0,
+  reviewCount: 0,
+  checkedAt: new Date().toISOString(),
 };
 
 describe('safe issue application', () => {
@@ -47,11 +55,9 @@ describe('safe issue application', () => {
       issues: [issue],
       warnings: [],
       safetyGate: {
+        ...passedSafetyGate,
         status: 'quarantined',
-        checks: [],
         blockedCount: 1,
-        reviewCount: 0,
-        checkedAt: new Date().toISOString(),
       },
       generatedAt: new Date().toISOString(),
     };
@@ -60,6 +66,23 @@ describe('safe issue application', () => {
     expect(() => applyIssueToWorkspace(state, issue)).toThrow('AI 候选稿已被安全门隔离，不能应用到作者工作稿。');
     expect(state.workingText).toBe(draft.sourceText);
     expect(state.appliedEdits).toHaveLength(0);
+  });
+
+  it('requires legacy results without a safety report to be analyzed again', () => {
+    const draft = createDraft({ sourceText: 'The results can well prove this.' });
+    const legacyResult: ReviewResult = {
+      id: 'result-legacy',
+      taskId: draft.id,
+      summary: 'Legacy result',
+      suggestedText: 'The results indicate this.',
+      issues: [issue],
+      warnings: [],
+      generatedAt: new Date().toISOString(),
+    };
+    const state = { ...createWorkspaceState(draft), currentResult: legacyResult };
+
+    expect(() => applyIssueToWorkspace(state, issue)).toThrow('旧版分析结果缺少安全门报告，请重新分析后再应用。');
+    expect(state.workingText).toBe(draft.sourceText);
   });
 
   it('removes one applied issue and safely replays retained edits', () => {
@@ -77,6 +100,7 @@ describe('safe issue application', () => {
       suggestedText: 'The results indicate the manuscript.',
       issues: [issue, second],
       warnings: [],
+      safetyGate: passedSafetyGate,
       generatedAt: new Date().toISOString(),
     };
     const state = { ...createWorkspaceState(draft), currentResult: result };
