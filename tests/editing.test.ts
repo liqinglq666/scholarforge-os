@@ -37,6 +37,31 @@ describe('safe issue application', () => {
     expect(redoWorkspace(undoWorkspace(applied)).workingText).toBe(applied.workingText);
   });
 
+  it('blocks every automatic application when the safety gate quarantines the candidate', () => {
+    const draft = createDraft({ sourceText: 'The results can well prove this.' });
+    const result: ReviewResult = {
+      id: 'result-quarantined',
+      taskId: draft.id,
+      summary: 'Candidate quarantined',
+      suggestedText: 'The results indicate this.',
+      issues: [issue],
+      warnings: [],
+      safetyGate: {
+        status: 'quarantined',
+        checks: [],
+        blockedCount: 1,
+        reviewCount: 0,
+        checkedAt: new Date().toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+    const state = { ...createWorkspaceState(draft), currentResult: result };
+
+    expect(() => applyIssueToWorkspace(state, issue)).toThrow('AI 候选稿已被安全门隔离，不能应用到作者工作稿。');
+    expect(state.workingText).toBe(draft.sourceText);
+    expect(state.appliedEdits).toHaveLength(0);
+  });
+
   it('removes one applied issue and safely replays retained edits', () => {
     const second: ReviewIssue = {
       ...issue,
