@@ -30,6 +30,7 @@ function IssueDetail({
   issue,
   decision,
   workspace,
+  candidateQuarantined,
   onDecision,
   onApply,
   onRemove,
@@ -37,13 +38,18 @@ function IssueDetail({
   issue: ReviewIssue;
   decision: IssueDecision;
   workspace: WorkspaceState;
+  candidateQuarantined: boolean;
   onDecision: (decision: IssueDecision) => void;
   onApply: () => void;
   onRemove: () => void;
 }) {
   const anchor = analyzeIssueAnchor(workspace.workingText, issue, workspace.appliedEdits);
   const applied = workspace.appliedEdits.some((edit) => edit.issueId === issue.id);
-  const canApply = anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
+  const anchorSafe = anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
+  const canApply = !candidateQuarantined && anchorSafe;
+  const applicationMessage = candidateQuarantined
+    ? '安全门已隔离完整候选稿，所有自动应用权限均已关闭。'
+    : anchor.message;
 
   return (
     <article className="review-detail issue-detail" aria-labelledby={`issue-title-${issue.id}`}>
@@ -73,12 +79,17 @@ function IssueDetail({
 
       <div className={applied || canApply ? 'application-permission allowed' : 'application-permission blocked'}>
         <span aria-hidden="true">{applied || canApply ? '✓' : '!'}</span>
-        <div><strong>{applied ? '已应用到作者工作稿' : canApply ? '代码允许安全定位' : '已阻止自动应用'}</strong><p>{anchor.message}</p></div>
+        <div>
+          <strong>{applied ? '已应用到作者工作稿' : candidateQuarantined ? '安全门已阻止自动应用' : canApply ? '代码允许安全定位' : '已阻止自动应用'}</strong>
+          <p>{applicationMessage}</p>
+        </div>
       </div>
       {applied ? (
         <button className="secondary-button full-button" onClick={onRemove} type="button">从作者工作稿撤回这一条</button>
       ) : (
-        <button className="primary-button full-button" disabled={!canApply || decision !== 'accepted'} onClick={onApply} type="button">{decision === 'accepted' ? '应用这一条建议' : '先接受，再应用建议'}</button>
+        <button className="primary-button full-button" disabled={!canApply || decision !== 'accepted'} onClick={onApply} type="button">
+          {candidateQuarantined ? '安全门已阻止应用' : decision === 'accepted' ? '应用这一条建议' : '先接受，再应用建议'}
+        </button>
       )}
     </article>
   );
@@ -217,7 +228,7 @@ export function ReviewWorkbench({
             </aside>
 
             <section className="review-detail-column">
-              {selectedIssue ? <IssueDetail decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
+              {selectedIssue ? <IssueDetail candidateQuarantined={candidateQuarantined} decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
             </section>
 
             <section className="review-document-column document-panel" aria-labelledby="document-title">
