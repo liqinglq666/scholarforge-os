@@ -30,7 +30,7 @@ function IssueDetail({
   issue,
   decision,
   workspace,
-  candidateQuarantined,
+  applicationBlockedReason,
   onDecision,
   onApply,
   onRemove,
@@ -38,7 +38,7 @@ function IssueDetail({
   issue: ReviewIssue;
   decision: IssueDecision;
   workspace: WorkspaceState;
-  candidateQuarantined: boolean;
+  applicationBlockedReason: string;
   onDecision: (decision: IssueDecision) => void;
   onApply: () => void;
   onRemove: () => void;
@@ -46,10 +46,8 @@ function IssueDetail({
   const anchor = analyzeIssueAnchor(workspace.workingText, issue, workspace.appliedEdits);
   const applied = workspace.appliedEdits.some((edit) => edit.issueId === issue.id);
   const anchorSafe = anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
-  const canApply = !candidateQuarantined && anchorSafe;
-  const applicationMessage = candidateQuarantined
-    ? '安全门已隔离完整候选稿，所有自动应用权限均已关闭。'
-    : anchor.message;
+  const canApply = !applicationBlockedReason && anchorSafe;
+  const applicationMessage = applicationBlockedReason || anchor.message;
 
   return (
     <article className="review-detail issue-detail" aria-labelledby={`issue-title-${issue.id}`}>
@@ -80,7 +78,7 @@ function IssueDetail({
       <div className={applied || canApply ? 'application-permission allowed' : 'application-permission blocked'}>
         <span aria-hidden="true">{applied || canApply ? '✓' : '!'}</span>
         <div>
-          <strong>{applied ? '已应用到作者工作稿' : candidateQuarantined ? '安全门已阻止自动应用' : canApply ? '代码允许安全定位' : '已阻止自动应用'}</strong>
+          <strong>{applied ? '已应用到作者工作稿' : applicationBlockedReason ? '安全门未授权自动应用' : canApply ? '代码允许安全定位' : '已阻止自动应用'}</strong>
           <p>{applicationMessage}</p>
         </div>
       </div>
@@ -88,7 +86,7 @@ function IssueDetail({
         <button className="secondary-button full-button" onClick={onRemove} type="button">从作者工作稿撤回这一条</button>
       ) : (
         <button className="primary-button full-button" disabled={!canApply || decision !== 'accepted'} onClick={onApply} type="button">
-          {candidateQuarantined ? '安全门已阻止应用' : decision === 'accepted' ? '应用这一条建议' : '先接受，再应用建议'}
+          {applicationBlockedReason ? '当前结果不可自动应用' : decision === 'accepted' ? '应用这一条建议' : '先接受，再应用建议'}
         </button>
       )}
     </article>
@@ -154,7 +152,13 @@ export function ReviewWorkbench({
     setMessage('已从作者工作稿撤回这一条建议，作者决定仍保留为“已接受”。');
   }
 
+  const safetyGateMissing = !result.safetyGate;
   const candidateQuarantined = result.safetyGate?.status === 'quarantined';
+  const applicationBlockedReason = safetyGateMissing
+    ? '旧版分析结果缺少安全门报告，请重新分析后再应用。'
+    : candidateQuarantined
+      ? '安全门已隔离完整候选稿，所有自动应用权限均已关闭。'
+      : '';
   const displayedText = textView === 'original' ? workspace.draft.sourceText : textView === 'suggested' ? result.suggestedText : workspace.workingText;
 
   return (
@@ -184,7 +188,9 @@ export function ReviewWorkbench({
 
       {stage === 'review' ? (
         <>
-          {candidateQuarantined ? (
+          {safetyGateMissing ? (
+            <StatusBanner tone="warning" title="旧版结果需要重新分析">当前结果没有 Safety Gate 报告，自动应用权限已关闭。原文、作者工作稿和模型候选仍可查看。</StatusBanner>
+          ) : candidateQuarantined ? (
             <StatusBanner tone="danger" title="AI 候选稿已被安全门隔离">作者工作稿保持原文不变，所有自动应用权限均已关闭。你仍可以查看模型候选和阻断证据。</StatusBanner>
           ) : (
             <StatusBanner tone="warning" title="通过当前代码检查仍需作者核对">请继续核对事实、引用、统计结果、方法描述、因果边界和期刊要求。</StatusBanner>
@@ -228,12 +234,12 @@ export function ReviewWorkbench({
             </aside>
 
             <section className="review-detail-column">
-              {selectedIssue ? <IssueDetail candidateQuarantined={candidateQuarantined} decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
+              {selectedIssue ? <IssueDetail applicationBlockedReason={applicationBlockedReason} decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
             </section>
 
             <section className="review-document-column document-panel" aria-labelledby="document-title">
               <header className="document-toolbar">
-                <div><span className="product-label">文档视图</span><h2 id="document-title">{textView === 'author' ? '作者工作稿' : textView === 'suggested' ? (candidateQuarantined ? '已隔离的 AI 候选稿' : 'AI 候选稿') : '原始文本'}</h2></div>
+                <div><span className="product-label">文档视图</span><h2 id="document-title">{textView === 'author' ? '作者工作稿' : textView === 'suggested' ? (candidateQuarantined ? '已隔离的 AI 候选稿' : safetyGateMissing ? '未验证的 AI 候选稿' : 'AI 候选稿') : '原始文本'}</h2></div>
                 <div className="segmented-control" role="tablist" aria-label="文本版本">
                   <button aria-label="作者工作稿" aria-selected={textView === 'author'} onClick={() => setTextView('author')} role="tab" type="button">作者稿</button>
                   <button aria-label="AI 候选稿" aria-selected={textView === 'suggested'} onClick={() => setTextView('suggested')} role="tab" type="button">AI 候选</button>
@@ -246,7 +252,9 @@ export function ReviewWorkbench({
                   : textView === 'suggested'
                     ? candidateQuarantined
                       ? '该候选稿仅用于检查模型风险，不会覆盖作者工作稿。'
-                      : '模型完整候选仅供对照，不会自动覆盖作者稿。'
+                      : safetyGateMissing
+                        ? '该旧版候选稿缺少 Safety Gate 报告，只能查看，不能自动应用。'
+                        : '模型完整候选仅供对照，不会自动覆盖作者稿。'
                     : '分析时提交的只读原始文本。'}
               </div>
               <pre className="manuscript-text" tabIndex={0}>{displayedText}</pre>
