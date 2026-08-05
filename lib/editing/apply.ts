@@ -126,6 +126,10 @@ function applyIssueWithoutHistory(
 }
 
 export function applyIssueToWorkspace(state: WorkspaceState, issue: ReviewIssue): WorkspaceState {
+  if (state.currentResult?.safetyGate?.status === 'quarantined') {
+    throw new Error('AI 候选稿已被安全门隔离，不能应用到作者工作稿。');
+  }
+
   const next = applyIssueWithoutHistory(state.workingText, state.appliedEdits, issue);
   if (!next) {
     throw new Error(analyzeIssueAnchor(state.workingText, issue, state.appliedEdits).message);
