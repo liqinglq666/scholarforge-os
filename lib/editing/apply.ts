@@ -126,8 +126,11 @@ function applyIssueWithoutHistory(
 }
 
 export function applyIssueToWorkspace(state: WorkspaceState, issue: ReviewIssue): WorkspaceState {
-  if (state.currentResult?.safetyGate?.status === 'quarantined') {
-    throw new Error('AI 候选稿已被安全门隔离，不能应用到作者工作稿。');
+  const safetyGateStatus = state.currentResult?.safetyGate?.status;
+  if (state.currentResult && safetyGateStatus !== 'passed') {
+    throw new Error(safetyGateStatus === 'quarantined'
+      ? 'AI 候选稿已被安全门隔离，不能应用到作者工作稿。'
+      : '旧版分析结果缺少安全门报告，请重新分析后再应用。');
   }
 
   const next = applyIssueWithoutHistory(state.workingText, state.appliedEdits, issue);
