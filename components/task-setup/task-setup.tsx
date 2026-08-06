@@ -32,6 +32,11 @@ interface SourceState {
   activeExampleId?: string;
 }
 
+interface VolatileSourceState {
+  draftId: string;
+  value: SourceState;
+}
+
 interface DraftSnapshot {
   patch: Partial<WorkspaceDraft>;
   sourceState: SourceState;
@@ -87,6 +92,14 @@ function copyImportedDocument(value: ImportedDocument | undefined) {
   return value ? { ...value, warnings: [...value.warnings] } : undefined;
 }
 
+function runOnNextFrame(callback: () => void) {
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  window.setTimeout(callback, 0);
+}
+
 export function TaskSetup({
   draft,
   service,
@@ -111,11 +124,14 @@ export function TaskSetup({
   const [importError, setImportError] = useState('');
   const [termSource, setTermSource] = useState('');
   const [termPreferred, setTermPreferred] = useState('');
-  const [sourceState, setSourceState] = useState<SourceState>(() => inferSourceState(draft));
+  const [volatileSourceState, setVolatileSourceState] = useState<VolatileSourceState | null>(null);
   const [switchUndo, setSwitchUndo] = useState<DraftSnapshot | null>(null);
   const [taskNotice, setTaskNotice] = useState('');
   const [editorPulse, setEditorPulse] = useState(false);
 
+  const sourceState = volatileSourceState?.draftId === draft.id
+    ? volatileSourceState.value
+    : inferSourceState(draft);
   const textLength = draft.sourceText.length;
   const inputValid = textLength >= MIN_SOURCE_CHARACTERS && textLength <= MAX_SOURCE_CHARACTERS;
   const canAnalyze = Boolean(service?.configured && inputValid && !analyzing);
@@ -139,23 +155,17 @@ export function TaskSetup({
           ? `超出 ${textLength - MAX_SOURCE_CHARACTERS} 个字符，请缩短正文。`
           : '';
 
-  useEffect(() => {
-    setSourceState(inferSourceState(draft));
-    setSwitchUndo(null);
-    setTaskNotice('');
-  }, [draft.id]);
-
   useEffect(() => () => {
     if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
   }, []);
 
   function persistSourceState(next: SourceState) {
-    setSourceState(next);
+    setVolatileSourceState({ draftId: draft.id, value: next });
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(sourceStateKey(draft.id), JSON.stringify(next));
     } catch {
-      // The workspace itself still persists even when UI-only mode storage is unavailable.
+      // The volatile state still protects the current manuscript when storage is unavailable.
     }
   }
 
@@ -177,7 +187,7 @@ export function TaskSetup({
   function pulseSourceEditor() {
     if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
     setEditorPulse(false);
-    window.requestAnimationFrame(() => {
+    runOnNextFrame(() => {
       setEditorPulse(true);
       pulseTimerRef.current = window.setTimeout(() => setEditorPulse(false), 900);
       if (sourceTextRef.current) {
@@ -250,7 +260,7 @@ export function TaskSetup({
   }
 
   function loadExample(example: ResearchExample) {
-    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
+    if (sourceState.origin !== 'example' && draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
     applyExample(example, `已载入“${TASK_LABELS[example.taskType]}”公开合成示例。`);
   }
 
@@ -287,7 +297,7 @@ export function TaskSetup({
     persistSourceState({ origin: 'custom' });
     setTaskNotice('已进入“我的文本”模式。请粘贴论文正文，切换任务时内容会保持不变。');
     setInputMode('paste');
-    window.requestAnimationFrame(() => sourceTextRef.current?.focus());
+    runOnNextFrame(() => sourceTextRef.current?.focus());
   }
 
   function undoSourceSwitch() {
