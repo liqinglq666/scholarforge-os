@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test';
+import {
+  expectNoHorizontalOverflow,
+  followPrimaryNavigation,
+  sourceEditor,
+  startAnalysisButton,
+} from './helpers';
 
 const source = 'The results can well prove that the compressive strength was 42.5 MPa after 28 d, representing an increase of 12%.';
 const revised = 'The results indicate that the compressive strength was 42.5 MPa after 28 d, representing an increase of 12%.';
@@ -54,30 +60,43 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('quick review keeps the primary path short and preserves a local history entry', async ({ page }) => {
+test('quick review follows the current five-stage workflow and preserves a local history entry', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: '快速审校', exact: true }).click();
+  await followPrimaryNavigation(page, '快速审校');
 
-  await expect(page.getByRole('heading', { name: '粘贴文本，选择任务，开始分析' })).toBeVisible();
-  await page.getByLabel(/粘贴英文论文原文/).fill(source);
-  await page.getByText('高级设置与 DOCX 导入').click();
+  await expect(page).toHaveURL(/\/workspace$/);
+  await expect(page.getByRole('heading', { name: '准备本次审校任务' })).toBeVisible();
+
+  const editor = sourceEditor(page);
+  await expect(editor).toBeVisible();
+  await editor.fill(source);
   await page.getByLabel('任务名称（可选）').fill('E2E manuscript');
-  await expect(page.getByRole('button', { name: '开始分析' })).toBeEnabled();
-  await page.getByRole('button', { name: '开始分析' }).click();
+
+  const analyze = startAnalysisButton(page);
+  await expect(analyze).toBeEnabled();
+  await analyze.click();
   await expect(page.getByRole('heading', { name: '确认发送当前文本？' })).toBeVisible();
   await page.getByRole('button', { name: '确认并开始分析' }).click();
 
   await expect(page.getByRole('heading', { name: 'E2E manuscript' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '科研事实安全门' })).toBeVisible();
-  await expect(page.getByText('安全门通过')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '候选稿通过当前自动规则' })).toBeVisible();
+  await expect(page.getByText('通过当前代码检查仍需作者核对', { exact: true })).toBeVisible();
   await expect(page.getByText('发现一处结论强度问题，请作者核对。')).toBeVisible();
-  await page.getByRole('button', { name: '接受' }).click();
+
+  await page.getByRole('button', { name: '已接受', exact: true }).click();
   await page.getByRole('button', { name: '应用这一条建议' }).click();
-  await expect(page.locator('.manuscript-text')).toContainText('The results indicate');
-  await page.getByRole('button', { name: '撤销' }).click();
-  await expect(page.locator('.manuscript-text')).toContainText('can well prove');
-  await page.getByRole('button', { name: '重做' }).click();
-  await expect(page.locator('.manuscript-text')).toContainText('The results indicate');
+
+  const authorManuscript = page.locator('.author-manuscript');
+  await expect(authorManuscript).toContainText('The results indicate');
+
+  const titleActions = page.locator('.review-title-actions');
+  await titleActions.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(authorManuscript).toContainText('can well prove');
+  await titleActions.getByRole('button', { name: '重做', exact: true }).click();
+  await expect(authorManuscript).toContainText('The results indicate');
+
+  await page.getByRole('button', { name: '进入导出' }).click();
+  await expect(page.getByRole('heading', { name: '选择需要的交付文件' })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '审校报告 Markdown' }).click();
@@ -107,11 +126,16 @@ test('multi-project portfolio keeps project workflows in an explicit project rou
   await page.getByRole('button', { name: '开始本章节审校' }).click();
   await expect(page).toHaveURL(/\/projects\/[^/]+\/review$/);
   await expect(page.getByText('来自论文项目：Methods')).toBeVisible();
-  const projectText = page.getByLabel(/粘贴英文论文原文/);
+
+  const projectText = sourceEditor(page);
   await expect(projectText).toHaveValue(/126 participants/);
   await projectText.fill('A total of 126 participants were included. The compressive strength was 42.5 MPa after 28 days. This paragraph was clarified before review.');
-  await page.getByRole('button', { name: '开始分析' }).click();
+
+  const analyze = startAnalysisButton(page);
+  await expect(analyze).toBeEnabled();
+  await analyze.click();
   await page.getByRole('button', { name: '确认并开始分析' }).click();
+
   await expect(page.getByRole('heading', { name: 'E2E thesis' })).toBeVisible();
   await page.getByRole('button', { name: '保存当前文本回项目' }).click();
   await expect(page.getByText(/自动生成一条版本记录/)).toBeVisible();
@@ -158,15 +182,25 @@ test('feedback and versions stay inside the selected project', async ({ page }) 
   await expect(page.getByText('版本比较已保存到论文项目。')).toBeVisible();
 });
 
-test('homepage examples remain available as an optional quick-review helper', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('tab', { name: /环境与生态/ }).click();
-  await page.getByRole('link', { name: '在工作台使用此示例' }).click();
+test('workspace examples load into the local draft without sending a review request', async ({ page }) => {
+  let reviewRequests = 0;
+  await page.unroute('**/api/review');
+  await page.route('**/api/review', (route) => {
+    reviewRequests += 1;
+    return route.abort();
+  });
 
-  await expect(page.getByLabel(/粘贴中文科研原文/)).toHaveValue(/共采集36个样品/);
-  await expect(page.getByRole('radio', { name: /科研中译英/ })).toBeChecked();
-  await page.getByText('高级设置与 DOCX 导入').click();
-  await expect(page.getByText('必须使用：microplastics')).toBeVisible();
+  await page.goto('/workspace');
+  await expect(page.getByRole('heading', { name: '载入一个公开合成案例' })).toBeVisible();
+  await page.getByRole('button', { name: /使用示例：材料与工程，结果段：避免过度证明/ }).click();
+
+  await expect(sourceEditor(page)).toHaveValue(/The results can well prove/);
+  await expect(page.getByRole('radio', { name: /英文保守润色/ })).toBeChecked();
+  await page.getByText('术语规则', { exact: true }).click();
+  await expect(page.getByText('孔结构', { exact: true })).toBeVisible();
+  await expect(page.getByText('pore structure', { exact: true })).toBeVisible();
+  await expect(page.getByText(/示例已载入/)).toBeVisible();
+  expect(reviewRequests).toBe(0);
 });
 
 test('unconfigured service is explicit and never offers analysis', async ({ page }) => {
@@ -174,17 +208,22 @@ test('unconfigured service is explicit and never offers analysis', async ({ page
   await page.route('**/api/health', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ configured: false, model: null, message: '分析服务未配置。不会生成模拟结果。', limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 } }),
+    body: JSON.stringify({
+      configured: false,
+      model: null,
+      message: '分析服务未配置。不会生成模拟结果。',
+      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 },
+    }),
   }));
+
   await page.goto('/workspace');
-  await page.getByLabel(/粘贴英文论文原文/).fill(source);
+  await sourceEditor(page).fill(source);
   await expect(page.getByText('分析服务未配置', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '开始分析' })).toBeDisabled();
+  await expect(startAnalysisButton(page)).toBeDisabled();
 });
 
 test('core workspace has no horizontal overflow at the active viewport', async ({ page }) => {
   await page.goto('/workspace');
-  await page.getByLabel(/粘贴英文论文原文/).fill(source);
-  const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
-  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+  await sourceEditor(page).fill(source);
+  await expectNoHorizontalOverflow(page);
 });
