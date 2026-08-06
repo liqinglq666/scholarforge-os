@@ -8,13 +8,32 @@ import {
   TASK_DESCRIPTIONS,
   TASK_LABELS,
 } from '@/lib/config';
-import { RESEARCH_EXAMPLES, type ResearchExample } from '@/lib/examples';
+import {
+  findResearchExampleForSource,
+  getPrimaryResearchExample,
+  type ResearchExample,
+} from '@/lib/examples';
 import { extractDocx, type DocxImportResult } from '@/lib/documents/docx';
 import type { ReviewServiceStatus, TaskType, TerminologyLock, WorkspaceDraft } from '@/lib/types';
 import { StatusBanner } from '@/components/feedback/status-banner';
 
 const TASKS = Object.keys(TASK_LABELS) as TaskType[];
+const TASK_EXAMPLES = TASKS
+  .map((task) => getPrimaryResearchExample(task))
+  .filter((example): example is ResearchExample => example !== null);
 type InputMode = 'paste' | 'docx';
+
+function createExamplePatch(example: ResearchExample): Partial<WorkspaceDraft> {
+  return {
+    projectName: example.projectName,
+    taskType: example.taskType,
+    sectionType: example.sectionType,
+    targetJournal: example.targetJournal,
+    sourceText: example.sourceText,
+    terminologyLocks: example.terminologyLocks.map((term) => ({ ...term })),
+    importedDocument: undefined,
+  };
+}
 
 export function TaskSetup({
   draft,
@@ -91,21 +110,30 @@ export function TaskSetup({
     setInputMode('paste');
   }
 
-  function loadExample(example: ResearchExample) {
-    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
-    onChange({
-      projectName: example.projectName,
-      taskType: example.taskType,
-      sectionType: example.sectionType,
-      targetJournal: example.targetJournal,
-      sourceText: example.sourceText,
-      terminologyLocks: example.terminologyLocks.map((term) => ({ ...term })),
-      importedDocument: undefined,
-    });
+  function applyExample(example: ResearchExample) {
+    onChange(createExamplePatch(example));
     setImportResult(null);
     setImportError('');
     setLoadedExampleId(example.id);
     setInputMode('paste');
+  }
+
+  function loadExample(example: ResearchExample) {
+    if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
+    applyExample(example);
+  }
+
+  function selectTask(task: TaskType) {
+    const currentExample = findResearchExampleForSource(draft.sourceText);
+    const nextExample = getPrimaryResearchExample(task);
+
+    if (currentExample && nextExample && currentExample.taskType !== task) {
+      applyExample(nextExample);
+      return;
+    }
+
+    onChange({ taskType: task });
+    if (!currentExample) setLoadedExampleId('');
   }
 
   function addTerm() {
@@ -196,7 +224,7 @@ export function TaskSetup({
           <div className="task-choice-list quick-task-switcher" role="radiogroup" aria-label="任务类型">
             {TASKS.map((task) => (
               <label className={draft.taskType === task ? 'selected' : ''} key={task}>
-                <input checked={draft.taskType === task} name="taskType" onChange={() => onChange({ taskType: task })} type="radio" />
+                <input checked={draft.taskType === task} name="taskType" onChange={() => selectTask(task)} type="radio" />
                 <span aria-hidden="true" />
                 <div><strong>{TASK_LABELS[task]}</strong><small>{TASK_DESCRIPTIONS[task]}</small></div>
               </label>
@@ -230,15 +258,15 @@ export function TaskSetup({
       </div>
 
       <section className="example-loader" aria-labelledby="example-loader-title">
-        <div><span className="product-label">第一次使用</span><h2 id="example-loader-title">载入一个公开合成案例</h2><p>示例只会填入本地草稿，不会自动调用模型。</p></div>
+        <div><span className="product-label">第一次使用</span><h2 id="example-loader-title">载入一个公开合成案例</h2><p>每种任务提供一个对应示例。切换任务时，未修改的示例会同步切换；自定义文本不会被覆盖。</p></div>
         <div className="example-loader-list workspace-example-grid">
-          {RESEARCH_EXAMPLES.slice(0, 3).map((example) => (
+          {TASK_EXAMPLES.map((example) => (
             <button aria-label={`使用示例：${example.discipline}，${example.title}`} className="workspace-example-card" key={example.id} onClick={() => loadExample(example)} type="button">
               <span>{example.discipline}</span><strong>{example.title}</strong><small>{TASK_LABELS[example.taskType]}</small>
             </button>
           ))}
         </div>
-        {loadedExampleId ? <p className="example-loaded-message" role="status">示例已载入，可以修改后开始分析。</p> : null}
+        {loadedExampleId ? <p className="example-loaded-message" role="status">示例已载入。切换任务会自动换成对应示例，也可以直接修改后开始分析。</p> : null}
       </section>
 
       <dialog className="confirm-dialog" ref={confirmRef}>
