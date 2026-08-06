@@ -191,15 +191,15 @@ test('workspace examples load into the local draft without sending a review requ
   });
 
   await page.goto('/workspace');
-  await expect(page.getByRole('heading', { name: '载入一个公开合成案例' })).toBeVisible();
-  await page.getByRole('button', { name: /使用示例：材料与工程，结果段：避免过度证明/ }).click();
+  await expect(page.getByRole('heading', { name: '比较三种任务的处理边界' })).toBeVisible();
+  await page.getByRole('button', { name: /使用示例：英文保守润色/ }).click();
 
   await expect(sourceEditor(page)).toHaveValue(/The results can well prove/);
   await expect(page.getByRole('radio', { name: /英文保守润色/ })).toBeChecked();
+  await expect(page.locator('.source-origin-badge')).toHaveText('公开合成示例');
   await page.getByText('术语规则', { exact: true }).click();
-  await expect(page.getByText('孔结构', { exact: true })).toBeVisible();
-  await expect(page.getByText('pore structure', { exact: true })).toBeVisible();
-  await expect(page.getByText(/示例已载入/)).toBeVisible();
+  await expect(page.locator('.term-list')).toContainText('pore structure');
+  await expect(page.getByText(/已载入“英文保守润色”公开合成示例/)).toBeVisible();
   expect(reviewRequests).toBe(0);
 });
 
