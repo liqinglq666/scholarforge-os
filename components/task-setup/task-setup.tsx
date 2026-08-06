@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import {
   MAX_SOURCE_CHARACTERS,
   MIN_SOURCE_CHARACTERS,
@@ -9,19 +9,39 @@ import {
   TASK_LABELS,
 } from '@/lib/config';
 import {
+  findResearchExample,
   findResearchExampleForSource,
   getPrimaryResearchExample,
   type ResearchExample,
 } from '@/lib/examples';
 import { extractDocx, type DocxImportResult } from '@/lib/documents/docx';
-import type { ReviewServiceStatus, TaskType, TerminologyLock, WorkspaceDraft } from '@/lib/types';
+import type { ImportedDocument, ReviewServiceStatus, TaskType, TerminologyLock, WorkspaceDraft } from '@/lib/types';
 import { StatusBanner } from '@/components/feedback/status-banner';
 
 const TASKS = Object.keys(TASK_LABELS) as TaskType[];
 const TASK_EXAMPLES = TASKS
   .map((task) => getPrimaryResearchExample(task))
   .filter((example): example is ResearchExample => example !== null);
+const SOURCE_MODE_STORAGE_PREFIX = 'scholarforge.source-mode.v1.';
+
 type InputMode = 'paste' | 'docx';
+type SourceOrigin = 'example' | 'custom' | 'docx';
+
+interface SourceState {
+  origin: SourceOrigin;
+  activeExampleId?: string;
+}
+
+interface DraftSnapshot {
+  patch: Partial<WorkspaceDraft>;
+  sourceState: SourceState;
+}
+
+const TASK_SUMMARIES: Record<TaskType, string> = {
+  translate: '中文转为可核对的学术英文，保护数值与固定术语。',
+  polish: '改善英文表达，但不新增事实或扩大结论。',
+  precheck: '识别语言、方法报告和证据边界问题。',
+};
 
 function createExamplePatch(example: ResearchExample): Partial<WorkspaceDraft> {
   return {
@@ -33,6 +53,38 @@ function createExamplePatch(example: ResearchExample): Partial<WorkspaceDraft> {
     terminologyLocks: example.terminologyLocks.map((term) => ({ ...term })),
     importedDocument: undefined,
   };
+}
+
+function sourceStateKey(draftId: string) {
+  return `${SOURCE_MODE_STORAGE_PREFIX}${draftId}`;
+}
+
+function inferSourceState(draft: WorkspaceDraft): SourceState {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(sourceStateKey(draft.id)) || 'null') as Partial<SourceState> | null;
+      if (stored?.origin === 'custom') return { origin: 'custom' };
+      if (stored?.origin === 'docx' && draft.importedDocument) return { origin: 'docx' };
+      if (stored?.origin === 'example' && typeof stored.activeExampleId === 'string') {
+        const example = findResearchExample(stored.activeExampleId);
+        if (example && example.sourceText === draft.sourceText) {
+          return { origin: 'example', activeExampleId: example.id };
+        }
+      }
+    } catch {
+      // Invalid UI-only state is ignored; the persisted manuscript remains intact.
+    }
+  }
+
+  if (draft.importedDocument) return { origin: 'docx' };
+  const matchingExample = findResearchExampleForSource(draft.sourceText);
+  return matchingExample
+    ? { origin: 'example', activeExampleId: matchingExample.id }
+    : { origin: 'custom' };
+}
+
+function copyImportedDocument(value: ImportedDocument | undefined) {
+  return value ? { ...value, warnings: [...value.warnings] } : undefined;
 }
 
 export function TaskSetup({
@@ -51,18 +103,32 @@ export function TaskSetup({
   onAnalyze: () => void;
 }) {
   const confirmRef = useRef<HTMLDialogElement>(null);
+  const sourceTextRef = useRef<HTMLTextAreaElement>(null);
+  const pulseTimerRef = useRef<number | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('paste');
   const [importResult, setImportResult] = useState<DocxImportResult | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [termSource, setTermSource] = useState('');
   const [termPreferred, setTermPreferred] = useState('');
-  const [loadedExampleId, setLoadedExampleId] = useState('');
+  const [sourceState, setSourceState] = useState<SourceState>(() => inferSourceState(draft));
+  const [switchUndo, setSwitchUndo] = useState<DraftSnapshot | null>(null);
+  const [taskNotice, setTaskNotice] = useState('');
+  const [editorPulse, setEditorPulse] = useState(false);
 
   const textLength = draft.sourceText.length;
   const inputValid = textLength >= MIN_SOURCE_CHARACTERS && textLength <= MAX_SOURCE_CHARACTERS;
   const canAnalyze = Boolean(service?.configured && inputValid && !analyzing);
   const lengthPercent = Math.min(100, Math.max(0, (textLength / MAX_SOURCE_CHARACTERS) * 100));
+  const activeExample = sourceState.origin === 'example'
+    ? findResearchExample(sourceState.activeExampleId)
+    : null;
+  const currentTaskExample = getPrimaryResearchExample(draft.taskType);
+  const sourceModeLabel = sourceState.origin === 'example'
+    ? '公开合成示例'
+    : sourceState.origin === 'docx'
+      ? 'DOCX 导入'
+      : '我的文本';
   const disabledReason = serviceLoading
     ? '正在确认分析服务状态…'
     : !service?.configured
@@ -72,6 +138,65 @@ export function TaskSetup({
         : textLength > MAX_SOURCE_CHARACTERS
           ? `超出 ${textLength - MAX_SOURCE_CHARACTERS} 个字符，请缩短正文。`
           : '';
+
+  useEffect(() => {
+    setSourceState(inferSourceState(draft));
+    setSwitchUndo(null);
+    setTaskNotice('');
+  }, [draft.id]);
+
+  useEffect(() => () => {
+    if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+  }, []);
+
+  function persistSourceState(next: SourceState) {
+    setSourceState(next);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(sourceStateKey(draft.id), JSON.stringify(next));
+    } catch {
+      // The workspace itself still persists even when UI-only mode storage is unavailable.
+    }
+  }
+
+  function snapshotDraft(): DraftSnapshot {
+    return {
+      patch: {
+        projectName: draft.projectName,
+        taskType: draft.taskType,
+        sectionType: draft.sectionType,
+        targetJournal: draft.targetJournal,
+        sourceText: draft.sourceText,
+        terminologyLocks: draft.terminologyLocks.map((term) => ({ ...term })),
+        importedDocument: copyImportedDocument(draft.importedDocument),
+      },
+      sourceState,
+    };
+  }
+
+  function pulseSourceEditor() {
+    if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+    setEditorPulse(false);
+    window.requestAnimationFrame(() => {
+      setEditorPulse(true);
+      pulseTimerRef.current = window.setTimeout(() => setEditorPulse(false), 900);
+      if (sourceTextRef.current) {
+        sourceTextRef.current.scrollTop = 0;
+        sourceTextRef.current.setSelectionRange(0, 0);
+      }
+    });
+  }
+
+  function markAuthoredChange(patch: Partial<WorkspaceDraft>, textEdited = false) {
+    onChange(patch);
+    const leavesExampleMode = sourceState.origin === 'example';
+    const leavesDocxMode = textEdited && sourceState.origin === 'docx';
+    if (leavesExampleMode || leavesDocxMode) {
+      persistSourceState({ origin: 'custom' });
+      setTaskNotice('已进入“我的文本”模式。之后切换任务不会覆盖当前内容。');
+    }
+    setSwitchUndo(null);
+  }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -105,35 +230,74 @@ export function TaskSetup({
         warnings: importResult.warnings,
       },
     });
-    setLoadedExampleId('');
+    persistSourceState({ origin: 'docx' });
+    setSwitchUndo(null);
+    setTaskNotice(`已从 ${importResult.fileName} 载入“${section.title}”。切换任务不会覆盖这段正文。`);
     setImportResult(null);
     setInputMode('paste');
+    pulseSourceEditor();
   }
 
-  function applyExample(example: ResearchExample) {
+  function applyExample(example: ResearchExample, notice: string) {
+    setSwitchUndo(snapshotDraft());
     onChange(createExamplePatch(example));
+    persistSourceState({ origin: 'example', activeExampleId: example.id });
     setImportResult(null);
     setImportError('');
-    setLoadedExampleId(example.id);
     setInputMode('paste');
+    setTaskNotice(notice);
+    pulseSourceEditor();
   }
 
   function loadExample(example: ResearchExample) {
     if (draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
-    applyExample(example);
+    applyExample(example, `已载入“${TASK_LABELS[example.taskType]}”公开合成示例。`);
+  }
+
+  function loadCurrentTaskExample() {
+    if (!currentTaskExample) return;
+    loadExample(currentTaskExample);
   }
 
   function selectTask(task: TaskType) {
-    const currentExample = findResearchExampleForSource(draft.sourceText);
+    if (task === draft.taskType) return;
     const nextExample = getPrimaryResearchExample(task);
 
-    if (currentExample && nextExample && currentExample.taskType !== task) {
-      applyExample(nextExample);
+    if (sourceState.origin === 'example' && nextExample) {
+      applyExample(nextExample, `已切换为“${TASK_LABELS[task]}”示例；正文、任务名称、期刊和术语规则已同步更新。`);
       return;
     }
 
     onChange({ taskType: task });
-    if (!currentExample) setLoadedExampleId('');
+    setSwitchUndo(null);
+    setTaskNotice(`任务已切换为“${TASK_LABELS[task]}”，当前${sourceModeLabel}已保留。可使用“载入当前任务示例”主动替换。`);
+  }
+
+  function clearForCustomText() {
+    if (draft.sourceText.trim() && !window.confirm('这会清空当前示例正文和示例设置，进入“我的文本”模式。确定继续吗？')) return;
+    setSwitchUndo(snapshotDraft());
+    onChange({
+      projectName: '',
+      sectionType: 'general',
+      targetJournal: '',
+      sourceText: '',
+      terminologyLocks: [],
+      importedDocument: undefined,
+    });
+    persistSourceState({ origin: 'custom' });
+    setTaskNotice('已进入“我的文本”模式。请粘贴论文正文，切换任务时内容会保持不变。');
+    setInputMode('paste');
+    window.requestAnimationFrame(() => sourceTextRef.current?.focus());
+  }
+
+  function undoSourceSwitch() {
+    if (!switchUndo) return;
+    onChange(switchUndo.patch);
+    persistSourceState(switchUndo.sourceState);
+    setSwitchUndo(null);
+    setTaskNotice('已恢复切换前的正文和任务设置。');
+    setInputMode('paste');
+    pulseSourceEditor();
   }
 
   function addTerm() {
@@ -141,7 +305,7 @@ export function TaskSetup({
     const preferred = termPreferred.trim();
     if (!source || !preferred || draft.terminologyLocks.length >= 20) return;
     const next: TerminologyLock = { id: crypto.randomUUID(), source, preferred };
-    onChange({ terminologyLocks: [...draft.terminologyLocks, next] });
+    markAuthoredChange({ terminologyLocks: [...draft.terminologyLocks, next] });
     setTermSource('');
     setTermPreferred('');
   }
@@ -158,18 +322,31 @@ export function TaskSetup({
 
       <div className="workspace-titlebar">
         <div><span className="product-label">快速审校</span><h1>准备本次审校任务</h1></div>
-        <p>正文默认保存在当前浏览器。只有确认开始分析后，所选文本和设置才会发送到模型服务。</p>
+        <p>先确认任务与正文来源。正文默认保存在当前浏览器，只有确认开始分析后才会发送到模型服务。</p>
       </div>
 
       {!serviceLoading && service && !service.configured ? (
         <StatusBanner tone="warning" title="分析服务未配置">{service.message}</StatusBanner>
       ) : null}
 
+      {taskNotice ? (
+        <div className="task-switch-notice" role="status" aria-live="polite">
+          <span>{taskNotice}</span>
+          {switchUndo ? <button onClick={undoSourceSwitch} type="button">撤销切换</button> : null}
+        </div>
+      ) : null}
+
       <div className="setup-editor-grid">
-        <section aria-labelledby="source-editor-title" className="source-editor-panel quick-review-panel">
+        <section aria-labelledby="source-editor-title" className={`source-editor-panel quick-review-panel${editorPulse ? ' example-transition' : ''}`}>
           <header>
             <div><span className="setup-step">输入内容</span><h2 id="source-editor-title">论文文本</h2></div>
-            {draft.importedDocument ? <span className="imported-file-label">来自 {draft.importedDocument.fileName}</span> : null}
+            <div className="source-panel-actions">
+              {draft.importedDocument ? <span className="imported-file-label">来自 {draft.importedDocument.fileName}</span> : null}
+              <span className={`source-origin-badge origin-${sourceState.origin}`}>{sourceModeLabel}</span>
+              {sourceState.origin === 'example'
+                ? <button onClick={clearForCustomText} type="button">清空并输入我的文本</button>
+                : <button disabled={!currentTaskExample} onClick={loadCurrentTaskExample} type="button">载入当前任务示例</button>}
+            </div>
           </header>
 
           <div aria-label="输入方式" className="input-mode-tabs" role="tablist">
@@ -184,11 +361,9 @@ export function TaskSetup({
                 <textarea
                   aria-describedby="character-status"
                   id="source-text"
-                  onChange={(event) => {
-                    setLoadedExampleId('');
-                    onChange({ sourceText: event.target.value, importedDocument: undefined });
-                  }}
+                  onChange={(event) => markAuthoredChange({ sourceText: event.target.value, importedDocument: undefined }, true)}
                   placeholder={draft.taskType === 'translate' ? '粘贴需要翻译的摘要、方法、结果或讨论段落…' : 'Paste the manuscript passage that needs careful review…'}
+                  ref={sourceTextRef}
                   spellCheck={draft.taskType !== 'translate'}
                   value={draft.sourceText}
                 />
@@ -197,6 +372,30 @@ export function TaskSetup({
                 <div><span>{textLength < MIN_SOURCE_CHARACTERS ? `至少需要 ${MIN_SOURCE_CHARACTERS} 个字符` : textLength > MAX_SOURCE_CHARACTERS ? '内容超过限制' : '长度符合要求'}</span><strong>{textLength.toLocaleString()} / {MAX_SOURCE_CHARACTERS.toLocaleString()}</strong></div>
                 <span aria-hidden="true"><i style={{ width: `${lengthPercent}%` }} /></span>
               </div>
+
+              <section className="inline-example-switcher" aria-labelledby="inline-example-title">
+                <div>
+                  <span className="setup-step">同一研究主题</span>
+                  <h3 id="inline-example-title">比较三种任务的处理边界</h3>
+                  <p>公开合成示例不会自动调用模型。选择后可直接修改，首次编辑即进入“我的文本”模式。</p>
+                </div>
+                <div className="inline-example-list">
+                  {TASK_EXAMPLES.map((example) => (
+                    <button
+                      aria-label={`使用示例：${TASK_LABELS[example.taskType]}，${example.title}`}
+                      className={activeExample?.id === example.id ? 'selected' : ''}
+                      disabled={activeExample?.id === example.id}
+                      key={example.id}
+                      onClick={() => loadExample(example)}
+                      type="button"
+                    >
+                      <span>{TASK_LABELS[example.taskType]}</span>
+                      <strong>{example.title}</strong>
+                      <small>{example.focus}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
           ) : (
             <div aria-labelledby="docx-input-tab" className="docx-input-panel" id="docx-input-panel" role="tabpanel">
@@ -226,15 +425,19 @@ export function TaskSetup({
               <label className={draft.taskType === task ? 'selected' : ''} key={task}>
                 <input checked={draft.taskType === task} name="taskType" onChange={() => selectTask(task)} type="radio" />
                 <span aria-hidden="true" />
-                <div><strong>{TASK_LABELS[task]}</strong><small>{TASK_DESCRIPTIONS[task]}</small></div>
+                <div><strong>{TASK_LABELS[task]}</strong><small>{TASK_SUMMARIES[task]}</small></div>
               </label>
             ))}
           </div>
+          <div className="task-selection-detail">
+            <span>当前任务边界</span>
+            <p>{TASK_DESCRIPTIONS[draft.taskType]}</p>
+          </div>
 
           <div className="task-context-fields">
-            <label><span>章节类型</span><select onChange={(event) => onChange({ sectionType: event.target.value as WorkspaceDraft['sectionType'] })} value={draft.sectionType}>{SECTION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label><span>任务名称（可选）</span><input maxLength={120} onChange={(event) => onChange({ projectName: event.target.value })} placeholder="例如：Discussion 段落审校" value={draft.projectName} /></label>
-            <label><span>目标期刊或语境（可选）</span><input maxLength={160} onChange={(event) => onChange({ targetJournal: event.target.value })} placeholder="例如：Nature Communications" value={draft.targetJournal} /></label>
+            <label><span>章节类型</span><select onChange={(event) => markAuthoredChange({ sectionType: event.target.value as WorkspaceDraft['sectionType'] })} value={draft.sectionType}>{SECTION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label><span>任务名称（可选）</span><input maxLength={120} onChange={(event) => markAuthoredChange({ projectName: event.target.value })} placeholder="例如：Discussion 段落审校" value={draft.projectName} /></label>
+            <label><span>目标期刊或语境（可选）</span><input maxLength={160} onChange={(event) => markAuthoredChange({ targetJournal: event.target.value })} placeholder="例如：Nature Communications" value={draft.targetJournal} /></label>
           </div>
 
           <details className="compact-settings-details">
@@ -246,7 +449,7 @@ export function TaskSetup({
                 <label><span>指定表达</span><input maxLength={160} onChange={(event) => setTermPreferred(event.target.value)} value={termPreferred} /></label>
                 <button disabled={!termSource.trim() || !termPreferred.trim() || draft.terminologyLocks.length >= 20} onClick={addTerm} type="button">添加规则</button>
               </div>
-              {draft.terminologyLocks.length ? <ul className="term-list">{draft.terminologyLocks.map((term) => <li key={term.id}><span><b>{term.source}</b><small>{term.preferred}</small></span><button aria-label={`删除术语 ${term.source}`} onClick={() => onChange({ terminologyLocks: draft.terminologyLocks.filter((item) => item.id !== term.id) })} type="button">删除</button></li>)}</ul> : <p className="empty-inline">当前没有额外术语规则。</p>}
+              {draft.terminologyLocks.length ? <ul className="term-list">{draft.terminologyLocks.map((term) => <li key={term.id}><span><b>{term.source}</b><small>{term.preferred}</small></span><button aria-label={`删除术语 ${term.source}`} onClick={() => markAuthoredChange({ terminologyLocks: draft.terminologyLocks.filter((item) => item.id !== term.id) })} type="button">删除</button></li>)}</ul> : <p className="empty-inline">当前没有额外术语规则。</p>}
             </div>
           </details>
 
@@ -257,18 +460,6 @@ export function TaskSetup({
         </aside>
       </div>
 
-      <section className="example-loader" aria-labelledby="example-loader-title">
-        <div><span className="product-label">第一次使用</span><h2 id="example-loader-title">载入一个公开合成案例</h2><p>每种任务提供一个对应示例。切换任务时，未修改的示例会同步切换；自定义文本不会被覆盖。</p></div>
-        <div className="example-loader-list workspace-example-grid">
-          {TASK_EXAMPLES.map((example) => (
-            <button aria-label={`使用示例：${example.discipline}，${example.title}`} className="workspace-example-card" key={example.id} onClick={() => loadExample(example)} type="button">
-              <span>{example.discipline}</span><strong>{example.title}</strong><small>{TASK_LABELS[example.taskType]}</small>
-            </button>
-          ))}
-        </div>
-        {loadedExampleId ? <p className="example-loaded-message" role="status">示例已载入。切换任务会自动换成对应示例，也可以直接修改后开始分析。</p> : null}
-      </section>
-
       <dialog className="confirm-dialog" ref={confirmRef}>
         <form method="dialog">
           <span className="product-label">分析前确认</span>
@@ -277,6 +468,7 @@ export function TaskSetup({
           <div className="confirmation-list">
             <span><b>文本</b>{textLength.toLocaleString()} 个字符</span>
             <span><b>任务</b>{TASK_LABELS[draft.taskType]}</span>
+            <span><b>来源</b>{sourceModeLabel}</span>
             <span><b>章节</b>{SECTION_OPTIONS.find(([value]) => value === draft.sectionType)?.[1] || draft.sectionType}</span>
           </div>
           <div className="responsibility-note"><strong>仍需作者核对</strong><span>事实、数值、单位、方法、引用、因果关系和结论强度。</span></div>
