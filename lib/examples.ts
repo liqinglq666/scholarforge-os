@@ -14,21 +14,60 @@ export interface ResearchExample {
   suggestion: string;
 }
 
+const PRIMARY_EXAMPLE_IDS: Record<TaskType, string> = {
+  translate: 'materials-translate',
+  polish: 'materials-polish',
+  precheck: 'materials-precheck',
+};
+
 export const RESEARCH_EXAMPLES: ResearchExample[] = [
+  {
+    id: 'materials-translate',
+    discipline: '材料与工程',
+    title: '结果段：中译英并保护数值',
+    taskType: 'translate',
+    sectionType: 'results',
+    projectName: '水泥基材料孔结构研究 · 结果段中译英',
+    targetJournal: 'Construction and Building Materials',
+    sourceText: '养护28 d后，试样总孔隙率由18.6%下降至14.2%，抗压强度由42.5 MPa提高至51.3 MPa。上述结果表明，外加剂可能促进了孔结构致密化，但现有数据不足以证明有害孔隙已被完全消除。',
+    terminologyLocks: [
+      { id: 'materials-translate-term-1', source: '孔结构', preferred: 'pore structure' },
+      { id: 'materials-translate-term-2', source: '抗压强度', preferred: 'compressive strength' },
+    ],
+    focus: '完整保留28 d、18.6%、14.2%、42.5 MPa和51.3 MPa，并维持“可能促进”与“不足以证明”的证据边界。',
+    suggestion: '使用可核对的学术英文表达，不补充原文没有的机理、统计显著性或因果结论。',
+  },
   {
     id: 'materials-polish',
     discipline: '材料与工程',
-    title: '结果段：避免过度证明',
+    title: '结果段：保守润色表达',
     taskType: 'polish',
     sectionType: 'results',
-    projectName: '水泥基材料孔结构研究 · Results',
+    projectName: '水泥基材料孔结构研究 · 结果段保守润色',
     targetJournal: 'Construction and Building Materials',
     sourceText: 'The results can well prove that the pore structure became much denser after 28 d of curing. The total porosity decreased from 18.6% to 14.2%, and the compressive strength increased from 42.5 MPa to 51.3 MPa. Therefore, the additive completely eliminated the harmful pores in the matrix.',
     terminologyLocks: [
-      { id: 'materials-term-1', source: '孔结构', preferred: 'pore structure' },
+      { id: 'materials-polish-term-1', source: 'pore structure', preferred: 'pore structure' },
+      { id: 'materials-polish-term-2', source: 'compressive strength', preferred: 'compressive strength' },
     ],
-    focus: '检查结论强度、数值与单位是否保持一致。',
+    focus: '改善语法、句法和学术语气，同时保持数值、单位和证据强度。',
     suggestion: '把“prove”改为更审慎的“indicate”，并避免使用“completely eliminated”等绝对表述。',
+  },
+  {
+    id: 'materials-precheck',
+    discipline: '材料与工程',
+    title: '结果段：投稿前证据检查',
+    taskType: 'precheck',
+    sectionType: 'results',
+    projectName: '水泥基材料孔结构研究 · 结果段投稿前检查',
+    targetJournal: 'Construction and Building Materials',
+    sourceText: 'After 28 d of curing, the total porosity decreased from 18.6% to 14.2%, while the compressive strength increased from 42.5 MPa to 51.3 MPa. These results prove that the additive permanently removed all harmful pores and will improve the long-term durability of every cement-based material. No independent durability test was conducted in this study.',
+    terminologyLocks: [
+      { id: 'materials-precheck-term-1', source: 'total porosity', preferred: 'total porosity' },
+      { id: 'materials-precheck-term-2', source: 'compressive strength', preferred: 'compressive strength' },
+    ],
+    focus: '检查绝对结论、未经验证的长期耐久性主张、外推范围以及结果与试验设计是否一致。',
+    suggestion: '保留已报告数值，但将结论限制到当前试样和已执行的测试范围。',
   },
   {
     id: 'biomed-precheck',
@@ -122,5 +161,5 @@ export function findResearchExampleForSource(sourceText: string) {
 }
 
 export function getPrimaryResearchExample(taskType: TaskType) {
-  return RESEARCH_EXAMPLES.find((example) => example.taskType === taskType) || null;
+  return findResearchExample(PRIMARY_EXAMPLE_IDS[taskType]);
 }
