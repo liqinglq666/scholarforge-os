@@ -86,7 +86,7 @@ describe('TaskSetup', () => {
     await userEvent.click(screen.getByRole('button', { name: /使用示例：英文保守润色/ }));
 
     expect(screen.getByRole('radio', { name: /英文保守润色/ })).toBeChecked();
-    expect(screen.getByLabelText('英文论文原文')).toHaveValue(expect.stringContaining('42.5 MPa'));
+    expect((screen.getByLabelText('英文论文原文') as HTMLTextAreaElement).value).toContain('42.5 MPa');
     expect(screen.getByLabelText('任务名称（可选）')).toHaveValue('水泥基材料孔结构研究 · 结果段保守润色');
     expect(screen.getByText('公开合成示例', { selector: '.source-origin-badge' })).toBeInTheDocument();
     expect(onAnalyze).not.toHaveBeenCalled();
@@ -97,14 +97,14 @@ describe('TaskSetup', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /科研中译英/ }));
     expect(screen.getByRole('radio', { name: /科研中译英/ })).toBeChecked();
-    expect(screen.getByLabelText('中文科研原文')).toHaveValue(expect.stringContaining('养护28 d后'));
+    expect((screen.getByLabelText('中文科研原文') as HTMLTextAreaElement).value).toContain('养护28 d后');
     expect(screen.getByLabelText('任务名称（可选）')).toHaveValue('水泥基材料孔结构研究 · 结果段中译英');
     expect(screen.getByLabelText('目标期刊或语境（可选）')).toHaveValue('Construction and Building Materials');
     expect(screen.getByText(/正文、任务名称、期刊和术语规则已同步更新/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('radio', { name: /投稿前检查/ }));
     expect(screen.getByRole('radio', { name: /投稿前检查/ })).toBeChecked();
-    expect(screen.getByLabelText('英文论文原文')).toHaveValue(expect.stringContaining('No independent durability test'));
+    expect((screen.getByLabelText('英文论文原文') as HTMLTextAreaElement).value).toContain('No independent durability test');
     expect(screen.getByLabelText('任务名称（可选）')).toHaveValue('水泥基材料孔结构研究 · 结果段投稿前检查');
   });
 
