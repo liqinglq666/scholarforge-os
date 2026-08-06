@@ -1,184 +1,343 @@
-# ScholarForge OS｜研语工坊
+<div align="center">
+  <img src="./app/icon.svg" width="112" height="112" alt="ScholarForge OS logo" />
 
-[English](README.en.md)
+  <h1>ScholarForge OS｜研语工坊</h1>
 
+  <p><strong>科研事实安全审校工作台</strong></p>
+  <p>模型提出 · 代码核验 · 作者决定</p>
+
+  <p>
+    <a href="https://scholarforge-os.vercel.app"><strong>在线体验</strong></a>
+    ·
+    <a href="https://scholarforge-os.vercel.app/try">快速评审</a>
+    ·
+    <a href="https://scholarforge-os.vercel.app/trust">安全规则</a>
+    ·
+    <a href="https://scholarforge-os.vercel.app/guide">使用手册</a>
+    ·
+    <a href="./README.en.md">English</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml">
+      <img alt="ScholarForge CI" src="https://github.com/liqinglq666/scholarforge-os/actions/workflows/ci.yml/badge.svg" />
+    </a>
+    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs" />
+    <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" />
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" />
+    <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white" />
+    <img alt="Vercel" src="https://img.shields.io/badge/Deploy-Vercel-000000?logo=vercel" />
+  </p>
+</div>
+
+> [!IMPORTANT]
 > **普通 AI 帮助修改论文，ScholarForge 负责阻止 AI 改错论文。**  
-> AI 提建议，作者做决定。
+> ScholarForge 不把模型输出直接覆盖到作者文本，而是在 AI 候选稿与作者工作稿之间加入独立的 **ScholarForge Safety Gate｜科研事实安全门**。
 
-ScholarForge OS 是一款面向研究生、科研人员和学术编辑的**科研事实安全审校工作台**。它不把模型输出直接写进论文，而是在 AI 候选稿与作者工作稿之间增加独立的 **ScholarForge Safety Gate｜科研事实安全门**。
+---
 
-- 公网体验：`https://scholarforge-os.vercel.app`
-- 推荐评审入口：`/try`
-- 安全规则与测试：`/trust`
-- 使用手册：`/guide`
+## 目录
 
-> 生产域名在正式合并和部署后指向本版本。评审无需下载程序、拉取代码、部署依赖或配置 API Key。
+- [在线体验](#在线体验)
+- [为什么需要 ScholarForge](#为什么需要-scholarforge)
+- [可信审校模型](#可信审校模型)
+- [核心能力](#核心能力)
+- [产品工作流](#产品工作流)
+- [Safety Gate](#safety-gate)
+- [技术架构](#技术架构)
+- [项目结构](#项目结构)
+- [快速开始](#快速开始)
+- [环境变量](#环境变量)
+- [API 契约](#api-契约)
+- [质量保障](#质量保障)
+- [数据隐私与安全](#数据隐私与安全)
+- [已知边界](#已知边界)
+- [路线图](#路线图)
+- [贡献与许可](#贡献与许可)
 
-## 为什么需要科研事实安全门
+## 在线体验
 
-大模型可以改善语言，但也可能在润色、翻译或重写过程中无意改变：
+| 入口 | 地址 | 适合场景 |
+| --- | --- | --- |
+| **产品首页** | [scholarforge-os.vercel.app](https://scholarforge-os.vercel.app) | 了解产品定位与核心能力 |
+| **快速评审** | [/try](https://scholarforge-os.vercel.app/try) | 无需登录，体验完整审校流程 |
+| **专业工作台** | [/workspace](https://scholarforge-os.vercel.app/workspace) | 输入文本、导入 DOCX、配置任务 |
+| **Safety Gate** | [/trust](https://scholarforge-os.vercel.app/trust) | 查看规则范围、风险边界和测试说明 |
+| **使用手册** | [/guide](https://scholarforge-os.vercel.app/guide) | 查看操作流程与数据说明 |
+| **论文项目** | [/projects](https://scholarforge-os.vercel.app/projects) | 管理多论文、多章节、版本与导师意见 |
 
-- 数值、百分数、样本量或科学计数法；
-- 数值与单位组合；
-- 作者—年份引用或 DOI；
-- 材料名、量表、算法与缩写；
-- 原文没有提供的实验或方法步骤；
+> [!TIP]
+> 推荐先打开 **快速评审**，选择任一公开合成示例，再依次体验：任务切换 → 分析前确认 → Safety Gate → 作者决策 → 安全应用 → 撤销/重做 → 导出。
+
+## 为什么需要 ScholarForge
+
+科研写作模型可以改善语法、表达和结构，但也可能在“润色”过程中静默改变：
+
+- 数值、百分数、样本量和科学计数法；
+- 数值与单位的对应关系；
+- 作者—年份引用、DOI 或受保护术语；
+- 原文没有提供的实验步骤或方法声明；
 - 相关关系与因果关系；
 - 审慎结论与确定性结论；
 - 有限样本与普遍人群之间的研究范围。
 
-ScholarForge 的核心创新不是让模型“写得更多”，而是让**模型修改本身成为被审查的对象**。
+ScholarForge 的核心创新不是让模型写得更多，而是让 **AI 修改本身成为被审查的对象**。
 
 ```text
-AI 生成候选修改
-        ↓
-ScholarForge Safety Gate
-数值｜单位｜引用｜术语｜实验声明｜因果｜结论强度｜研究范围
-        ↓
-作者逐条决定
-接受｜拒绝｜暂缓｜安全应用｜撤回｜导出
+传统 AI 写作工具
+原文 ──> 模型改写 ──> 直接复制到论文
+
+ScholarForge OS
+原文 ──> 模型候选 ──> Safety Gate ──> 作者逐条决定 ──> 工作稿
 ```
 
-## 三层权限模型
+## 可信审校模型
+
+ScholarForge 使用三层权限模型，把“生成、校验、决策”拆分为彼此独立的责任边界。
+
+```mermaid
+flowchart LR
+    A[作者原文] --> B[任务与术语配置]
+    B --> C[模型生成候选稿与问题列表]
+    C --> D{ScholarForge Safety Gate}
+
+    D -->|硬规则失败| E[Quarantined 已隔离]
+    D -->|通过当前规则| F[逐条作者审阅]
+
+    E --> G[展示阻断证据<br/>禁止自动应用]
+    F --> H{作者决定}
+
+    H -->|接受| I[检查局部安全应用资格]
+    H -->|拒绝| J[保留原文]
+    H -->|暂缓| K[等待进一步核对]
+
+    I -->|可唯一锚定且无事实风险| L[应用到作者工作稿]
+    I -->|不满足条件| M[仅保留为建议]
+
+    L --> N[撤销 / 重做 / 导出]
+    J --> N
+    K --> N
+    M --> N
+```
 
 ### 1. 模型只提出候选
 
-阿里云百炼模型生成完整候选稿、问题列表、原文证据和修改理由。模型无权直接覆盖作者工作稿，也无权自行宣布一条修改“可以安全应用”。
+模型生成候选文本、问题位置、修改理由和证据，但无权：
+
+- 覆盖作者工作稿；
+- 宣布自己生成的内容“安全”；
+- 绕过代码规则；
+- 代替作者接受建议。
 
 ### 2. 代码独立执行安全门
 
-模型输出返回后，应用代码独立检查科研事实硬规则。若候选稿违反规则，结果会进入 **quarantined｜已隔离** 状态，而不是被当作一次模糊的普通错误。
-
-隔离状态下：
-
-- 原文保持不变；
-- 作者工作稿保持不变；
-- AI 候选稿仅供理解风险；
-- 所有自动应用权限关闭；
-- 页面展示逐项检查证据与阻断原因。
+模型返回后，应用代码重新检查数字、单位、引用、术语、实验声明和科研主张边界。失败结果会进入 `quarantined`，而不是伪装成普通成功。
 
 ### 3. 作者控制最终文本
 
-即使完整候选稿通过安全门，作者仍须逐条核对。只有同时满足以下条件的局部建议才可能自动应用：
+即使候选稿通过当前规则，作者仍需逐条接受、拒绝或暂缓。只有具备唯一文本锚点且满足硬规则的局部建议，才可能应用到工作稿。
 
-- 原文片段能够在当前工作稿中唯一定位；
-- 修改不跨越段落；
-- 不改变数值、单位、引用和受保护术语；
-- 不新增实验、事实或占位符；
-- 不升级因果关系、结论强度或研究范围；
-- 不需要作者补充信息；
-- 不与已经应用的修改重叠。
+## 核心能力
 
-## 评委推荐体验路径
+### 三种科研任务
 
-打开 `/try` 后，无需登录即可完成核心体验：
-
-1. 载入公开生命医学讨论段案例；
-2. 选择“投稿前检查”；
-3. 确认本次发送内容；
-4. 调用真实百炼模型；
-5. 查看科研事实安全门逐项结果；
-6. 对每条建议选择接受、拒绝或暂缓；
-7. 只应用代码允许的局部修改；
-8. 体验撤销、重做和导出。
-
-推荐案例为公开合成科研文本，只会先填入当前浏览器草稿，不会自动调用模型。
-
-## 核心任务
-
-| 任务 | 解决的问题 | 硬性边界 |
+| 任务 | 目标 | 不可突破的边界 |
 | --- | --- | --- |
-| 科研中译英 | 把中文科研文本转换为可核对的学术英文 | 不改变数值、单位、术语、引用和证据强度 |
-| 英文保守润色 | 改善语法、句法、连贯性、简洁性和学术表达 | 不新增事实、实验、引用或更强结论 |
-| 投稿前检查 | 识别语言、逻辑、方法报告与证据边界问题 | 不预测录用、不替代同行评议、不声称验证科学正确性 |
+| **科研中译英** | 将中文科研段落转换为可核对的学术英文 | 不改变数值、单位、术语、引用和证据强度 |
+| **英文保守润色** | 改善语法、句法、连贯性、简洁性与学术表达 | 不新增事实、实验、引用或更强结论 |
+| **投稿前检查** | 识别语言、方法报告、逻辑与证据边界风险 | 不预测录用，不替代同行评议，不声称验证科学正确性 |
 
-## 完整论文工作流
+### 明确的正文来源模式
 
-除公开快速体验外，ScholarForge 还支持：
+工作台不会通过“猜测文本内容”判断当前状态，而是明确展示来源：
 
-1. 创建多个独立论文项目；
-2. 管理摘要、方法、结果、讨论等多个章节；
-3. 设置目标期刊语境和项目术语规则；
-4. 只把作者明确选择的章节送入审校；
-5. 保存作者确认后的文本回原项目；
-6. 自动生成版本比较记录；
-7. 在浏览器中运行跨章节一致性检查；
-8. 拆分和追踪导师意见；
-9. 导出修改说明；
-10. 导出 TXT、Markdown、清洁 DOCX 或完整 JSON 备份。
+- `公开合成示例`：切换任务时同步更换整套示例；
+- `我的文本`：切换任务只改变任务类型，不覆盖正文；
+- `DOCX 导入`：原始文件在浏览器解析，切换任务不覆盖所选章节。
 
-## 当前安全门检查范围
+用户首次修改公开示例后，系统会自动进入“我的文本”模式，并保护后续内容不被任务切换覆盖。
 
-### 数值与单位
+### 完整论文工作流
 
-- 整数、负数、小数；
-- 百分数；
-- 科学计数法；
-- 千位分隔符；
-- 样本量候选；
-- MPa、kPa、mg/L、°C、时间等受支持单位组合。
+- 多论文项目与多章节管理；
+- 摘要、方法、结果、讨论等章节级审校；
+- 目标期刊语境和项目术语规则；
+- 跨章节数值、样本量和术语一致性检查；
+- 导师意见拆分、处理状态与作者回复；
+- 版本比较、历史记录与非破坏性恢复；
+- TXT、Markdown、清洁 DOCX 和 JSON 工作区备份导出。
 
-### 引用与事实注入
+## 产品工作流
 
-- 作者—年份引用；
-- DOI；
-- 原文未提供的新实验声明；
-- TODO、待补引用和危险占位符。
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 作者
+    participant UI as ScholarForge Workspace
+    participant API as POST /api/review
+    participant M as Model Studio
+    participant V as Response Validator
+    participant G as Safety Gate
 
-### 科研主张边界
+    U->>UI: 粘贴文本或导入 DOCX
+    U->>UI: 选择任务、章节、期刊、术语
+    UI->>U: 展示将发送的字符数与正文来源
+    U->>UI: 确认开始分析
+    UI->>API: 发送结构化审校请求
+    API->>API: 校验 JSON / 大小 / 限流 / 并发 / 预算
+    API->>M: 请求候选稿与问题列表
+    M-->>API: 返回结构化模型输出
+    API->>V: 校验字段、截断、重复项与异常输出
+    V->>G: 对候选修改执行独立硬规则检查
 
-- associated / correlated / predicted → caused / led to；
-- may / suggest / indicate → prove / confirm / completely；
-- 特定样本、单中心、三所高校、横断面研究 → 所有人群、全国、普遍适用。
+    alt 违反科研事实硬规则
+        G-->>UI: quarantined + 阻断证据
+        UI-->>U: 保留作者工作稿，关闭自动应用
+    else 通过当前规则
+        G-->>UI: passed + 逐项建议
+        UI-->>U: 接受 / 拒绝 / 暂缓
+        U->>UI: 应用安全的局部修改
+        UI-->>U: 撤销 / 重做 / 导出
+    end
+```
 
-规则检测可能出现漏报或误报，因此安全门通过**不等于科学正确**。
+## Safety Gate
 
-## 数据与隐私
+### 当前检查范围
 
-- 论文项目、章节、导师意见、版本全文、分析历史和作者决定默认保存在当前浏览器 `localStorage`；
-- DOCX 在浏览器中提取正文，原始二进制文件不会上传；
-- 只有用户明确确认并开始分析后，当前所选文本和设置才会发送到服务端与模型；
-- `DASHSCOPE_API_KEY` 只在服务端读取；
-- 可选 Supabase 账户只同步经过验证的个性化偏好；
-- 登录不会自动上传论文正文、导师意见、版本全文或分析记录；
-- 模型未配置时，分析按钮禁用，API 返回明确 `503`，不会伪造结果；
-- 完整 JSON 备份支持非破坏性恢复，备份中的编辑偏移不会被直接信任。
+| 检查域 | 示例 |
+| --- | --- |
+| **数字** | 整数、负数、小数、百分数、科学计数法、千位分隔符、样本量候选 |
+| **单位** | MPa、kPa、mg/L、°C、时间等受支持的数值—单位组合 |
+| **引用** | 作者—年份引用、DOI、引用占位符 |
+| **术语** | 材料名、量表、算法、缩写、作者锁定译法 |
+| **实验声明** | 原文未出现的新实验、新方法或新数据来源 |
+| **因果关系** | associated / correlated / predicted → caused / led to |
+| **结论强度** | may / suggest / indicate → prove / confirm / completely |
+| **研究范围** | 特定样本或单中心研究 → 所有人群或普遍适用 |
+
+### 安全应用状态机
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Analyzing: 作者确认发送
+    Analyzing --> Quarantined: 硬规则失败
+    Analyzing --> ReviewReady: 输出与 Safety Gate 通过
+
+    Quarantined --> Draft: 返回修改原文
+    ReviewReady --> AuthorReview: 展示逐条建议
+
+    AuthorReview --> Accepted: 作者接受
+    AuthorReview --> Rejected: 作者拒绝
+    AuthorReview --> Deferred: 作者暂缓
+
+    Accepted --> Applied: 唯一锚点 + 不跨段落 + 无重叠 + 无事实风险
+    Accepted --> ManualOnly: 不满足安全应用条件
+
+    Applied --> AuthorReview: 撤销
+    AuthorReview --> Applied: 重做
+    Applied --> Exported: 导出
+    Rejected --> Exported
+    Deferred --> Exported
+    ManualOnly --> Exported
+    Exported --> [*]
+```
+
+> [!WARNING]
+> Safety Gate 通过只表示“未被当前代码规则阻断”，**不等于科学正确、统计正确或可直接投稿**。规则与模型都可能出现漏报或误报。
 
 ## 技术架构
 
-```text
-Next.js 16 App Router + React 19 + TypeScript
-├─ 公开奖项评审入口：/try /trust /guide
-├─ 多论文项目与项目级路由
-├─ 浏览器 DOCX 正文提取（Mammoth）
-├─ POST /api/review
-│  ├─ 请求校验、大小限制、会话/IP限流、并发、超时、预算熔断
-│  ├─ 阿里云百炼兼容 Chat Completions 接口
-│  ├─ 结构化模型输出验证
-│  └─ ScholarForge Safety Gate
-├─ 代码独立计算安全应用资格
-├─ 唯一文本锚点、重叠检查、撤销与重做
-├─ 跨章节一致性检查
-├─ 导师意见与版本比较
-└─ TXT / Markdown / clean DOCX / JSON backup
+```mermaid
+flowchart TB
+    subgraph Browser[浏览器端]
+        UI[Next.js App Router UI]
+        WS[工作区状态与历史]
+        DOCX[Mammoth DOCX 正文提取]
+        EDIT[安全应用 / 撤销 / 重做]
+        EXPORT[TXT / Markdown / DOCX / JSON]
+        LOCAL[(localStorage)]
+
+        UI --> WS
+        UI --> DOCX
+        WS --> LOCAL
+        WS --> EDIT
+        EDIT --> EXPORT
+    end
+
+    subgraph Server[Next.js Server Routes]
+        HEALTH[GET /api/health]
+        REVIEW[POST /api/review]
+        AUTH[Auth & Preference Routes]
+        LIMIT[请求校验 / 限流 / 并发 / 超时 / 预算]
+        VALIDATE[结构化输出校验]
+        GATE[ScholarForge Safety Gate]
+
+        REVIEW --> LIMIT
+        LIMIT --> VALIDATE
+        VALIDATE --> GATE
+    end
+
+    subgraph External[可选外部服务]
+        MODEL[Alibaba Cloud Model Studio]
+        SUPA[Supabase Auth / Preferences]
+    end
+
+    UI --> HEALTH
+    UI --> REVIEW
+    LIMIT --> MODEL
+    AUTH --> SUPA
+    GATE --> UI
 ```
 
-## 限流与评审期稳定性
+### 技术栈
 
-公开分析接口采用多层保护：
+| 层级 | 技术 |
+| --- | --- |
+| Web 框架 | Next.js 16 App Router |
+| UI 运行时 | React 19 |
+| 类型系统 | TypeScript strict |
+| DOCX 导入 | Mammoth |
+| DOCX 导出 | `docx` |
+| 单元与组件测试 | Vitest + Testing Library |
+| 浏览器自动化 | Playwright |
+| 模型接口 | 阿里云百炼 / OpenAI-compatible Chat Completions |
+| 可选账户 | Supabase Auth + 用户偏好同步 |
+| 部署 | Vercel |
+| CI | GitHub Actions |
 
-- 每个浏览器会话 10 分钟最多 8 次分析；
-- 每个出口 IP 10 分钟最多 40 次，降低共享评审网络误伤；
-- 单实例最多 6 个并发模型请求；
-- 可配置每日请求预算熔断；
-- 模型请求和浏览器等待都有明确超时；
-- 所有 429 响应包含 `Retry-After`。
+## 项目结构
 
-当前计数器为单实例内存实现。多实例大规模公开部署应替换为共享原子存储，并配合平台 WAF 与供应商预算告警。
+```text
+scholarforge-os/
+├── app/                         # App Router 页面、API 路由与全局样式
+│   ├── api/                     # review / health / auth / preferences
+│   ├── projects/                # 多论文项目及项目级子路由
+│   ├── workspace/               # 快速审校工作台
+│   ├── trust/                   # Safety Gate 规则与边界
+│   └── guide/                   # 使用手册
+├── components/                  # 工作台、审校、反馈与通用 UI
+├── lib/                         # 领域逻辑、校验、存储、导入导出
+│   ├── documents/               # DOCX 导入导出
+│   ├── review/                  # Safety Gate 与审校规则
+│   └── ...
+├── tests/                       # Vitest 单元、API 与组件测试
+├── e2e/                         # Playwright 桌面端与移动端场景
+├── supabase/migrations/         # 可选偏好同步数据库迁移
+├── .github/workflows/ci.yml     # 完整质量门
+├── .env.example
+└── package.json
+```
 
-## 本地运行
+## 快速开始
 
-要求 Node.js `>=22.12.0`。
+### 环境要求
+
+- Node.js `22.x`
+- npm（建议使用仓库锁定版本安装依赖）
+
+### 本地运行
 
 ```bash
 git clone https://github.com/liqinglq666/scholarforge-os.git
@@ -188,69 +347,258 @@ cp .env.example .env.local
 npm run dev
 ```
 
-模型环境变量：
+打开：
 
-```env
-DASHSCOPE_API_KEY=your_server_side_key
+```text
+http://localhost:3000
+```
+
+模型未配置时，页面仍可用于浏览、编辑、项目管理、DOCX 解析和本地规则体验；真实分析按钮会明确禁用，不会生成伪造结果。
+
+## 环境变量
+
+```dotenv
+# 必填：真实模型分析，仅在服务端读取
+DASHSCOPE_API_KEY=
+
+# 可选：阿里云百炼 OpenAI-compatible 地址与模型
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-plus
+
+# 可选：每日请求预算熔断；0 表示关闭应用级预算
 REVIEW_DAILY_REQUEST_BUDGET=0
+
+# 可选：账户与个性化偏好同步
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
 ```
 
-可选账户环境变量：
+> [!CAUTION]
+> `DASHSCOPE_API_KEY` 必须保持为服务端环境变量，不得添加 `NEXT_PUBLIC_` 前缀，也不得提交到 Git。
 
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-```
-
-开启账户前还需执行：
+启用 Supabase 偏好同步前，需要执行：
 
 ```text
 supabase/migrations/202608020001_user_preferences.sql
 ```
 
-## 验证
+## API 契约
+
+### 健康检查
+
+```http
+GET /api/health
+```
+
+### 发起审校
+
+```http
+POST /api/review
+Content-Type: application/json
+```
+
+请求示例：
+
+```json
+{
+  "taskId": "review-2026-001",
+  "taskType": "polish",
+  "sectionType": "results",
+  "sourceText": "The compressive strength increased from 42.5 MPa to 51.3 MPa...",
+  "targetJournal": "Construction and Building Materials",
+  "terminologyLocks": [
+    {
+      "id": "term-1",
+      "source": "pore structure",
+      "preferred": "pore structure"
+    }
+  ]
+}
+```
+
+响应由模型结果与代码独立计算的 Safety Gate 信息共同组成。概念结构如下：
+
+```json
+{
+  "requestId": "req_xxx",
+  "result": {
+    "summary": "发现需要作者核对的表达与证据边界问题。",
+    "suggestedText": "...",
+    "issues": [
+      {
+        "id": "issue-1",
+        "original": "can prove",
+        "revised": "indicate",
+        "reason": "避免把证据强度升级为确定性证明。",
+        "safeToApply": true
+      }
+    ],
+    "safetyGate": {
+      "status": "passed",
+      "blockedCount": 0,
+      "reviewCount": 1,
+      "checks": []
+    }
+  }
+}
+```
+
+> API 的实际字段以仓库 TypeScript 类型和运行时校验为准。客户端不得自行信任或伪造 `safeToApply`。
+
+## 常用命令
 
 ```bash
+npm run dev          # 本地开发
+npm run lint         # ESLint，禁止警告
+npm run test         # Vitest 单元 / API / 组件测试
+npm run test:watch   # 测试监听模式
+npm run typecheck    # Next.js 类型生成 + tsc --noEmit
+npm run build        # Next.js 生产构建
+npm run start        # 启动生产构建
+npm run test:e2e     # Playwright E2E
+```
+
+## 质量保障
+
+当前 CI 在每次推送与 Pull Request 上执行完整质量门：
+
+```mermaid
+flowchart LR
+    A[npm ci] --> B[npm audit --omit=dev]
+    B --> C[ESLint 0 warnings]
+    C --> D[Vitest 75 tests]
+    D --> E[TypeScript check]
+    E --> F[Next.js production build]
+    F --> G[Install Chromium]
+    G --> H[Playwright 30 E2E tests]
+```
+
+自动化覆盖包括：
+
+- 请求与模型输出结构校验；
+- 数字、单位、引用、术语和实验声明；
+- 因果关系、结论强度和研究范围；
+- 模型自称安全但被代码拒绝；
+- 隔离结果与安全应用权限；
+- 唯一文本锚点、重叠检查、撤销与重做；
+- 示例模式、我的文本模式和 DOCX 模式；
+- 多项目、跨章节一致性、导师意见与版本比较；
+- 备份导入、恢复与篡改数据防护；
+- 桌面端和移动端核心流程；
+- 页面横向溢出与关键字号回归。
+
+## 部署到 Vercel
+
+1. Fork 或导入本仓库；
+2. Framework Preset 选择 `Next.js`；
+3. Node.js 版本设置为 `22.x`；
+4. 配置服务端环境变量；
+5. 执行生产部署；
+6. 部署后访问 `/api/health` 检查模型配置状态。
+
+生产建议同时配置：
+
+- 平台 WAF 与速率限制；
+- 模型供应商预算告警；
+- 共享原子限流存储；
+- 错误监控与隐私审计；
+- 自定义域名和明确的数据处理政策。
+
+## 数据隐私与安全
+
+- 论文项目、章节、导师意见、版本全文、分析历史和作者决定默认保存在当前浏览器 `localStorage`；
+- DOCX 在浏览器中提取正文，原始二进制文件不会上传；
+- 只有用户明确确认开始分析后，当前文本和设置才会发送到服务端与模型；
+- 登录不会自动上传论文正文、导师意见、版本全文或分析历史；
+- 可选 Supabase 账户只同步经过验证的个性化偏好；
+- 模型未配置时，API 返回明确错误，不生成演示或伪造分析；
+- 完整 JSON 备份采用非破坏性恢复，历史编辑偏移不会被直接信任；
+- 应用不会在日志中记录完整论文正文、API Key 或完整模型响应。
+
+### 公开接口保护
+
+- 浏览器会话级请求限制；
+- 出口 IP 级请求限制；
+- 单实例并发限制；
+- 请求体与字符数限制；
+- 模型超时与输出长度限制；
+- 可配置每日请求预算熔断；
+- `429` 响应包含 `Retry-After`。
+
+当前限流计数器为单实例内存实现。多实例公开部署应替换为共享原子存储。
+
+## 已知边界
+
+ScholarForge **不能**：
+
+- 验证原始数据真实性；
+- 判断统计分析是否正确；
+- 核实参考文献内容是否支持主张；
+- 替代导师、统计专家、伦理审查、同行评议或期刊编辑；
+- 完整保留复杂 DOCX 的公式、表格、脚注、批注、修订痕迹和原始排版；
+- 保证模型或规则不存在漏报与误报；
+- 将 Safety Gate 通过解释为“论文已经科学正确”。
+
+清洁 DOCX 是重新生成的编辑副本，不是对原文件进行原位修改。
+
+## 路线图
+
+```mermaid
+mindmap
+  root((ScholarForge OS))
+    Safety Gate
+      更丰富的单位系统
+      引用数据库核验接口
+      规则证据可解释性
+      共享限流与预算服务
+    Manuscript Workspace
+      更强的 DOCX 结构保留
+      表格与公式辅助核对
+      项目级术语库
+      跨设备加密同步
+    Collaboration
+      导师批注导入
+      多角色审阅
+      可追踪审校签名
+    Quality
+      可访问性审计
+      视觉回归测试
+      多浏览器 E2E
+      性能预算
+```
+
+路线图表示规划方向，不代表已经实现或承诺发布时间。
+
+## 贡献与许可
+
+欢迎通过 Issue 或 Pull Request 提交：
+
+- 可复现的安全规则问题；
+- 科研文本边界测试案例；
+- 无障碍、移动端和交互改进；
+- DOCX 导入导出兼容性修复；
+- 文档与中英文表达改进。
+
+建议贡献流程：
+
+```bash
+git checkout -b feat/your-change
 npm ci
-npm audit --omit=dev --audit-level=high
 npm run lint
 npm run test
 npm run typecheck
 npm run build
-npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-自动化测试覆盖：
+> [!NOTE]
+> 仓库当前尚未包含独立开源许可证文件。在许可证明确之前，请勿默认将代码视为可自由复制、再分发或商用。
 
-- 请求和模型输出校验；
-- 数字、单位、引用、术语和实验声明；
-- 因果关系、结论强度和研究范围；
-- 模型自称安全但被代码拒绝；
-- 安全隔离结果；
-- 安全应用、撤销和重做；
-- 工作区恢复和篡改备份；
-- 多项目、跨章节一致性、导师意见和版本比较；
-- DOCX 导入与导出边界；
-- 登录未配置回退；
-- 桌面和移动端公网体验流程；
-- 页面横向溢出检查。
+ScholarForge OS 的输出仅用于辅助作者核对，不构成投稿、发表、统计、伦理、医学或法律保证。科研事实、引用、统计结果和最终文本始终由作者负责。
 
-## 已知限制
+---
 
-- 系统不能验证原始数据真实性、统计分析正确性或参考文献内容；
-- 系统不能替代导师、统计专家、伦理审查、同行评议或期刊编辑；
-- DOCX 只提取可用正文，不能保留全部公式、表格、脚注、批注、修订痕迹和原始排版；
-- 清洁 DOCX 是新生成的编辑副本；
-- 规则与模型都可能出现漏报和误报；
-- 当前论文工作区不会跨设备同步，账户只同步偏好；
-- 多实例部署需要共享限流存储；
-- 公开使用前应持续检查模型费用、日志、数据区域、隐私政策和服务条款。
-
-## 许可与责任
-
-仓库当前未包含独立开源许可证文件。公开分发或第三方使用前，应由仓库所有者补充明确许可证。
-
-ScholarForge OS 的输出仅供作者辅助核对，不构成投稿、发表、统计、伦理、医学或法律保证。科研事实、引用、统计结果和最终文本始终由作者负责。
+<div align="center">
+  <strong>ScholarForge OS</strong><br />
+  Stop unsafe AI edits before they enter scientific manuscripts.
+</div>
