@@ -14,17 +14,26 @@ const unavailable = {
 describe('TaskSetup', () => {
   it('explains and disables analysis when the service is not configured', () => {
     render(<TaskSetup analyzing={false} draft={createDraft({ sourceText: 'A'.repeat(60) })} onAnalyze={vi.fn()} onChange={vi.fn()} service={unavailable} serviceLoading={false} />);
+
     expect(screen.getByText('分析服务未配置', { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '开始分析' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '检查并开始分析' })).toBeDisabled();
+    expect(screen.getByText('分析服务未配置。文本仍会保存在此浏览器。')).toBeInTheDocument();
   });
 
-  it('keeps task selection in the primary flow and advanced metadata collapsed', async () => {
+  it('keeps task selection and common metadata in the primary flow while terminology rules stay collapsed', async () => {
     const onChange = vi.fn();
     render(<TaskSetup analyzing={false} draft={createDraft()} onAnalyze={vi.fn()} onChange={onChange} service={unavailable} serviceLoading={false} />);
+
     await userEvent.click(screen.getByText('科研中译英', { selector: 'strong' }));
     expect(onChange).toHaveBeenCalledWith({ taskType: 'translate' });
-    await userEvent.click(screen.getByText('高级设置与 DOCX 导入'));
-    await userEvent.type(screen.getByLabelText('任务名称（可选）'), 'My paper');
+
+    const terminologySummary = screen.getByText('术语规则');
+    const terminologyDetails = terminologySummary.closest('details');
+    expect(terminologyDetails).not.toHaveAttribute('open');
+    await userEvent.click(terminologySummary);
+    expect(terminologyDetails).toHaveAttribute('open');
+
+    await userEvent.type(screen.getByLabelText('任务名称（可选）'), 'M');
     expect(onChange).toHaveBeenCalledWith({ projectName: 'M' });
   });
 
@@ -33,7 +42,7 @@ describe('TaskSetup', () => {
     const onAnalyze = vi.fn();
     render(<TaskSetup analyzing={false} draft={createDraft()} onAnalyze={onAnalyze} onChange={onChange} service={unavailable} serviceLoading={false} />);
 
-    await userEvent.click(screen.getByText('第一次使用？载入示例'));
+    expect(screen.getByRole('heading', { name: '载入一个公开合成案例' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /使用示例：材料与工程/ }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({

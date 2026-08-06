@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { followPrimaryNavigation } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -22,7 +23,8 @@ test('personal preferences create a tailored manuscript project', async ({ page 
   await page.getByRole('button', { name: '保存本地偏好' }).click();
   await expect(page.getByText('个性化偏好已保存到此浏览器')).toBeVisible();
 
-  await page.getByRole('link', { name: '论文项目', exact: true }).click();
+  await followPrimaryNavigation(page, '论文项目');
+  await expect(page).toHaveURL(/\/projects$/);
   await page.getByRole('button', { name: '创建第一个项目' }).click();
   await expect(page.getByRole('button', { name: /Structured Abstract/ })).toBeVisible();
   await expect(page.getByLabel('目标期刊（可选）')).toHaveValue('Water Research');
@@ -34,6 +36,7 @@ test('account page clearly falls back to guest-local mode when auth is unconfigu
   await expect(page.getByRole('heading', { name: '登录用于同步偏好，不自动上传论文' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '账户服务尚未配置' })).toBeVisible();
   await expect(page.getByText('SUPABASE_URL=https://your-project.supabase.co')).toBeVisible();
+
   const dimensions = await page.evaluate(() => ({
     width: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
