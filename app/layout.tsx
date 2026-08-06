@@ -15,6 +15,7 @@ import './editorial-workspace.css';
 import './editorial-review.css';
 import './editorial-responsive.css';
 import './professional-ui.css';
+import './professional-ui-fixes.css';
 
 export const metadata: Metadata = {
   title: {
