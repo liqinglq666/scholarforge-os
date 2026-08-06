@@ -1,0 +1,54 @@
+/* Responsive containment fixes for the professional application layer. */
+
+.workspace-main,
+.setup-editor-grid,
+.source-editor-panel,
+.task-settings-panel,
+.paste-input-panel,
+.quick-source,
+.quick-source textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workspace-stage-bar {
+  width: 100%;
+  max-width: min(980px, 100%);
+}
+
+@media (max-width: 720px) {
+  .workspace-stage-bar {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .workspace-stage-bar > span,
+  .workspace-stage-bar > button {
+    flex: 0 0 112px;
+    min-width: 112px;
+    scroll-snap-align: start;
+  }
+
+  .setup-editor-grid,
+  .source-editor-panel,
+  .task-settings-panel,
+  .input-mode-tabs,
+  .task-context-fields,
+  .analysis-commitment,
+  .compact-settings-content,
+  .example-loader,
+  .example-loader-list {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .quick-source textarea {
+    width: 100%;
+  }
+}
