@@ -16,6 +16,17 @@
   max-width: min(980px, 100%);
 }
 
+@media (max-width: 900px) {
+  .example-loader {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .example-loaded-message {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 720px) {
   .workspace-stage-bar {
     display: flex;
@@ -46,6 +57,25 @@
   .example-loader-list {
     min-width: 0;
     max-width: 100%;
+  }
+
+  .example-loader-list {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .example-loader-list button,
+  .workspace-example-card {
+    width: 100%;
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .example-loader-list button:last-child,
+  .workspace-example-card:last-child {
+    border-bottom: 0;
   }
 
   .quick-source textarea {
