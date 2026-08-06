@@ -114,3 +114,13 @@ export const RESEARCH_EXAMPLES: ResearchExample[] = [
 export function findResearchExample(id: string | null | undefined) {
   return id ? RESEARCH_EXAMPLES.find((example) => example.id === id) || null : null;
 }
+
+export function findResearchExampleForSource(sourceText: string) {
+  const normalizedSource = sourceText.trim();
+  if (!normalizedSource) return null;
+  return RESEARCH_EXAMPLES.find((example) => example.sourceText.trim() === normalizedSource) || null;
+}
+
+export function getPrimaryResearchExample(taskType: TaskType) {
+  return RESEARCH_EXAMPLES.find((example) => example.taskType === taskType) || null;
+}
