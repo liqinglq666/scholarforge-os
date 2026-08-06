@@ -1,5 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers';
+
+async function fontSize(locator: Locator) {
+  return locator.evaluate((element) => Number.parseFloat(window.getComputedStyle(element).fontSize));
+}
 
 test('homepage presents the scientific-safety proposition and one clear entry path', async ({ page }) => {
   await page.goto('/');
@@ -70,4 +74,19 @@ test('public and product routes retain responsive layouts', async ({ page }) => 
     await expect(page.locator('#main-content')).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
+});
+
+test('professional typography keeps critical application text readable', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.editorial-hero h1')).toBeVisible();
+  expect(await fontSize(page.locator('body'))).toBeGreaterThanOrEqual(16);
+  expect(await fontSize(page.locator('.product-label').first())).toBeGreaterThanOrEqual(13);
+  expect(await fontSize(page.locator('.gate-preview-findings strong').first())).toBeGreaterThanOrEqual(14);
+
+  await page.goto('/workspace');
+  await expect(page.getByRole('heading', { name: '准备本次审校任务' })).toBeVisible();
+  expect(await fontSize(page.locator('#source-text'))).toBeGreaterThanOrEqual(16);
+  expect(await fontSize(page.locator('.workspace-stage-bar').locator('span, button').first())).toBeGreaterThanOrEqual(13);
+  expect(await fontSize(page.locator('.task-choice-list strong').first())).toBeGreaterThanOrEqual(14);
+  await expectNoHorizontalOverflow(page);
 });

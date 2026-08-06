@@ -14,6 +14,8 @@ import './editorial-try.css';
 import './editorial-workspace.css';
 import './editorial-review.css';
 import './editorial-responsive.css';
+import './professional-ui.css';
+import './professional-ui-fixes.css';
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +42,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   colorScheme: 'light',
-  themeColor: '#f4f1ea',
+  themeColor: '#f3f5f7',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
