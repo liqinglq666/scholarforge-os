@@ -29,10 +29,38 @@ export function startAnalysisButton(page: Page) {
 }
 
 export async function expectNoHorizontalOverflow(page: Page) {
-  const dimensions = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    content: document.documentElement.scrollWidth,
-  }));
+  const dimensions = await page.evaluate(() => {
+    const viewport = document.documentElement.clientWidth;
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          selector: [
+            element.tagName.toLowerCase(),
+            element.id ? `#${element.id}` : '',
+            ...Array.from(element.classList).slice(0, 3).map((name) => `.${name}`),
+          ].join(''),
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+          scrollWidth: element.scrollWidth,
+          text: (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
+        };
+      })
+      .filter((item) => item.right > viewport + 1 || item.left < -1)
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 12);
 
-  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
+    return {
+      url: window.location.pathname,
+      viewport,
+      content: document.documentElement.scrollWidth,
+      offenders,
+    };
+  });
+
+  expect(
+    dimensions.content,
+    `Horizontal overflow at ${dimensions.url}: viewport=${dimensions.viewport}, content=${dimensions.content}. Offenders: ${JSON.stringify(dimensions.offenders)}`,
+  ).toBeLessThanOrEqual(dimensions.viewport + 1);
 }
