@@ -1,0 +1,443 @@
+.judge-page { background: var(--canvas); }
+
+.judge-hero {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.judge-hero-grid {
+  min-height: 680px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(430px, 0.98fr);
+  align-items: center;
+  gap: clamp(40px, 7vw, 84px);
+  padding-block: clamp(64px, 8vw, 100px);
+}
+
+.judge-hero-copy h1 {
+  max-width: 820px;
+  margin: 18px 0 24px;
+  font-size: clamp(48px, 6.3vw, 78px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1.04;
+}
+
+.judge-hero-copy > p:not(.hero-assurance) {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.judge-hero-copy > p strong { color: var(--ink); }
+
+.judge-passport-preview,
+.judge-passport-card {
+  border: 1px solid #bfc7c1;
+  border-radius: 18px;
+  background: #f7faf8;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.judge-passport-preview > header,
+.judge-passport-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #d7ded9;
+  padding: 22px 24px;
+  background: #1b2823;
+  color: white;
+}
+
+.judge-passport-preview > header div,
+.judge-passport-card > header div {
+  display: grid;
+  gap: 4px;
+}
+
+.judge-passport-preview > header span,
+.judge-passport-card > header span {
+  color: #b8c9c0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.judge-passport-preview > header strong,
+.judge-passport-card > header strong { font-size: 18px; }
+
+.judge-passport-preview > header b,
+.passport-result {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.11);
+  color: #d9e3de;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.judge-passport-preview > header b,
+.passport-blocked { background: #f5d8d2; color: #7d342b; }
+.passport-passed { background: #d8eadf; color: #245540; }
+
+.judge-preview-text { display: grid; gap: 10px; padding: 18px 22px 10px; }
+.judge-preview-text section,
+.judge-text-compare section {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 15px 16px;
+  background: white;
+}
+.judge-preview-text section > span,
+.judge-text-compare section > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.judge-preview-text p,
+.judge-text-compare p {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.judge-mark {
+  border-radius: 4px;
+  padding: 1px 3px;
+  color: inherit;
+}
+.judge-mark-risk { background: #f4d0ca; }
+.judge-mark-safe { background: #dcebe4; }
+
+.judge-passport-preview dl,
+.judge-passport-card dl {
+  display: grid;
+  margin: 0;
+}
+.judge-passport-preview dl { padding: 10px 22px 22px; }
+.judge-passport-card dl { padding: 14px 22px 22px; }
+.judge-passport-preview dl div,
+.judge-passport-card dl div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.3fr);
+  gap: 18px;
+  border-bottom: 1px solid #d7ded9;
+  padding: 10px 0;
+}
+.judge-passport-preview dl div:last-child,
+.judge-passport-card dl div:last-child { border-bottom: 0; }
+.judge-passport-preview dt,
+.judge-passport-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.judge-passport-preview dd,
+.judge-passport-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.judge-passport-explainer { padding-block: clamp(72px, 8vw, 104px); }
+.judge-section-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+  gap: 48px;
+  align-items: end;
+  margin-bottom: 36px;
+}
+.judge-section-heading h2 {
+  margin: 10px 0 0;
+  font-size: clamp(36px, 4.5vw, 54px);
+  font-weight: 500;
+  line-height: 1.08;
+}
+.judge-section-heading > p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.judge-passport-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.judge-passport-grid article {
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  background: var(--paper);
+}
+.judge-passport-grid article > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--brand);
+  font-family: Georgia, serif;
+  font-weight: 700;
+}
+.judge-passport-grid h3 { margin: 34px 0 10px; font-size: 21px; }
+.judge-passport-grid p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+.judge-experience-section {
+  border-block: 1px solid var(--line);
+  padding-block: clamp(72px, 8vw, 108px);
+  background: #eef1ed;
+}
+
+.judge-progress {
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--paper);
+}
+.judge-progress > div:first-child { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; }
+.judge-progress > div:first-child span { color: var(--muted); font-weight: 700; }
+.judge-progress-track {
+  height: 7px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #e3e0d7;
+  overflow: hidden;
+}
+.judge-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 180ms ease-out;
+}
+
+.judge-case-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.judge-case-tab {
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--paper);
+  cursor: pointer;
+  text-align: left;
+}
+.judge-case-tab:hover { border-color: var(--brand); }
+.judge-case-tab.active { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(31, 92, 82, 0.12); }
+.judge-case-tab > span { color: var(--brand); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.judge-case-tab strong { margin-top: 6px; font-size: 15px; }
+.judge-case-tab small { margin-top: auto; color: var(--muted); font-size: 11px; }
+
+.judge-case-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(350px, 0.82fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.judge-case-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(20px, 3vw, 30px);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.judge-case-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 22px;
+}
+.judge-case-card > header > div > span { color: var(--brand); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.judge-case-card h3 { margin: 7px 0 8px; font-size: 28px; }
+.judge-case-card header p { margin: 0; color: var(--muted); }
+.judge-passport-id {
+  flex: 0 0 auto;
+  height: max-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.judge-text-compare { display: grid; gap: 10px; }
+.judge-text-compare section.candidate { border-color: #c8c2b7; background: #fffdf8; }
+
+.judge-run-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.judge-run-panel p { max-width: 580px; margin: 0; color: var(--muted); font-size: 13px; }
+
+.judge-result-banner {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 14px;
+  align-items: start;
+  margin-top: 18px;
+  border-radius: 12px;
+  padding: 16px;
+}
+.judge-result-banner > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  font-weight: 900;
+}
+.judge-result-banner strong { display: block; font-size: 13px; letter-spacing: 0.06em; }
+.judge-result-banner p { margin: 3px 0 0; font-size: 13px; }
+.judge-result-blocked { background: var(--major-soft); color: #78382f; }
+.judge-result-blocked > span { background: #e8b9b2; }
+.judge-result-passed { background: var(--success-soft); color: #225440; }
+.judge-result-passed > span { background: #bfdfd1; }
+
+.judge-trace-panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(22px, 3vw, 30px);
+  background: var(--paper);
+}
+.judge-trace-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr);
+  gap: 30px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+.judge-trace-heading h3 { margin: 7px 0 0; font-size: 25px; }
+.judge-trace-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.judge-trace-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.judge-trace-list li {
+  min-height: 155px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fbfaf6;
+}
+.judge-trace-list li > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+.judge-trace-list strong { display: block; margin-top: 24px; font-size: 13px; }
+.judge-trace-list p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.judge-trace-list .trace-blocked { border-color: #ddb1a8; background: #fff7f4; }
+.judge-trace-list .trace-blocked > span { background: #f3d3cd; color: #7a372d; }
+.judge-trace-list .trace-waiting { border-style: dashed; }
+
+.judge-author-decision {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+.judge-author-decision h3 { margin: 7px 0 8px; font-size: 24px; }
+.judge-author-decision p { margin: 0; color: var(--muted); }
+.judge-decision-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.judge-decision-actions .selected { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.judge-decision-status {
+  margin-top: 12px !important;
+  border-left: 3px solid var(--brand);
+  padding-left: 12px;
+  font-size: 13px;
+}
+.judge-next-case { display: flex; justify-content: flex-end; margin-top: 22px; }
+
+.judge-boundary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto;
+  gap: 48px;
+  align-items: end;
+  padding-block: clamp(72px, 8vw, 100px);
+}
+.judge-boundary h2 { max-width: 760px; margin: 10px 0 14px; font-size: clamp(34px, 4vw, 48px); font-weight: 500; }
+.judge-boundary p { max-width: 760px; margin: 0; color: var(--muted); }
+
+.home-passport-fields {
+  margin-top: 20px !important;
+  border-left: 3px solid var(--brand);
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 14px !important;
+}
+
+@media (max-width: 980px) {
+  .judge-hero-grid,
+  .judge-section-heading,
+  .judge-case-layout,
+  .judge-trace-heading,
+  .judge-boundary {
+    grid-template-columns: 1fr;
+  }
+  .judge-hero-grid { min-height: auto; }
+  .judge-passport-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .judge-trace-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .judge-boundary { align-items: start; }
+}
+
+@media (max-width: 720px) {
+  .judge-hero-grid { padding-block: 52px 64px; }
+  .judge-hero-copy h1 { font-size: clamp(42px, 12vw, 58px); }
+  .judge-passport-grid,
+  .judge-case-tabs,
+  .judge-trace-list { grid-template-columns: 1fr; }
+  .judge-passport-grid article { min-height: auto; }
+  .judge-case-tab { min-height: 92px; }
+  .judge-case-card > header,
+  .judge-run-panel { align-items: stretch; flex-direction: column; }
+  .judge-run-panel .primary-button { width: 100%; }
+  .judge-passport-preview dl div,
+  .judge-passport-card dl div { grid-template-columns: 1fr; gap: 3px; }
+  .judge-trace-list li { min-height: auto; }
+  .judge-trace-list strong { margin-top: 14px; }
+  .judge-next-case .primary-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .judge-progress-track span { transition: none; }
+}
