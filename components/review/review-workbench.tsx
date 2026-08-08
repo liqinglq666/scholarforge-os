@@ -12,6 +12,7 @@ type TextView = 'author' | 'suggested' | 'original';
 type DecisionFilter = 'all' | IssueDecision;
 type SeverityFilter = 'all' | IssueSeverity;
 type WorkbenchStage = 'review' | 'edit' | 'export';
+type PassportGateState = 'passed' | 'quarantined' | 'unverified';
 
 const DECISION_LABELS: Record<IssueDecision, string> = {
   pending: '待处理',
@@ -31,6 +32,7 @@ function IssueDetail({
   decision,
   workspace,
   applicationBlockedReason,
+  gateState,
   onDecision,
   onApply,
   onRemove,
@@ -39,6 +41,7 @@ function IssueDetail({
   decision: IssueDecision;
   workspace: WorkspaceState;
   applicationBlockedReason: string;
+  gateState: PassportGateState;
   onDecision: (decision: IssueDecision) => void;
   onApply: () => void;
   onRemove: () => void;
@@ -48,6 +51,22 @@ function IssueDetail({
   const anchorSafe = anchor.state === 'safe-exact' || anchor.state === 'safe-whitespace';
   const canApply = !applicationBlockedReason && anchorSafe;
   const applicationMessage = applicationBlockedReason || anchor.message;
+  const passportIdPart = issue.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'ISSUE';
+  const passportGateLabel = gateState === 'quarantined' ? 'BLOCKED' : gateState === 'unverified' ? 'UNVERIFIED' : 'PASSED';
+  const passportState = applied
+    ? 'applied'
+    : gateState === 'quarantined'
+      ? 'quarantined'
+      : gateState === 'unverified'
+        ? 'legacy_unverified'
+        : 'author_review';
+  const passportPermission = applied
+    ? '作者已授权并应用'
+    : applicationBlockedReason
+      ? '禁止自动应用'
+      : canApply
+        ? '具备局部定位条件，仍需作者接受'
+        : '当前定位不安全，禁止自动应用';
 
   return (
     <article className="review-detail issue-detail" aria-labelledby={`issue-title-${issue.id}`}>
@@ -56,6 +75,23 @@ function IssueDetail({
         <span className={`decision-state decision-${decision}`}>{DECISION_LABELS[decision]}</span>
       </header>
       <h2 id={`issue-title-${issue.id}`}>{issue.location}</h2>
+
+      <section className="edit-passport" aria-label="Verified Edit Passport 科研修改通行证">
+        <header>
+          <div><span>Verified Edit Passport</span><strong>科研修改通行证</strong></div>
+          <b className={`edit-passport-state passport-gate-${gateState}`}>{passportGateLabel}</b>
+        </header>
+        <dl>
+          <div><dt>通行证编号</dt><dd>VEP-{passportIdPart}</dd></div>
+          <div><dt>修改类型 / 检查域</dt><dd>{issue.category}</dd></div>
+          <div><dt>Safety Gate</dt><dd>{passportGateLabel}</dd></div>
+          <div><dt>状态</dt><dd>{passportState}</dd></div>
+          <div><dt>自动应用</dt><dd>{passportPermission}</dd></div>
+          <div><dt>局部定位证据</dt><dd>{anchor.message}</dd></div>
+          <div><dt>最终控制者</dt><dd>作者</dd></div>
+        </dl>
+        <p className="edit-passport-note">通行证记录的是这条候选修改当前通过了哪些权限检查；PASSED 只代表未被当前规则阻断，不代表科学正确。</p>
+      </section>
 
       <div className="evidence-diff">
         <section className="evidence-source"><span>原文证据</span><p>{issue.original || '没有可定位的原文证据。'}</p></section>
@@ -159,6 +195,7 @@ export function ReviewWorkbench({
     : candidateQuarantined
       ? '安全门已隔离完整候选稿，所有自动应用权限均已关闭。'
       : '';
+  const passportGateState: PassportGateState = safetyGateMissing ? 'unverified' : candidateQuarantined ? 'quarantined' : 'passed';
   const displayedText = textView === 'original' ? workspace.draft.sourceText : textView === 'suggested' ? result.suggestedText : workspace.workingText;
 
   return (
@@ -234,7 +271,7 @@ export function ReviewWorkbench({
             </aside>
 
             <section className="review-detail-column">
-              {selectedIssue ? <IssueDetail applicationBlockedReason={applicationBlockedReason} decision={workspace.decisions[selectedIssue.id] || 'pending'} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
+              {selectedIssue ? <IssueDetail applicationBlockedReason={applicationBlockedReason} decision={workspace.decisions[selectedIssue.id] || 'pending'} gateState={passportGateState} issue={selectedIssue} onApply={() => applyIssue(selectedIssue)} onDecision={(decision) => setDecision(selectedIssue.id, decision)} onRemove={() => removeIssue(selectedIssue)} workspace={workspace} /> : null}
             </section>
 
             <section className="review-document-column document-panel" aria-labelledby="document-title">

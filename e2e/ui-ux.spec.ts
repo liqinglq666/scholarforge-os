@@ -5,15 +5,41 @@ async function fontSize(locator: Locator) {
   return locator.evaluate((element) => Number.parseFloat(window.getComputedStyle(element).fontSize));
 }
 
-test('homepage presents the scientific-safety proposition and one clear entry path', async ({ page }) => {
+test('homepage presents the competition safety proposition and a short reviewer path', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.editorial-hero h1')).toContainText('让 AI 修改先通过科研事实安全门');
-  await expect(page.getByRole('link', { name: '直接体验公开案例' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '进入论文工作台' })).toBeVisible();
+  await expect(page.locator('.editorial-hero h1')).toContainText('谁来检查 AI 改错了没有');
+  await expect(page.getByRole('link', { name: '90 秒看懂 ScholarForge' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '体验真实公开案例' })).toBeVisible();
   await expect(page.locator('.gate-preview-findings li')).toHaveCount(3);
-  await expect(page.locator('.gate-preview-findings .protected')).toContainText('作者工作稿保持不变');
+  await expect(page.locator('.gate-preview-findings .protected')).toContainText('决定权不会交给模型');
   await expect(page.getByText('自动应用权限', { exact: true })).toBeVisible();
+  await expect(page.getByText('Verified Edit Passport', { exact: true }).first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test('90-second judge route explains a blocked edit with deterministic evidence', async ({ page }) => {
+  await page.goto('/judge');
+
+  await expect(page.getByRole('heading', { name: '每一次 AI 修改，都先证明自己没有越界。' })).toBeVisible();
+  await expect(page.getByText('固定合成案例 · 不调用模型 · 不写入工作区 · 重点展示真实安全机制')).toBeVisible();
+  await page.getByRole('button', { name: '运行 Safety Gate' }).click();
+
+  await expect(page.locator('.judge-result-banner')).toContainText('BLOCKED');
+  await expect(page.locator('.judge-passport-card')).toContainText('48.3 MPa ≠ 58.3 MPa');
+  await expect(page.locator('.judge-passport-card')).toContainText('quarantined');
+  await expect(page.locator('.judge-passport-card')).toContainText('最终控制者');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('90-second judge route keeps author confirmation after a safe edit passes', async ({ page }) => {
+  await page.goto('/judge');
+  await page.getByRole('button', { name: /安全的语言润色/ }).click();
+  await page.getByRole('button', { name: '运行 Safety Gate' }).click();
+
+  await expect(page.locator('.judge-result-banner')).toContainText('PASSED');
+  await expect(page.getByRole('heading', { name: '通过 Safety Gate，也不等于自动写入论文' })).toBeVisible();
+  await page.getByRole('button', { name: '接受' }).click();
+  await expect(page.getByText(/作者已选择：接受/)).toBeVisible();
 });
 
 test('public evaluator entry loads a real quick-review case without sending it automatically', async ({ page }) => {
@@ -50,13 +76,13 @@ test('global navigation stays compact on desktop and becomes a drawer on mobile'
     await menuButton.click();
 
     const mobileNavigation = page.getByRole('dialog');
-    await expect(mobileNavigation.getByRole('link', { name: '直接体验', exact: true })).toBeVisible();
+    await expect(mobileNavigation.getByRole('link', { name: '90 秒评审', exact: true })).toBeVisible();
     await expect(mobileNavigation.getByRole('link', { name: '论文项目', exact: true })).toBeVisible();
     await expect(mobileNavigation.getByRole('link', { name: '快速审校', exact: true })).toBeVisible();
     await expect(mobileNavigation.getByRole('link', { name: '安全说明', exact: true })).toBeVisible();
     await mobileNavigation.getByRole('link', { name: '论文项目', exact: true }).click();
   } else {
-    await expect(primaryNavigation.getByRole('link', { name: '直接体验', exact: true })).toBeVisible();
+    await expect(primaryNavigation.getByRole('link', { name: '90 秒评审', exact: true })).toBeVisible();
     await expect(primaryNavigation.getByRole('link', { name: '论文项目', exact: true })).toBeVisible();
     await expect(primaryNavigation.getByRole('link', { name: '快速审校', exact: true })).toBeVisible();
     await expect(primaryNavigation.getByRole('link', { name: '安全说明', exact: true })).toBeVisible();
@@ -69,7 +95,7 @@ test('global navigation stays compact on desktop and becomes a drawer on mobile'
 });
 
 test('public and product routes retain responsive layouts', async ({ page }) => {
-  for (const route of ['/', '/try', '/trust', '/guide', '/workspace', '/projects', '/preferences', '/login']) {
+  for (const route of ['/', '/judge', '/try', '/trust', '/guide', '/workspace', '/projects', '/preferences', '/login']) {
     await page.goto(route);
     await expect(page.locator('#main-content')).toBeVisible();
     await expectNoHorizontalOverflow(page);
