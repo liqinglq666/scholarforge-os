@@ -74,6 +74,6 @@ describe('Verified Edit Passport in the real workbench', () => {
 
     expect(screen.getAllByText('BLOCKED').length).toBeGreaterThan(0);
     expect(screen.getByText('quarantined')).toBeInTheDocument();
-    expect(screen.getByText('禁止自动应用')).toBeInTheDocument();
+    expect(screen.getAllByText('禁止自动应用').length).toBeGreaterThan(0);
   });
 });
