@@ -5,7 +5,7 @@ describe('JudgeExperience', () => {
   it('quarantines a deterministic numerical mutation and shows evidence', () => {
     render(<JudgeExperience />);
 
-    expect(screen.getByText('数字被 AI 偷偷改了')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '数字被 AI 偷偷改了' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '运行 Safety Gate' }));
 
     expect(screen.getByText('48.3 MPa ≠ 58.3 MPa')).toBeInTheDocument();
