@@ -55,7 +55,7 @@ export default function Home() {
             <div className="gate-preview-copy">
               <section>
                 <span>作者原文</span>
-                <p>The compressive strength increased from 42.6 MPa to <mark>48.3 MPa</mark>.</p>
+                <p>The compressive strength increased from 42.6 MPa to <span className="protected-value">48.3 MPa</span>.</p>
               </section>
               <section className="candidate-risk">
                 <span>AI 危险候选</span>
