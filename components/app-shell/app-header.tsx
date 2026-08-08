@@ -6,13 +6,14 @@ import { useEffect, useState } from 'react';
 import { AccountMenu } from '@/components/account/account-menu';
 
 const primaryNavigation = [
-  { href: '/try', label: '直接体验' },
+  { href: '/judge', label: '90 秒评审' },
   { href: '/projects', label: '论文项目' },
   { href: '/workspace', label: '快速审校' },
   { href: '/trust', label: '安全说明' },
 ];
 
 const secondaryNavigation = [
+  { href: '/try', label: '完整公开体验' },
   { href: '/guide', label: '使用手册' },
   { href: '/settings', label: '数据与隐私' },
 ];
@@ -132,7 +133,8 @@ export function AppFooter() {
           <p><strong>让 AI 修改先通过科研事实安全门。</strong><span>模型提出候选，代码检查风险，作者决定最终文本。</span></p>
         </div>
         <nav aria-label="页脚导航">
-          <Link href="/try">直接体验</Link>
+          <Link href="/judge">90 秒评审</Link>
+          <Link href="/try">完整公开体验</Link>
           <Link href="/trust">安全说明</Link>
           <Link href="/guide">使用手册</Link>
           <Link href="/settings">数据与隐私</Link>
