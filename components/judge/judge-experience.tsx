@@ -141,6 +141,7 @@ export function JudgeExperience() {
   const activeCase = cases[activeIndex];
   const activeRevealed = Boolean(revealed[activeCase.id]);
   const completedCount = useMemo(() => Object.keys(revealed).length, [revealed]);
+  const benchmarkComplete = completedCount === cases.length;
 
   const revealCurrent = () => {
     setRevealed((current) => ({ ...current, [activeCase.id]: true }));
@@ -152,6 +153,12 @@ export function JudgeExperience() {
 
   const goNext = () => {
     setActiveIndex((current) => Math.min(current + 1, cases.length - 1));
+  };
+
+  const resetExperience = () => {
+    setActiveIndex(0);
+    setRevealed({});
+    setDecisions({});
   };
 
   return (
@@ -296,6 +303,41 @@ export function JudgeExperience() {
               </div>
             ) : null}
           </div>
+        ) : null}
+
+        {benchmarkComplete ? (
+          <section aria-labelledby="judge-benchmark-title" className="judge-trace-panel">
+            <div className="judge-trace-heading">
+              <div>
+                <span className="product-label">Safety Benchmark · Public Challenge Set</span>
+                <h3 id="judge-benchmark-title">三次修改，三次留下可核对的权限结论</h3>
+              </div>
+              <p>
+                这是本页三个固定合成案例的确定性汇总，不是模型准确率，也不代表对所有科研风险的覆盖率。
+              </p>
+            </div>
+            <ol className="judge-trace-list" aria-label="评审体验汇总">
+              <li className="trace-blocked">
+                <span>02</span>
+                <div><strong>危险修改被隔离</strong><p>数值篡改与因果越界均进入 quarantined。</p></div>
+              </li>
+              <li>
+                <span>01</span>
+                <div><strong>安全候选进入作者审阅</strong><p>PASSED 只开放审阅权限，不授予自动写入权限。</p></div>
+              </li>
+              <li>
+                <span>00</span>
+                <div><strong>自动写入论文</strong><p>三个案例都没有绕过作者确认直接修改工作稿。</p></div>
+              </li>
+              <li className="trace-waiting">
+                <span>YOU</span>
+                <div><strong>Attack the Gate</strong><p>重置案例，再从评委视角尝试判断哪一次修改应该被拦截。</p></div>
+              </li>
+            </ol>
+            <div className="judge-next-case">
+              <button className="secondary-button" onClick={resetExperience} type="button">重置并再次挑战 Safety Gate</button>
+            </div>
+          </section>
         ) : null}
       </div>
     </section>
