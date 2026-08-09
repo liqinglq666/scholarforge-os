@@ -474,9 +474,33 @@
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .login-brand,
-  .login-benefits {
+  .login-brand {
     display: none;
+  }
+
+  .login-benefits {
+    display: block;
+    margin: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .login-benefits li {
+    display: none;
+  }
+
+  .login-benefits li:last-child {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 14px 0 0;
+    background: transparent;
+  }
+
+  .login-benefits li:last-child span {
+    margin-top: 0;
+    color: rgba(255, 255, 255, 0.68);
   }
 
   .login-story h1 {
