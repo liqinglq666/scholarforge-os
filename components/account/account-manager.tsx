@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { useAuthStatus } from '@/components/account/use-auth-status';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import type { AuthStatus } from '@/lib/types';
 
 export function AccountManager() {
-  const [status, setStatus] = useState<AuthStatus | null>(null);
+  const { status, setStatus, reloadStatus } = useAuthStatus();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,27 +15,6 @@ export function AccountManager() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  async function loadStatus() {
-    try {
-      const response = await fetch('/api/auth/session', { cache: 'no-store' });
-      const payload = await response.json() as AuthStatus;
-      setStatus(payload);
-    } catch {
-      setStatus({ configured: false, authenticated: false, user: null, message: '暂时无法读取账户状态，仍可使用游客本地模式。' });
-    }
-  }
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthStatus>)
-      .then((payload) => { if (active) setStatus(payload); })
-      .catch(() => {
-        if (active) setStatus({ configured: false, authenticated: false, user: null, message: '暂时无法读取账户状态，仍可使用游客本地模式。' });
-      });
-    return () => { active = false; };
-  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +52,7 @@ export function AccountManager() {
       const response = await fetch('/api/auth/session', { method: 'DELETE' });
       const payload = await response.json() as { error?: string; message?: string };
       if (!response.ok) throw new Error(payload.error || '退出失败。');
-      await loadStatus();
+      await reloadStatus();
       setMessage(payload.message || '已退出账户。');
       window.dispatchEvent(new Event('scholarforge-auth-change'));
     } catch (cause) {
