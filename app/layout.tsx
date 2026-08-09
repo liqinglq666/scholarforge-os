@@ -17,7 +17,6 @@ import './editorial-responsive.css';
 import './judge.css';
 import './edit-passport.css';
 import './professional-ui.css';
-import './professional-ui-fixes.css';
 
 export const metadata: Metadata = {
   title: {
