@@ -80,7 +80,7 @@ export function LoginManager() {
           <li><strong>术语保持一致</strong><span>跨项目复用材料、量表、算法与缩写的指定表达。</span></li>
           <li><strong>正文仍由你控制</strong><span>登录不会自动上传现有论文，也不会替代完整工作区备份。</span></li>
         </ul>
-        <small>登录不会自动上传现有论文。AI 只提供建议；科研事实、引用、统计与最终文本始终由作者核对。</small>
+        <small>AI 只提供建议；科研事实、引用、统计与最终文本始终由作者核对。</small>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
