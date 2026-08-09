@@ -27,6 +27,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const [mobileOpenPath, setMobileOpenPath] = useState<string | null>(null);
   const mobileOpen = mobileOpenPath === pathname;
+  const isLoginPage = pathname === '/login';
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -41,6 +42,26 @@ export function AppHeader() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [mobileOpen]);
+
+  if (isLoginPage) {
+    return (
+      <header className="app-header login-auth-header">
+        <div className="shell header-inner login-auth-header-inner">
+          <Link aria-label="ScholarForge OS 首页" className="brand" href="/">
+            <span aria-hidden="true" className="brand-mark">SF</span>
+            <span className="brand-copy">
+              <b>ScholarForge</b>
+              <small>科研事实安全审校</small>
+            </span>
+          </Link>
+          <nav aria-label="登录页快捷导航" className="login-auth-header-actions">
+            <Link href="/">返回首页</Link>
+            <Link className="login-auth-guest-link" href="/workspace">继续游客使用</Link>
+          </nav>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="app-header">
