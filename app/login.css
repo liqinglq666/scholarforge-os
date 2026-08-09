@@ -75,30 +75,6 @@
   color: white;
 }
 
-.login-brand {
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-  color: white;
-  text-decoration: none;
-}
-
-.login-brand > span {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: #9bcdbd;
-  color: #12322a;
-  font: 800 15px Georgia, "Times New Roman", serif;
-}
-
-.login-brand strong {
-  font: 700 19px Georgia, "Times New Roman", serif;
-}
-
 .login-story .eyebrow {
   color: #9bcdbd;
 }
@@ -472,10 +448,6 @@
     gap: 16px;
     padding: 24px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .login-brand {
-    display: none;
   }
 
   .login-benefits {
