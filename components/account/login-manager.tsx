@@ -2,34 +2,19 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { useAuthStatus } from '@/components/account/use-auth-status';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import type { AuthStatus } from '@/lib/types';
 
-const FALLBACK_STATUS: AuthStatus = {
-  configured: false,
-  authenticated: false,
-  user: null,
-  message: '暂时无法读取账户状态，仍可使用游客本地模式。',
-};
-
 export function LoginManager() {
   const router = useRouter();
-  const [status, setStatus] = useState<AuthStatus | null>(null);
+  const { status } = useAuthStatus();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthStatus>)
-      .then((payload) => { if (active) setStatus(payload); })
-      .catch(() => { if (active) setStatus(FALLBACK_STATUS); });
-    return () => { active = false; };
-  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,10 +51,6 @@ export function LoginManager() {
   return (
     <div className="login-layout">
       <section className="login-story" aria-labelledby="login-story-title">
-        <Link aria-label="返回 ScholarForge OS 首页" className="login-brand" href="/">
-          <span aria-hidden="true">SF</span>
-          <strong>ScholarForge</strong>
-        </Link>
         <div>
           <span className="eyebrow">账户只同步偏好</span>
           <h1 id="login-story-title">让你的科研写作环境跨设备保持一致</h1>
