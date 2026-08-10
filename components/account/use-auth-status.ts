@@ -32,9 +32,12 @@ export function useAuthStatus() {
 
   useEffect(() => {
     mountedRef.current = true;
+    const handleAuthChange = () => { void reloadStatus(); };
     void reloadStatus();
+    window.addEventListener('scholarforge-auth-change', handleAuthChange);
     return () => {
       mountedRef.current = false;
+      window.removeEventListener('scholarforge-auth-change', handleAuthChange);
     };
   }, [reloadStatus]);
 
