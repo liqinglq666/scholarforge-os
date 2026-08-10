@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { saveWorkspaceBackToProject } from '@/lib/project/workspace';
+import { removeProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
 import {
   createBackup,
   createDraft,
@@ -80,6 +80,44 @@ describe('multi-project persistence', () => {
     });
     expect(parsed.current.draft.linkedProjectId).toBe(project.id);
     expect(parsed.current.draft.linkedChapterId).toBe(chapter.id);
+  });
+});
+
+describe('project deletion', () => {
+  it('unlinks a deleted project from the current workspace without deleting the manuscript text', () => {
+    const project = createManuscriptProject({ name: 'Linked project to delete' });
+    const sourceText = 'Current workspace text must survive project deletion. '.repeat(3);
+    const draft = createDraft({
+      projectName: project.name,
+      sourceText,
+      linkedProjectId: project.id,
+      linkedChapterId: project.chapters[0].id,
+    });
+    const data = {
+      ...createPersistedWorkspace(),
+      projects: [project],
+      activeProjectId: project.id,
+      current: createWorkspaceState(draft),
+    };
+
+    const next = removeProject(data, project.id);
+
+    expect(next.projects).toHaveLength(0);
+    expect(next.activeProjectId).toBeUndefined();
+    expect(next.current.draft.linkedProjectId).toBeUndefined();
+    expect(next.current.draft.linkedChapterId).toBeUndefined();
+    expect(next.current.draft.sourceText).toBe(sourceText);
+  });
+
+  it('moves the active project to a remaining project after deletion', () => {
+    const first = createManuscriptProject({ name: 'Keep me' });
+    const second = createManuscriptProject({ name: 'Delete me' });
+    const data = { ...createPersistedWorkspace(), projects: [second, first], activeProjectId: second.id };
+
+    const next = removeProject(data, second.id);
+
+    expect(next.projects.map((project) => project.id)).toEqual([first.id]);
+    expect(next.activeProjectId).toBe(first.id);
   });
 });
 
