@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LoginManager } from '@/components/account/login-manager';
+import '../login.css';
 
 export const metadata: Metadata = {
   title: '登录',
