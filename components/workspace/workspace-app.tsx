@@ -57,8 +57,8 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
     if (requestedExample) {
       const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
       if (hasCurrentWork) {
-        setPendingEntryExample(requestedExample);
-        return;
+        const timer = window.setTimeout(() => setPendingEntryExample(requestedExample), 0);
+        return () => window.clearTimeout(timer);
       }
       const nextData = loadResearchExampleWorkspace(data, requestedExample);
       replaceData(nextData);
