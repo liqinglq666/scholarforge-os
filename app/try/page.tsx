@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TryServiceStatus } from '@/components/try/service-status';
+import '../editorial-try.css';
 
 export const metadata: Metadata = {
   title: '直接体验',
