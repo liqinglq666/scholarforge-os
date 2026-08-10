@@ -9,12 +9,11 @@ import { useReviewServiceStatus } from '@/components/review/use-review-service-s
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
-import { MAX_HISTORY_ENTRIES, TASK_LABELS } from '@/lib/config';
+import { MAX_HISTORY_ENTRIES } from '@/lib/config';
 import { findResearchExample } from '@/lib/examples';
-import { compareRevisionTexts } from '@/lib/project/revisions';
-import { getProject, upsertProject } from '@/lib/project/workspace';
+import { getProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
 import type { ApiErrorPayload, ReviewResult, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createDraft, createDraftFromPreferences, createHistoryEntry, createRevisionComparison, createWorkspaceState } from '@/lib/workspace/schema';
+import { createDraft, createDraftFromPreferences, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
@@ -105,60 +104,12 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   }
 
   function saveBackToProject() {
-    const project = getProject(data, data.current.draft.linkedProjectId || projectId);
-    const chapterId = data.current.draft.linkedChapterId;
-    if (!project || data.current.draft.linkedProjectId !== project.id || !chapterId) return;
-    const chapter = project.chapters.find((item) => item.id === chapterId);
-    if (!chapter) {
-      setProjectMessage('关联章节已不存在，无法回写。当前工作台内容仍然保留。');
-      return;
+    const result = saveWorkspaceBackToProject(data, projectId);
+    if (result.data !== data) {
+      replaceData(result.data);
+      saveNow(result.data);
     }
-    const now = new Date().toISOString();
-    const text = data.current.currentResult ? data.current.workingText : data.current.draft.sourceText;
-    const changes = chapter.text === text
-      ? []
-      : compareRevisionTexts(chapter.text, text).map((change) => ({
-          ...change,
-          source: data.current.currentResult ? 'ai' as const : 'author' as const,
-          reason: data.current.currentResult
-            ? `作者在“${TASK_LABELS[data.current.draft.taskType]}”流程中确认后保存。`
-            : '作者从项目审校页面保存了新文本。',
-        }));
-    const comparison = changes.length ? createRevisionComparison({
-      title: `${chapter.title} · ${TASK_LABELS[data.current.draft.taskType]} · ${new Date(now).toLocaleDateString('zh-CN')}`,
-      chapterId,
-      baseLabel: '保存前',
-      revisedLabel: '作者确认后',
-      baseText: chapter.text,
-      revisedText: text,
-      changes,
-      createdAt: now,
-      updatedAt: now,
-    }) : null;
-    const nextProject = {
-      ...project,
-      activeChapterId: chapterId,
-      chapters: project.chapters.map((item) => item.id === chapterId
-        ? {
-            ...item,
-            title: item.title || data.current.draft.projectName,
-            sectionType: data.current.draft.sectionType,
-            text,
-            updatedAt: now,
-            lastReviewedAt: data.current.currentResult ? now : item.lastReviewedAt,
-          }
-        : item),
-      revisionComparisons: comparison
-        ? [comparison, ...project.revisionComparisons].slice(0, 20)
-        : project.revisionComparisons,
-      updatedAt: now,
-    };
-    const nextData = upsertProject(data, nextProject);
-    replaceData(nextData);
-    saveNow(nextData);
-    setProjectMessage(comparison
-      ? `已保存回“${chapter.title}”，并自动生成一条版本记录。`
-      : `“${chapter.title}”没有文本变化，已更新审校时间。`);
+    setProjectMessage(result.message);
   }
 
   async function analyze() {
@@ -266,7 +217,6 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   if (!ready) {
     return <main className="shell page-main"><div className="loading-state" role="status"><span className="spinner" /><strong>正在恢复本地工作区</strong><p>不会上传任何文本。</p></div></main>;
   }
-
 
   if (projectId && !routeProject) {
     return (
