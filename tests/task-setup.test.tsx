@@ -1,17 +1,24 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { getPrimaryResearchExample } from '@/lib/examples';
-import type { WorkspaceDraft } from '@/lib/types';
+import type { ReviewServiceStatus, WorkspaceDraft } from '@/lib/types';
 import { createDraft } from '@/lib/workspace/schema';
 
-const unavailable = {
+const unavailable: ReviewServiceStatus = {
   configured: false,
   model: null,
   message: '分析服务未配置。',
   limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 6, windowMinutes: 10 },
+};
+
+const available: ReviewServiceStatus = {
+  ...unavailable,
+  configured: true,
+  model: 'qwen-plus',
+  message: '分析服务可用。',
 };
 
 function exampleDraft(taskType: WorkspaceDraft['taskType']) {
@@ -30,9 +37,11 @@ function exampleDraft(taskType: WorkspaceDraft['taskType']) {
 function TaskSetupHarness({
   initialDraft,
   onAnalyze = vi.fn(),
+  service = unavailable,
 }: {
   initialDraft: WorkspaceDraft;
   onAnalyze?: () => void;
+  service?: ReviewServiceStatus;
 }) {
   const [draft, setDraft] = useState(initialDraft);
   return (
@@ -41,7 +50,7 @@ function TaskSetupHarness({
       draft={draft}
       onAnalyze={onAnalyze}
       onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-      service={unavailable}
+      service={service}
       serviceLoading={false}
     />
   );
@@ -90,6 +99,43 @@ describe('TaskSetup', () => {
     expect(screen.getByLabelText('任务名称（可选）')).toHaveValue('水泥基材料孔结构研究 · 结果段保守润色');
     expect(screen.getByText('公开合成示例', { selector: '.source-origin-badge' })).toBeInTheDocument();
     expect(onAnalyze).not.toHaveBeenCalled();
+  });
+
+  it('requires explicit confirmation before replacing custom text with an example', async () => {
+    const polishExample = getPrimaryResearchExample('polish');
+    const customText = 'This custom manuscript passage must remain untouched until replacement is explicitly confirmed.';
+    render(<TaskSetupHarness initialDraft={createDraft({ taskType: 'polish', sourceText: customText })} />);
+
+    await userEvent.click(screen.getByRole('button', { name: '载入当前任务示例' }));
+
+    const dialog = screen.getByRole('dialog', { name: '载入“英文保守润色”示例？' });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByLabelText('英文论文原文')).toHaveValue(customText);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '替换并载入示例' }));
+
+    expect(screen.getByLabelText('英文论文原文')).toHaveValue(polishExample!.sourceText);
+    expect(screen.getByText('公开合成示例', { selector: '.source-origin-badge' })).toBeInTheDocument();
+  });
+
+  it('keeps an example intact when custom-mode clearing is cancelled and clears it only after confirmation', async () => {
+    const polishExample = getPrimaryResearchExample('polish');
+    render(<TaskSetupHarness initialDraft={exampleDraft('polish')} />);
+
+    await userEvent.click(screen.getByRole('button', { name: '清空并输入我的文本' }));
+    let dialog = screen.getByRole('dialog', { name: '清空示例并输入我的文本？' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '保留当前内容' }));
+
+    expect(screen.getByLabelText('英文论文原文')).toHaveValue(polishExample!.sourceText);
+    expect(screen.getByText('公开合成示例', { selector: '.source-origin-badge' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: '清空并输入我的文本' }));
+    dialog = screen.getByRole('dialog', { name: '清空示例并输入我的文本？' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '清空并输入我的文本' }));
+
+    expect(screen.getByLabelText('英文论文原文')).toHaveValue('');
+    expect(screen.getByText('我的文本', { selector: '.source-origin-badge' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '撤销切换' })).toBeInTheDocument();
   });
 
   it('switches the complete example package across all three tasks', async () => {
@@ -143,5 +189,23 @@ describe('TaskSetup', () => {
     expect(screen.getByRole('radio', { name: /英文保守润色/ })).toBeChecked();
     expect(screen.getByLabelText('英文论文原文')).toHaveValue(polishExample!.sourceText);
     expect(screen.getByText('已恢复切换前的正文和任务设置。')).toBeInTheDocument();
+  });
+
+  it('does not start analysis until the send confirmation is explicitly accepted', async () => {
+    const onAnalyze = vi.fn();
+    const sourceText = 'A'.repeat(60);
+    render(<TaskSetupHarness initialDraft={createDraft({ taskType: 'polish', sourceText })} onAnalyze={onAnalyze} service={available} />);
+
+    await userEvent.click(screen.getByRole('button', { name: '检查并开始分析' }));
+
+    const dialog = screen.getByRole('dialog', { name: '确认发送当前文本？' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText('60 个字符')).toBeInTheDocument();
+    expect(within(dialog).getByText('仍需作者核对')).toBeInTheDocument();
+    expect(onAnalyze).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '确认并开始分析' }));
+
+    expect(onAnalyze).toHaveBeenCalledTimes(1);
   });
 });
