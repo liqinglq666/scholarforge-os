@@ -6,10 +6,7 @@ import {
 } from '@/app/api/auth/session/route';
 import { POST as signUp } from '@/app/api/auth/sign-up/route';
 import { GET as getCloudPreferences } from '@/app/api/preferences/cloud/route';
-import {
-  SupabaseRequestFailure,
-  supabaseRequest,
-} from '@/lib/auth/supabase';
+import { supabaseRequest } from '@/lib/auth/supabase';
 import { SUPABASE_REQUEST_TIMEOUT_MS } from '@/lib/config';
 
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
@@ -165,17 +162,20 @@ describe('Supabase outage and session preservation', () => {
 
   it('aborts a hanging Supabase request at the configured timeout', async () => {
     vi.useFakeTimers();
-    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => (
-      await new Promise<Response>((_resolve, reject) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      return await new Promise<Response>((resolve, reject) => {
+        void resolve;
         const signal = init?.signal;
         signal?.addEventListener('abort', () => {
           reject(new DOMException('Aborted', 'AbortError'));
         }, { once: true });
-      })
-    )));
+      });
+    }));
 
     const requestPromise = supabaseRequest('/auth/v1/user', { method: 'GET' }, 'token');
-    const expectation = expect(requestPromise).rejects.toMatchObject<SupabaseRequestFailure>({
+    const expectation = expect(requestPromise).rejects.toMatchObject({
+      name: 'SupabaseRequestFailure',
       reason: 'timeout',
     });
 
