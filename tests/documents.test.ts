@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferSectionType, validateDocxFile } from '@/lib/documents/docx';
+import { inferSectionType, truncateImportedText, validateDocxFile } from '@/lib/documents/docx';
 
 describe('DOCX import boundaries', () => {
   it('recognizes common scientific section headings', () => {
@@ -11,5 +11,13 @@ describe('DOCX import boundaries', () => {
   it('rejects unsupported files', () => {
     expect(() => validateDocxFile(new File(['x'], 'paper.pdf', { type: 'application/pdf' }))).toThrow(/仅支持/);
     expect(() => validateDocxFile(new File([], 'paper.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }))).toThrow(/为空/);
+  });
+
+  it('reports source length when an imported text preview is truncated', () => {
+    const preview = truncateImportedText('A'.repeat(25), 10);
+
+    expect(preview.text).toBe('A'.repeat(10));
+    expect(preview.sourceCharacterCount).toBe(25);
+    expect(preview.truncated).toBe(true);
   });
 });
