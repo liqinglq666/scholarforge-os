@@ -1,12 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { SECTION_LABELS, TASK_LABELS } from '@/lib/config';
-import { analyzeIssueAnchor, applyIssueToWorkspace, redoWorkspace, removeAppliedIssueFromWorkspace, undoWorkspace } from '@/lib/editing/apply';
-import { exportCleanDocx, exportReviewReport, exportWorkingText } from '@/lib/exports/files';
-import type { IssueDecision, IssueSeverity, ReviewIssue, WorkspaceState } from '@/lib/types';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { SafetyGatePanel } from '@/components/review/safety-gate-panel';
+import { SECTION_LABELS, TASK_LABELS } from '@/lib/config';
+import {
+  analyzeIssueAnchor,
+  applyIssueToWorkspace,
+  issueDecisionRequiresAppliedEditRemoval,
+  redoWorkspace,
+  removeAppliedIssueFromWorkspace,
+  setIssueDecisionInWorkspace,
+  undoWorkspace,
+} from '@/lib/editing/apply';
+import { exportCleanDocx, exportReviewReport, exportWorkingText } from '@/lib/exports/files';
+import type { IssueDecision, IssueSeverity, ReviewIssue, WorkspaceState } from '@/lib/types';
 
 type TextView = 'author' | 'suggested' | 'original';
 type DecisionFilter = 'all' | IssueDecision;
@@ -145,6 +154,7 @@ export function ReviewWorkbench({
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('all');
   const [selectedId, setSelectedId] = useState(result?.issues[0]?.id || '');
   const [message, setMessage] = useState('');
+  const [pendingDecision, setPendingDecision] = useState<{ issueId: string; decision: IssueDecision } | null>(null);
 
   const filteredIssues = useMemo(() => (result?.issues || []).filter((issue) => {
     const decision = workspace.decisions[issue.id] || 'pending';
@@ -157,18 +167,27 @@ export function ReviewWorkbench({
 
   if (!result) return null;
 
-  function setDecision(issueId: string, decision: IssueDecision) {
-    const applied = workspace.appliedEdits.some((edit) => edit.issueId === issueId);
-    let next = workspace;
-    if (applied && decision !== 'accepted') {
-      const shouldRemove = window.confirm(`这条建议已经应用到作者工作稿。改为“${DECISION_LABELS[decision]}”时是否同时撤回该修改？`);
-      if (!shouldRemove) return;
-      next = removeAppliedIssueFromWorkspace(workspace, issueId);
-    }
-    onUpdate({ ...next, decisions: { ...next.decisions, [issueId]: decision } });
-    setMessage(applied && decision !== 'accepted'
+  function commitDecision(issueId: string, decision: IssueDecision) {
+    const removesAppliedEdit = issueDecisionRequiresAppliedEditRemoval(workspace, issueId, decision);
+    onUpdate(setIssueDecisionInWorkspace(workspace, issueId, decision));
+    setMessage(removesAppliedEdit
       ? `已撤回修改并记录作者决定：${DECISION_LABELS[decision]}。`
       : `已记录作者决定：${DECISION_LABELS[decision]}。`);
+  }
+
+  function setDecision(issueId: string, decision: IssueDecision) {
+    if (issueDecisionRequiresAppliedEditRemoval(workspace, issueId, decision)) {
+      setPendingDecision({ issueId, decision });
+      return;
+    }
+    commitDecision(issueId, decision);
+  }
+
+  function confirmPendingDecision() {
+    const pendingChange = pendingDecision;
+    if (!pendingChange) return;
+    setPendingDecision(null);
+    commitDecision(pendingChange.issueId, pendingChange.decision);
   }
 
   function applyIssue(issue: ReviewIssue) {
@@ -329,6 +348,17 @@ export function ReviewWorkbench({
           </div>
         </section>
       ) : null}
+
+      <ConfirmDialog
+        cancelLabel="保留当前决定"
+        confirmLabel={`撤回并改为${DECISION_LABELS[pendingDecision?.decision || 'rejected']}`}
+        description="这条建议已经应用到作者工作稿。确认后会先撤回该修改，再记录新的作者决定；原始文本和 AI 候选不会改变，工作稿撤回动作仍可使用“撤销”恢复。"
+        eyebrow="修改已应用建议的作者决定"
+        onCancel={() => setPendingDecision(null)}
+        onConfirm={confirmPendingDecision}
+        open={Boolean(pendingDecision)}
+        title={`撤回已应用修改并改为“${DECISION_LABELS[pendingDecision?.decision || 'rejected']}”？`}
+      />
     </div>
   );
 }
