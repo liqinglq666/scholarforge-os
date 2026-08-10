@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { removeProject, removeProjectChapter, saveWorkspaceBackToProject } from '@/lib/project/workspace';
+import {
+  openProjectChapterInWorkspace,
+  removeProject,
+  removeProjectChapter,
+  saveWorkspaceBackToProject,
+} from '@/lib/project/workspace';
 import {
   createBackup,
   createDraft,
@@ -82,6 +87,68 @@ describe('multi-project persistence', () => {
     });
     expect(parsed.current.draft.linkedProjectId).toBe(project.id);
     expect(parsed.current.draft.linkedChapterId).toBe(chapter.id);
+  });
+});
+
+describe('project chapter review transition', () => {
+  it('archives current work and opens a linked chapter with project terminology taking precedence', () => {
+    const chapter = createManuscriptChapter({
+      title: 'Methods',
+      sectionType: 'methods',
+      text: 'The methods chapter contains sufficient scientific text for review. '.repeat(2),
+    });
+    const project = createManuscriptProject({
+      name: 'Review transition project',
+      targetJournal: 'Target Journal',
+      chapters: [chapter],
+      activeChapterId: chapter.id,
+      terminologyLocks: [{ id: 'project-term', source: 'neural net', preferred: 'neural network (NN)' }],
+    });
+    const defaults = createPersistedWorkspace();
+    const previousText = 'Existing quick review text must be archived first. '.repeat(2);
+    const data = {
+      ...defaults,
+      projects: [project],
+      activeProjectId: project.id,
+      preferences: {
+        ...defaults.preferences,
+        customWritingRules: [
+          { id: 'personal-duplicate', source: 'Neural Net', preferred: 'personal preference' },
+          { id: 'personal-unique', source: 'dataset', preferred: 'data set' },
+        ],
+      },
+      current: createWorkspaceState(createDraft({ projectName: 'Quick review', sourceText: previousText })),
+    };
+
+    const result = openProjectChapterInWorkspace(data, project.id, chapter.id, 'translate');
+    const draft = result.data.current.draft;
+
+    expect(result.status).toBe('ready');
+    expect(result.data.history).toHaveLength(1);
+    expect(result.data.history[0].workspace.draft.sourceText).toBe(previousText);
+    expect(draft.sourceText).toBe(chapter.text);
+    expect(draft.projectName).toBe(project.name);
+    expect(draft.taskType).toBe('translate');
+    expect(draft.sectionType).toBe('methods');
+    expect(draft.targetJournal).toBe('Target Journal');
+    expect(draft.linkedProjectId).toBe(project.id);
+    expect(draft.linkedChapterId).toBe(chapter.id);
+    expect(draft.terminologyLocks.map((term) => [term.source, term.preferred])).toEqual([
+      ['neural net', 'neural network (NN)'],
+      ['dataset', 'data set'],
+    ]);
+    expect(result.data.projects[0].activeChapterId).toBe(chapter.id);
+  });
+
+  it('refuses to open a chapter that is too short without changing workspace state', () => {
+    const chapter = createManuscriptChapter({ title: 'Short', text: 'Too short.' });
+    const project = createManuscriptProject({ name: 'Short project', chapters: [chapter] });
+    const data = { ...createPersistedWorkspace(), projects: [project], activeProjectId: project.id };
+
+    const result = openProjectChapterInWorkspace(data, project.id, chapter.id, 'polish');
+
+    expect(result.status).toBe('too-short');
+    expect(result.data).toBe(data);
   });
 });
 
