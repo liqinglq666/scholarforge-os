@@ -33,7 +33,7 @@ test('personal preferences create a tailored manuscript project', async ({ page 
 
 test('account page clearly falls back to guest-local mode when auth is unconfigured', async ({ page }) => {
   await page.goto('/account');
-  await expect(page.getByRole('heading', { name: '登录用于同步偏好，不自动上传论文' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '账户只同步偏好，论文正文仍留在本地' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '账户服务尚未配置' })).toBeVisible();
   await expect(page.getByText('SUPABASE_URL=https://your-project.supabase.co')).toBeVisible();
 
