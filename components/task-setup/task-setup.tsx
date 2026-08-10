@@ -16,6 +16,7 @@ import {
 } from '@/lib/examples';
 import { extractDocx, type DocxImportResult } from '@/lib/documents/docx';
 import type { ImportedDocument, ReviewServiceStatus, TaskType, TerminologyLock, WorkspaceDraft } from '@/lib/types';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 
 const TASKS = Object.keys(TASK_LABELS) as TaskType[];
@@ -26,6 +27,9 @@ const SOURCE_MODE_STORAGE_PREFIX = 'scholarforge.source-mode.v1.';
 
 type InputMode = 'paste' | 'docx';
 type SourceOrigin = 'example' | 'custom' | 'docx';
+type PendingSourceAction =
+  | { kind: 'load-example'; example: ResearchExample }
+  | { kind: 'clear-custom' };
 
 interface SourceState {
   origin: SourceOrigin;
@@ -115,7 +119,6 @@ export function TaskSetup({
   onChange: (patch: Partial<WorkspaceDraft>) => void;
   onAnalyze: () => void;
 }) {
-  const confirmRef = useRef<HTMLDialogElement>(null);
   const sourceTextRef = useRef<HTMLTextAreaElement>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('paste');
@@ -128,6 +131,8 @@ export function TaskSetup({
   const [switchUndo, setSwitchUndo] = useState<DraftSnapshot | null>(null);
   const [taskNotice, setTaskNotice] = useState('');
   const [editorPulse, setEditorPulse] = useState(false);
+  const [pendingSourceAction, setPendingSourceAction] = useState<PendingSourceAction | null>(null);
+  const [analysisConfirmOpen, setAnalysisConfirmOpen] = useState(false);
 
   const sourceState = volatileSourceState?.draftId === draft.id
     ? volatileSourceState.value
@@ -154,6 +159,7 @@ export function TaskSetup({
         : textLength > MAX_SOURCE_CHARACTERS
           ? `超出 ${textLength - MAX_SOURCE_CHARACTERS} 个字符，请缩短正文。`
           : '';
+  const pendingExample = pendingSourceAction?.kind === 'load-example' ? pendingSourceAction.example : null;
 
   useEffect(() => () => {
     if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
@@ -260,7 +266,10 @@ export function TaskSetup({
   }
 
   function loadExample(example: ResearchExample) {
-    if (sourceState.origin !== 'example' && draft.sourceText.trim() && !window.confirm('载入示例会替换当前输入文本和设置。确定继续吗？')) return;
+    if (sourceState.origin !== 'example' && draft.sourceText.trim()) {
+      setPendingSourceAction({ kind: 'load-example', example });
+      return;
+    }
     applyExample(example, `已载入“${TASK_LABELS[example.taskType]}”公开合成示例。`);
   }
 
@@ -283,8 +292,7 @@ export function TaskSetup({
     setTaskNotice(`任务已切换为“${TASK_LABELS[task]}”，当前${sourceModeLabel}已保留。可使用“载入当前任务示例”主动替换。`);
   }
 
-  function clearForCustomText() {
-    if (draft.sourceText.trim() && !window.confirm('这会清空当前示例正文和示例设置，进入“我的文本”模式。确定继续吗？')) return;
+  function clearForCustomTextNow() {
     setSwitchUndo(snapshotDraft());
     onChange({
       projectName: '',
@@ -298,6 +306,25 @@ export function TaskSetup({
     setTaskNotice('已进入“我的文本”模式。请粘贴论文正文，切换任务时内容会保持不变。');
     setInputMode('paste');
     runOnNextFrame(() => sourceTextRef.current?.focus());
+  }
+
+  function clearForCustomText() {
+    if (draft.sourceText.trim()) {
+      setPendingSourceAction({ kind: 'clear-custom' });
+      return;
+    }
+    clearForCustomTextNow();
+  }
+
+  function confirmSourceAction() {
+    const action = pendingSourceAction;
+    if (!action) return;
+    setPendingSourceAction(null);
+    if (action.kind === 'load-example') {
+      applyExample(action.example, `已载入“${TASK_LABELS[action.example.taskType]}”公开合成示例。`);
+      return;
+    }
+    clearForCustomTextNow();
   }
 
   function undoSourceSwitch() {
@@ -318,6 +345,11 @@ export function TaskSetup({
     markAuthoredChange({ terminologyLocks: [...draft.terminologyLocks, next] });
     setTermSource('');
     setTermPreferred('');
+  }
+
+  function confirmAnalyze() {
+    setAnalysisConfirmOpen(false);
+    if (canAnalyze) onAnalyze();
   }
 
   return (
@@ -465,26 +497,42 @@ export function TaskSetup({
 
           <div className="analysis-commitment quick-review-submit">
             <div><strong>分析前状态</strong><span>{disabledReason || `将发送 ${textLength.toLocaleString()} 个字符和 ${draft.terminologyLocks.length} 条术语规则。`}</span></div>
-            <button className="primary-button" disabled={!canAnalyze} onClick={() => confirmRef.current?.showModal()} type="button">检查并开始分析</button>
+            <button className="primary-button" disabled={!canAnalyze} onClick={() => setAnalysisConfirmOpen(true)} type="button">检查并开始分析</button>
           </div>
         </aside>
       </div>
 
-      <dialog className="confirm-dialog" ref={confirmRef}>
-        <form method="dialog">
-          <span className="product-label">分析前确认</span>
-          <h2>确认发送当前文本？</h2>
-          <p>本次将发送 {textLength.toLocaleString()} 个字符、任务类型、章节类型、写作语境和 {draft.terminologyLocks.length} 条术语规则。原始 DOCX 不会发送。</p>
-          <div className="confirmation-list">
-            <span><b>文本</b>{textLength.toLocaleString()} 个字符</span>
-            <span><b>任务</b>{TASK_LABELS[draft.taskType]}</span>
-            <span><b>来源</b>{sourceModeLabel}</span>
-            <span><b>章节</b>{SECTION_OPTIONS.find(([value]) => value === draft.sectionType)?.[1] || draft.sectionType}</span>
-          </div>
-          <div className="responsibility-note"><strong>仍需作者核对</strong><span>事实、数值、单位、方法、引用、因果关系和结论强度。</span></div>
-          <div className="dialog-actions"><button value="cancel">返回检查</button><button className="primary-button" onClick={onAnalyze} value="confirm">确认并开始分析</button></div>
-        </form>
-      </dialog>
+      <ConfirmDialog
+        cancelLabel="保留当前内容"
+        confirmLabel={pendingExample ? '替换并载入示例' : '清空并输入我的文本'}
+        description={pendingExample
+          ? `当前正文和任务设置会被“${TASK_LABELS[pendingExample.taskType]}”公开合成示例替换。替换后可使用“撤销切换”恢复当前内容。`
+          : '当前示例正文、任务名称、期刊语境和术语规则会被清空，并切换到“我的文本”模式。清空后可使用“撤销切换”恢复。'}
+        eyebrow={pendingExample ? '载入公开合成示例' : '切换正文来源'}
+        onCancel={() => setPendingSourceAction(null)}
+        onConfirm={confirmSourceAction}
+        open={Boolean(pendingSourceAction)}
+        title={pendingExample ? `载入“${TASK_LABELS[pendingExample.taskType]}”示例？` : '清空示例并输入我的文本？'}
+      />
+
+      <ConfirmDialog
+        cancelLabel="返回检查"
+        confirmLabel="确认并开始分析"
+        description={`本次将发送 ${textLength.toLocaleString()} 个字符、任务类型、章节类型、写作语境和 ${draft.terminologyLocks.length} 条术语规则。原始 DOCX 不会发送。`}
+        eyebrow="分析前确认"
+        onCancel={() => setAnalysisConfirmOpen(false)}
+        onConfirm={confirmAnalyze}
+        open={analysisConfirmOpen}
+        title="确认发送当前文本？"
+      >
+        <div className="confirmation-list">
+          <span><b>文本</b>{textLength.toLocaleString()} 个字符</span>
+          <span><b>任务</b>{TASK_LABELS[draft.taskType]}</span>
+          <span><b>来源</b>{sourceModeLabel}</span>
+          <span><b>章节</b>{SECTION_OPTIONS.find(([value]) => value === draft.sectionType)?.[1] || draft.sectionType}</span>
+        </div>
+        <div className="responsibility-note"><strong>仍需作者核对</strong><span>事实、数值、单位、方法、引用、因果关系和结论强度。</span></div>
+      </ConfirmDialog>
     </div>
   );
 }
