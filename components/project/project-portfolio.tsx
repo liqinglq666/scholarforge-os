@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { MAX_PROJECTS } from '@/lib/config';
 import { createProjectFromPreferences } from '@/lib/project/create';
@@ -15,6 +17,7 @@ function formatDate(value: string) {
 export function ProjectPortfolio() {
   const router = useRouter();
   const { data, ready, saveState, saveMessage, replaceData, saveNow } = useWorkspace();
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   function createProject() {
     if (data.projects.length >= MAX_PROJECTS) return;
@@ -25,9 +28,10 @@ export function ProjectPortfolio() {
     router.push(`/projects/${project.id}`);
   }
 
-  function deleteProject(projectId: string, name: string) {
-    if (!window.confirm(`删除“${name || '未命名项目'}”及其章节、意见和版本记录？此操作无法撤销，建议先导出完整备份。`)) return;
-    const next = removeProject(data, projectId);
+  function deleteProjectConfirmed() {
+    if (!pendingDelete) return;
+    const next = removeProject(data, pendingDelete.id);
+    setPendingDelete(null);
     replaceData(next);
     saveNow(next);
   }
@@ -64,7 +68,7 @@ export function ProjectPortfolio() {
                 </dl>
                 <div className="project-card-actions">
                   <Link className="primary-link" href={`/projects/${project.id}`}>进入项目</Link>
-                  <button className="danger-button" onClick={() => deleteProject(project.id, project.name)} type="button">删除</button>
+                  <button className="danger-button" onClick={() => setPendingDelete({ id: project.id, name: project.name || '未命名项目' })} type="button">删除</button>
                 </div>
               </article>
             );
@@ -77,6 +81,16 @@ export function ProjectPortfolio() {
           <button className="primary-button" onClick={createProject} type="button">创建第一个项目</button>
         </div>
       )}
+      <ConfirmDialog
+        confirmLabel="永久删除项目"
+        description="项目中的章节、导师或审稿意见、版本记录会从当前浏览器永久删除；若当前工作区关联这个项目，关联关系也会被解除。此操作无法撤销，建议先导出完整备份。"
+        eyebrow="删除论文项目"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={deleteProjectConfirmed}
+        open={Boolean(pendingDelete)}
+        title={`删除“${pendingDelete?.name || '未命名项目'}”？`}
+        tone="danger"
+      />
     </div>
   );
 }
