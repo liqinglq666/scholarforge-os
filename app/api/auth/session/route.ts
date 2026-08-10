@@ -22,6 +22,7 @@ export async function GET() {
       configured: true,
       authenticated: false,
       user: null,
+      unavailable: true,
       message: '账户服务暂时不可用。现有登录凭据已保留，请稍后重试。',
     }, { status: 503 });
   }
