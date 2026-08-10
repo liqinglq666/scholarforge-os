@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
 import { useReviewServiceStatus } from '@/components/review/use-review-service-status';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
@@ -13,7 +14,8 @@ import { MAX_HISTORY_ENTRIES } from '@/lib/config';
 import { findResearchExample } from '@/lib/examples';
 import { getProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
 import type { ApiErrorPayload, ReviewResult, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createDraft, createDraftFromPreferences, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
+import { createDraft, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
+import { startNewTaskWorkspace } from '@/lib/workspace/transitions';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
@@ -33,6 +35,7 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null);
   const [pageError, setPageError] = useState('');
   const [projectMessage, setProjectMessage] = useState('');
+  const [newTaskConfirmOpen, setNewTaskConfirmOpen] = useState(false);
   const analysisControllerRef = useRef<AbortController | null>(null);
   const entryParamAppliedRef = useRef(false);
   const routeProject = projectId ? getProject(data, projectId) : null;
@@ -196,17 +199,12 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   }
 
   function startNew() {
-    if (!window.confirm('开始新任务会把当前结果保留在“最近任务”，并清空当前输入。确定继续吗？')) return;
-    const entry = data.current.currentResult ? createHistoryEntry(data.current) : null;
-    const history = entry
-      ? [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES)
-      : data.history;
-    const nextData = {
-      ...data,
-      current: createWorkspaceState(createDraftFromPreferences(data.preferences)),
-      history,
-      updatedAt: new Date().toISOString(),
-    };
+    setNewTaskConfirmOpen(true);
+  }
+
+  function startNewConfirmed() {
+    const nextData = startNewTaskWorkspace(data);
+    setNewTaskConfirmOpen(false);
     replaceData(nextData);
     saveNow(nextData);
     setPageError('');
@@ -280,6 +278,16 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
       {data.current.currentResult
         ? <ReviewWorkbench onStartNew={startNew} onUpdate={updateCurrent} workspace={data.current} />
         : <TaskSetup analyzing={data.current.status === 'analyzing'} draft={data.current.draft} onAnalyze={() => void analyze()} onChange={updateDraft} service={service} serviceLoading={serviceLoading} />}
+      <ConfirmDialog
+        cancelLabel="继续当前任务"
+        confirmLabel="保存并开始新任务"
+        description="当前正文、分析结果和作者决定会先保存到“最近任务”，随后清空当前工作区并开始一份新任务。"
+        eyebrow="新建审校任务"
+        onCancel={() => setNewTaskConfirmOpen(false)}
+        onConfirm={startNewConfirmed}
+        open={newTaskConfirmOpen}
+        title="开始一份新任务？"
+      />
     </main>
   );
 }
