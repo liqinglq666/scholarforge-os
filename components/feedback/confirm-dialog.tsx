@@ -36,7 +36,7 @@ export function ConfirmDialog({
 
     if (open && !dialog.open) {
       dialog.showModal();
-      window.requestAnimationFrame(() => cancelButtonRef.current?.focus());
+      cancelButtonRef.current?.focus();
       return;
     }
 
