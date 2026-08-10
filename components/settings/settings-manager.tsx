@@ -11,8 +11,9 @@ import { useWorkspace } from '@/components/workspace/use-workspace';
 import { APP_VERSION } from '@/lib/config';
 import { exportWorkspaceBackup } from '@/lib/exports/files';
 import type { WorkspaceBackup } from '@/lib/types';
+import { readWorkspaceBackupFile } from '@/lib/workspace/backup-file';
 import { clearWorkspaceData, writeWorkspaceData } from '@/lib/workspace/storage';
-import { createPersistedWorkspace, parseBackupText } from '@/lib/workspace/schema';
+import { createPersistedWorkspace } from '@/lib/workspace/schema';
 
 export function SettingsManager() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export function SettingsManager() {
     if (!file) return;
     setMessage('');
     try {
-      const preview = parseBackupText(await file.text());
+      const preview = await readWorkspaceBackupFile(file);
       setImportPreview(preview);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '备份导入失败。当前工作区没有改变。');
