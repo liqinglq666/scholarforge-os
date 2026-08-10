@@ -9,7 +9,7 @@ import type { AuthStatus } from '@/lib/types';
 
 export function LoginManager() {
   const router = useRouter();
-  const { status } = useAuthStatus();
+  const { status, reloadStatus } = useAuthStatus();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +67,20 @@ export function LoginManager() {
       <section className="login-card" aria-labelledby="login-title">
         {error ? <StatusBanner tone="danger" title="登录未完成">{error}</StatusBanner> : null}
 
-        {!status.configured ? (
+        {status.unavailable ? (
+          <div className="login-state-card">
+            <span className="login-state-mark" aria-hidden="true">!</span>
+            <span className="eyebrow">登录凭据已保留</span>
+            <h2 id="login-title">账户服务暂时不可用</h2>
+            <p>{status.user
+              ? `最近一次已确认账户为 ${status.user.email}。当前无法重新验证会话，但不会把这次故障当成退出登录。`
+              : '当前无法确认登录状态。浏览器中的现有登录凭据没有被删除，服务恢复后可以重新验证。'}</p>
+            <div className="login-actions stacked">
+              <button className="primary-button" onClick={() => void reloadStatus()} type="button">重试账户状态</button>
+              <Link className="secondary-link" href="/workspace">先继续使用本地工作区</Link>
+            </div>
+          </div>
+        ) : !status.configured ? (
           <div className="login-state-card">
             <span className="login-state-mark" aria-hidden="true">!</span>
             <span className="eyebrow">游客模式可继续使用</span>
