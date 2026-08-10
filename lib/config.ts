@@ -8,6 +8,7 @@ export const LEGACY_HISTORY_KEY = 'scholarforge-os-paperlens-history-v1';
 export const MAX_SOURCE_CHARACTERS = 12_000;
 export const MIN_SOURCE_CHARACTERS = 40;
 export const MAX_REQUEST_BYTES = 80_000;
+export const MAX_AUTH_REQUEST_BYTES = 8_000;
 export const MAX_MODEL_OUTPUT_CHARACTERS = 100_000;
 export const MAX_HISTORY_ENTRIES = 12;
 export const MAX_PROJECTS = 12;
