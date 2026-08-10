@@ -23,6 +23,11 @@ function errorPayload(error: string, code: string, requestId: string, detail?: s
   return { error, code, requestId, ...(detail ? { detail } : {}) };
 }
 
+function logUnexpectedFailure(requestId: string, error: unknown) {
+  const name = error instanceof Error ? error.name : 'UnknownError';
+  console.error(`[ScholarForge:${requestId}] review failed (${name})`);
+}
+
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   const contentLength = Number(request.headers.get('content-length') || 0);
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
       const headers: Record<string, string> = error.status === 429 ? { 'Retry-After': '30' } : {};
       return json(errorPayload(error.message, error.code, requestId), error.status, headers);
     }
-    console.error(`[ScholarForge:${requestId}] review failed`, error);
+    logUnexpectedFailure(requestId, error);
     return json(
       errorPayload('分析失败。你的正文仍安全保存在浏览器中，可以稍后重试。', 'REVIEW_FAILED', requestId),
       502,

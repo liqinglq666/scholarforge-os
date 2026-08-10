@@ -22,6 +22,21 @@ function parseJsonOutput(value: string) {
   }
 }
 
+async function parseProviderPayload(response: Response) {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ValidationError('模型服务返回了无法解析的响应。', 'INVALID_PROVIDER_RESPONSE', 502);
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new ValidationError('模型服务返回了无效的响应结构。', 'INVALID_PROVIDER_RESPONSE', 502);
+  }
+  return payload as {
+    choices?: Array<{ finish_reason?: string | null; message?: { content?: string } }>;
+  };
+}
+
 export async function reviewWithModel(request: ReviewRequest): Promise<ReviewResult> {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) throw new ValidationError('分析服务未配置。你的正文没有发送给模型。', 'SERVICE_NOT_CONFIGURED', 503);
@@ -64,11 +79,14 @@ export async function reviewWithModel(request: ReviewRequest): Promise<ReviewRes
     throw new ValidationError(`模型服务返回错误（${response.status}）。`, 'MODEL_ERROR', 502);
   }
 
-  const payload = await response.json() as {
-    choices?: Array<{ finish_reason?: string; message?: { content?: string } }>;
-  };
+  const payload = await parseProviderPayload(response);
   const choice = payload.choices?.[0];
   if (!choice?.message?.content) throw new ValidationError('模型返回了空结果。', 'EMPTY_MODEL_OUTPUT', 502);
-  if (choice.finish_reason === 'length') throw new ValidationError('模型输出被截断，请缩短输入后重试。', 'MODEL_OUTPUT_TRUNCATED', 502);
+  if (choice.finish_reason === 'length') {
+    throw new ValidationError('模型输出被截断，请缩短输入后重试。', 'MODEL_OUTPUT_TRUNCATED', 502);
+  }
+  if (choice.finish_reason && choice.finish_reason !== 'stop') {
+    throw new ValidationError('模型响应未正常结束，请稍后重试。', 'MODEL_OUTPUT_INCOMPLETE', 502);
+  }
   return normalizeModelResult(parseJsonOutput(choice.message.content), request);
 }
