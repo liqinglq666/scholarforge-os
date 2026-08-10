@@ -8,7 +8,6 @@ import type { AuthStatus } from '@/lib/types';
 
 export function AccountManager() {
   const { status, setStatus, reloadStatus } = useAuthStatus();
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -22,13 +21,13 @@ export function AccountManager() {
     setError('');
     setMessage('');
     try {
-      const response = await fetch(mode === 'sign-up' ? '/api/auth/sign-up' : '/api/auth/session', {
+      const response = await fetch('/api/auth/sign-up', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, displayName }),
       });
       const payload = await response.json() as Partial<AuthStatus> & { error?: string };
-      if (!response.ok) throw new Error(payload.error || '账户操作失败。');
+      if (!response.ok) throw new Error(payload.error || '账户创建失败。');
       setStatus({
         configured: payload.configured === true,
         authenticated: payload.authenticated === true,
@@ -39,7 +38,7 @@ export function AccountManager() {
       setPassword('');
       window.dispatchEvent(new Event('scholarforge-auth-change'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '账户操作失败。');
+      setError(cause instanceof Error ? cause.message : '账户创建失败。');
     } finally {
       setSubmitting(false);
     }
@@ -69,8 +68,8 @@ export function AccountManager() {
   return (
     <div className="account-content">
       <div className="page-heading">
-        <div><span className="eyebrow">可选账户 · 游客模式始终可用</span><h1>登录用于同步偏好，不自动上传论文</h1></div>
-        <p>邮箱账户只保存你的个性化配置。论文项目、章节正文、导师意见和版本内容仍保存在当前浏览器，除非未来明确启用单独的项目同步功能。</p>
+        <div><span className="eyebrow">可选账户 · 游客模式始终可用</span><h1>账户只同步偏好，论文正文仍留在本地</h1></div>
+        <p>账户中心负责注册、同步范围和退出登录；已有账户请使用独立登录页。论文项目、章节正文、导师意见和版本内容仍默认保存在当前浏览器。</p>
       </div>
 
       {message ? <StatusBanner tone="success" title="账户状态">{message}</StatusBanner> : null}
@@ -99,21 +98,24 @@ export function AccountManager() {
       ) : (
         <div className="account-grid">
           <section className="account-panel">
-            <div className="account-mode" role="tablist" aria-label="账户操作">
-              <button aria-selected={mode === 'sign-in'} className={mode === 'sign-in' ? 'active' : ''} onClick={() => setMode('sign-in')} role="tab" type="button">登录</button>
-              <button aria-selected={mode === 'sign-up'} className={mode === 'sign-up' ? 'active' : ''} onClick={() => setMode('sign-up')} role="tab" type="button">注册</button>
-            </div>
+            <span className="eyebrow">创建账户</span>
+            <h2>注册 ScholarForge</h2>
+            <p>注册只用于同步个性化偏好。已有账户不需要在这里重复填写，请直接前往登录页。</p>
             <form className="account-form" onSubmit={(event) => void submit(event)}>
-              {mode === 'sign-up' ? <label><span>显示名称（可选）</span><input autoComplete="name" maxLength={80} onChange={(event) => setDisplayName(event.target.value)} value={displayName} /></label> : null}
+              <label><span>显示名称（可选）</span><input autoComplete="name" maxLength={80} onChange={(event) => setDisplayName(event.target.value)} value={displayName} /></label>
               <label><span>邮箱</span><input autoComplete="email" inputMode="email" maxLength={254} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></label>
-              <label><span>密码</span><input autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} minLength={8} maxLength={128} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
-              <button className="primary-button" disabled={submitting} type="submit">{submitting ? '正在处理…' : mode === 'sign-up' ? '创建账户' : '登录账户'}</button>
+              <label><span>密码</span><input autoComplete="new-password" minLength={8} maxLength={128} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
+              <button className="primary-button" disabled={submitting} type="submit">{submitting ? '正在创建…' : '创建账户'}</button>
             </form>
-            <small>{mode === 'sign-up' ? '部署方可以在 Supabase 中开启邮箱确认。收到确认邮件时，请先完成确认再登录。' : '登录不会把此浏览器中的论文数据自动上传。'}</small>
+            <small>部署方可以在 Supabase 中开启邮箱确认。收到确认邮件时，请先完成确认再登录。</small>
+            <div className="account-actions">
+              <Link className="secondary-link" href="/login">已有账户？前往登录</Link>
+              <Link className="secondary-link" href="/workspace">暂不注册，继续游客使用</Link>
+            </div>
           </section>
           <aside className="account-boundary">
             <span className="eyebrow">账户边界</span>
-            <h2>登录解决跨设备偏好，不混淆数据归属</h2>
+            <h2>账户解决跨设备偏好，不混淆数据归属</h2>
             <ul>
               <li>同步默认任务、期刊、学科、术语规则与章节模板。</li>
               <li>不自动同步未发表论文、导师原话和版本全文。</li>
