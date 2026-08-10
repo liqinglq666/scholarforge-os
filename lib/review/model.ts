@@ -38,11 +38,11 @@ async function parseProviderPayload(response: Response) {
 }
 
 export async function reviewWithModel(request: ReviewRequest): Promise<ReviewResult> {
-  const apiKey = process.env.DASHSCOPE_API_KEY;
+  const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) throw new ValidationError('分析服务未配置。你的正文没有发送给模型。', 'SERVICE_NOT_CONFIGURED', 503);
 
-  const baseUrl = (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
-  const model = process.env.DASHSCOPE_MODEL || 'qwen-plus';
+  const baseUrl = (process.env.DASHSCOPE_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/$/, '');
+  const model = process.env.DASHSCOPE_MODEL?.trim() || 'qwen-plus';
   const prompt = buildReviewPrompt(request);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
