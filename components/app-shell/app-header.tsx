@@ -5,21 +5,22 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AccountMenu } from '@/components/account/account-menu';
 
-const primaryNavigation = [
-  { href: '/judge', label: '90 秒评审' },
-  { href: '/projects', label: '论文项目' },
-  { href: '/workspace', label: '快速审校' },
-  { href: '/trust', label: '安全说明' },
-];
+const navigation = {
+  judge: { href: '/judge', label: '90 秒评审' },
+  projects: { href: '/projects', label: '论文项目' },
+  workspace: { href: '/workspace', label: '快速审校' },
+  trust: { href: '/trust', label: '安全说明' },
+  try: { href: '/try', label: '完整公开体验' },
+  guide: { href: '/guide', label: '使用手册' },
+  settings: { href: '/settings', label: '数据与隐私' },
+} as const;
 
-const secondaryNavigation = [
-  { href: '/try', label: '完整公开体验' },
-  { href: '/guide', label: '使用手册' },
-  { href: '/settings', label: '数据与隐私' },
-];
+const primaryNavigation = [navigation.judge, navigation.projects, navigation.workspace, navigation.trust];
+const secondaryNavigation = [navigation.try, navigation.guide, navigation.settings];
+const footerNavigation = [navigation.judge, navigation.try, navigation.trust, navigation.guide, navigation.settings];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === '/projects') return pathname === '/projects' || pathname.startsWith('/projects/');
+  if (href === navigation.projects.href) return pathname === navigation.projects.href || pathname.startsWith(`${navigation.projects.href}/`);
   return pathname === href;
 }
 
@@ -62,7 +63,7 @@ export function AppHeader() {
           <BrandHomeLink />
           <nav aria-label="登录页快捷导航" className="login-auth-header-actions">
             <Link href="/">返回首页</Link>
-            <Link className="login-auth-guest-link" href="/workspace">继续游客使用</Link>
+            <Link className="login-auth-guest-link" href={navigation.workspace.href}>继续游客使用</Link>
           </nav>
         </div>
       </header>
@@ -154,11 +155,7 @@ export function AppFooter() {
           <p><strong>让 AI 修改先通过科研事实安全门。</strong><span>模型提出候选，代码检查风险，作者决定最终文本。</span></p>
         </div>
         <nav aria-label="页脚导航">
-          <Link href="/judge">90 秒评审</Link>
-          <Link href="/try">完整公开体验</Link>
-          <Link href="/trust">安全说明</Link>
-          <Link href="/guide">使用手册</Link>
-          <Link href="/settings">数据与隐私</Link>
+          {footerNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
           <a href="https://github.com/liqinglq666/scholarforge-os" rel="noreferrer" target="_blank">GitHub</a>
         </nav>
       </div>
