@@ -10,14 +10,15 @@ import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
-import { MAX_HISTORY_ENTRIES } from '@/lib/config';
 import { findResearchExample, type ResearchExample } from '@/lib/examples';
 import { getProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
-import type { ApiErrorPayload, ReviewResult, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createHistoryEntry } from '@/lib/workspace/schema';
+import {
+  createReviewAnalysisRun,
+  type AnalysisStage,
+  type ReviewAnalysisRun,
+} from '@/lib/review/client';
+import type { TaskType, WorkspaceDraft } from '@/lib/types';
 import { loadResearchExampleWorkspace, startNewTaskWorkspace } from '@/lib/workspace/transitions';
-
-type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
 const STAGE_LABELS: Record<AnalysisStage, { title: string; description: string }> = {
   preparing: { title: '正在准备请求', description: '校验正文长度、任务设置和术语锁。' },
@@ -26,7 +27,6 @@ const STAGE_LABELS: Record<AnalysisStage, { title: string; description: string }
 };
 
 const TASK_TYPES = new Set<TaskType>(['translate', 'polish', 'precheck']);
-const CLIENT_ANALYSIS_TIMEOUT_MS = 65_000;
 
 export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
@@ -37,7 +37,8 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   const [projectMessage, setProjectMessage] = useState('');
   const [newTaskConfirmOpen, setNewTaskConfirmOpen] = useState(false);
   const [pendingEntryExample, setPendingEntryExample] = useState<ResearchExample | null>(null);
-  const analysisControllerRef = useRef<AbortController | null>(null);
+  const analysisRunRef = useRef<ReviewAnalysisRun | null>(null);
+  const mountedRef = useRef(true);
   const entryParamAppliedRef = useRef(false);
   const routeProject = projectId ? getProject(data, projectId) : null;
   const linkedChapter = (() => {
@@ -76,7 +77,11 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
     if (requestedTask) window.history.replaceState(null, '', '/workspace');
   }, [data, projectId, ready, replaceData, saveNow, updateCurrent]);
 
-  useEffect(() => () => analysisControllerRef.current?.abort(), []);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    analysisRunRef.current?.cancel();
+    analysisRunRef.current = null;
+  }, []);
 
   function updateDraft(patch: Partial<WorkspaceDraft>) {
     updateCurrent((current) => ({
@@ -99,86 +104,29 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   }
 
   async function analyze() {
-    if (analysisControllerRef.current) return;
-    const workspace = data.current;
-    const controller = new AbortController();
-    analysisControllerRef.current = controller;
-    let timedOut = false;
-    const timeout = window.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, CLIENT_ANALYSIS_TIMEOUT_MS);
-
+    if (analysisRunRef.current) return;
     setPageError('');
-    setAnalysisStage('preparing');
-    updateCurrent({ ...workspace, status: 'analyzing', lastError: undefined });
 
-    const requestBody = {
-      taskId: workspace.draft.id,
-      projectName: workspace.draft.projectName,
-      taskType: workspace.draft.taskType,
-      sectionType: workspace.draft.sectionType,
-      targetJournal: workspace.draft.targetJournal,
-      text: workspace.draft.sourceText,
-      terminologyLocks: workspace.draft.terminologyLocks,
-      discipline: data.preferences.discipline,
-      academicStage: data.preferences.academicStage,
-      englishVariant: data.preferences.englishVariant,
-      explanationLevel: data.preferences.explanationLevel,
-    };
+    const run = createReviewAnalysisRun(data, {
+      onStage: (stage) => {
+        if (mountedRef.current) setAnalysisStage(stage);
+      },
+    });
+    analysisRunRef.current = run;
+    replaceData(run.startedData);
 
-    try {
-      setAnalysisStage('reviewing');
-      const response = await fetch('/api/review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-ScholarForge-Session': workspace.draft.id },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-      setAnalysisStage('organizing');
-      const payload = await response.json() as { result?: ReviewResult } & Partial<ApiErrorPayload>;
-      if (!response.ok || !payload.result) throw new Error(payload.error || '分析没有返回有效结果。');
-      if (payload.result.taskId !== workspace.draft.id) throw new Error('分析结果与当前任务不匹配，已拒绝加载。');
+    const outcome = await run.promise;
+    if (!mountedRef.current || analysisRunRef.current !== run) return;
 
-      const decisions = Object.fromEntries(payload.result.issues.map((issue) => [issue.id, 'pending' as const]));
-      const completed = {
-        ...workspace,
-        currentResult: payload.result,
-        decisions,
-        appliedEdits: [],
-        undoStack: [],
-        redoStack: [],
-        workingText: workspace.draft.sourceText,
-        status: 'reviewing' as const,
-        lastError: undefined,
-      };
-      const entry = createHistoryEntry(completed);
-      const nextData = {
-        ...data,
-        current: completed,
-        history: [entry, ...data.history.filter((item) => item.id !== entry.id)].slice(0, MAX_HISTORY_ENTRIES),
-        updatedAt: new Date().toISOString(),
-      };
-      replaceData(nextData);
-      saveNow(nextData);
-    } catch (error) {
-      const aborted = error instanceof Error && error.name === 'AbortError';
-      const message = aborted
-        ? timedOut
-          ? '分析等待超过 65 秒，已在浏览器端停止等待。原文和设置仍保存在此浏览器中。'
-          : '分析已取消。原文和设置仍保存在此浏览器中。'
-        : error instanceof Error ? error.message : '分析失败。';
-      setPageError(message);
-      updateCurrent((current) => ({ ...current, status: current.currentResult ? 'reviewing' : 'draft', lastError: message }));
-    } finally {
-      window.clearTimeout(timeout);
-      analysisControllerRef.current = null;
-      setAnalysisStage(null);
-    }
+    analysisRunRef.current = null;
+    setAnalysisStage(null);
+    replaceData(outcome.data);
+    saveNow(outcome.data);
+    if (!outcome.ok) setPageError(outcome.message);
   }
 
   function cancelAnalysis() {
-    analysisControllerRef.current?.abort();
+    analysisRunRef.current?.cancel();
   }
 
   function confirmEntryExample() {
