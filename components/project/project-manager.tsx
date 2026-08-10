@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import {
@@ -13,7 +14,7 @@ import {
   TASK_LABELS,
 } from '@/lib/config';
 import { analyzeProjectConsistency } from '@/lib/project/consistency';
-import { getProject, upsertProject } from '@/lib/project/workspace';
+import { getProject, removeProjectChapter, upsertProject } from '@/lib/project/workspace';
 import type {
   ConsistencyIssue,
   ManuscriptChapter,
@@ -54,6 +55,7 @@ export function ProjectManager({ projectId }: { projectId: string }) {
   const [termPreferred, setTermPreferred] = useState('');
   const [report, setReport] = useState<ConsistencyIssue[] | null>(null);
   const [reviewTask, setReviewTask] = useState<TaskType>(data.preferences.defaultTaskType);
+  const [pendingChapterDelete, setPendingChapterDelete] = useState<{ id: string; title: string } | null>(null);
   const project = getProject(data, projectId);
   const activeChapter = useMemo(() => {
     if (!project) return null;
@@ -90,17 +92,14 @@ export function ProjectManager({ projectId }: { projectId: string }) {
     commitProject({ ...project, chapters: [...project.chapters, chapter], activeChapterId: chapter.id });
   }
 
-  function removeChapter(chapter: ManuscriptChapter) {
-    if (!project || project.chapters.length <= 1) return;
-    if (!window.confirm(`删除“${chapter.title}”？该章节文本和关联记录会从本地项目中移除，建议先导出备份。`)) return;
-    const chapters = project.chapters.filter((item) => item.id !== chapter.id);
-    commitProject({
-      ...project,
-      chapters,
-      activeChapterId: chapters[0]?.id,
-      supervisorFeedback: project.supervisorFeedback.map((item) => item.chapterId === chapter.id ? { ...item, chapterId: undefined } : item),
-      revisionComparisons: project.revisionComparisons.filter((item) => item.chapterId !== chapter.id),
-    });
+  function deleteChapterConfirmed() {
+    if (!project || !pendingChapterDelete) return;
+    const nextData = removeProjectChapter(data, project.id, pendingChapterDelete.id);
+    setPendingChapterDelete(null);
+    if (nextData === data) return;
+    replaceData(nextData);
+    saveNow(nextData);
+    setReport(null);
   }
 
   function addTerm() {
@@ -225,7 +224,7 @@ export function ProjectManager({ projectId }: { projectId: string }) {
           <section className="chapter-editor" aria-labelledby="chapter-editor-title">
             <div className="chapter-editor-heading">
               <div><h2 id="chapter-editor-title">{activeChapter.title}</h2></div>
-              <button className="danger-button" disabled={project.chapters.length <= 1} onClick={() => removeChapter(activeChapter)} type="button">删除章节</button>
+              <button className="danger-button" disabled={project.chapters.length <= 1} onClick={() => setPendingChapterDelete({ id: activeChapter.id, title: activeChapter.title || '未命名章节' })} type="button">删除章节</button>
             </div>
             <div className="form-grid two-columns">
               <label><span>章节名称</span><input maxLength={120} onChange={(event) => updateChapter(activeChapter.id, { title: event.target.value })} value={activeChapter.title} /></label>
@@ -276,6 +275,17 @@ export function ProjectManager({ projectId }: { projectId: string }) {
           ) : <StatusBanner tone="success" title="未发现当前规则覆盖的跨章节冲突">仍需人工核对统计口径、图表、引用、方法和结论。</StatusBanner>
         ) : <div className="empty-state project-report-empty"><strong>尚未运行检查</strong><p>至少填写两个章节后运行，结果更有价值。</p></div>}
       </section>
+
+      <ConfirmDialog
+        confirmLabel="永久删除章节"
+        description="该章节正文和与它绑定的版本比较会从当前浏览器永久删除。已有导师或审稿意见会保留，但会解除章节绑定；若当前审校工作区关联此章节，工作区正文和结果仍会保留，只解除项目章节关联。"
+        eyebrow="删除项目章节"
+        onCancel={() => setPendingChapterDelete(null)}
+        onConfirm={deleteChapterConfirmed}
+        open={Boolean(pendingChapterDelete)}
+        title={`删除“${pendingChapterDelete?.title || '未命名章节'}”？`}
+        tone="danger"
+      />
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { removeProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
+import { removeProject, removeProjectChapter, saveWorkspaceBackToProject } from '@/lib/project/workspace';
 import {
   createBackup,
   createDraft,
   createManuscriptChapter,
   createManuscriptProject,
   createPersistedWorkspace,
+  createRevisionComparison,
+  createSupervisorFeedbackItem,
   createWorkspaceState,
   parseBackupText,
   parsePersistedWorkspace,
@@ -118,6 +120,61 @@ describe('project deletion', () => {
 
     expect(next.projects.map((project) => project.id)).toEqual([first.id]);
     expect(next.activeProjectId).toBe(first.id);
+  });
+});
+
+describe('chapter deletion', () => {
+  it('removes chapter text and revisions, preserves feedback as unlinked, and keeps current workspace text', () => {
+    const methods = createManuscriptChapter({ title: 'Methods', text: 'Project methods text. '.repeat(4) });
+    const results = createManuscriptChapter({ title: 'Results', text: 'Project results text. '.repeat(4) });
+    const linkedFeedback = createSupervisorFeedbackItem({ comment: 'Please clarify sampling.', chapterId: methods.id });
+    const resultsFeedback = createSupervisorFeedbackItem({ comment: 'Check this table.', chapterId: results.id });
+    const methodsRevision = createRevisionComparison({ title: 'Methods revision', chapterId: methods.id });
+    const resultsRevision = createRevisionComparison({ title: 'Results revision', chapterId: results.id });
+    const project = createManuscriptProject({
+      name: 'Chapter deletion project',
+      chapters: [methods, results],
+      activeChapterId: methods.id,
+      supervisorFeedback: [linkedFeedback, resultsFeedback],
+      revisionComparisons: [methodsRevision, resultsRevision],
+    });
+    const sourceText = 'Current review workspace must remain intact. '.repeat(3);
+    const draft = createDraft({
+      projectName: project.name,
+      sourceText,
+      linkedProjectId: project.id,
+      linkedChapterId: methods.id,
+    });
+    const data = {
+      ...createPersistedWorkspace(),
+      projects: [project],
+      activeProjectId: project.id,
+      current: createWorkspaceState(draft),
+    };
+
+    const next = removeProjectChapter(data, project.id, methods.id);
+    const savedProject = next.projects[0];
+
+    expect(savedProject.chapters.map((chapter) => chapter.id)).toEqual([results.id]);
+    expect(savedProject.activeChapterId).toBe(results.id);
+    expect(savedProject.supervisorFeedback).toHaveLength(2);
+    expect(savedProject.supervisorFeedback[0].comment).toBe(linkedFeedback.comment);
+    expect(savedProject.supervisorFeedback[0].chapterId).toBeUndefined();
+    expect(savedProject.supervisorFeedback[1].chapterId).toBe(results.id);
+    expect(savedProject.revisionComparisons.map((comparison) => comparison.id)).toEqual([resultsRevision.id]);
+    expect(next.current.draft.linkedProjectId).toBeUndefined();
+    expect(next.current.draft.linkedChapterId).toBeUndefined();
+    expect(next.current.draft.sourceText).toBe(sourceText);
+  });
+
+  it('refuses to remove the final remaining chapter', () => {
+    const project = createManuscriptProject({ name: 'Single chapter project' });
+    const data = { ...createPersistedWorkspace(), projects: [project], activeProjectId: project.id };
+
+    const next = removeProjectChapter(data, project.id, project.chapters[0].id);
+
+    expect(next).toBe(data);
+    expect(next.projects[0].chapters).toHaveLength(1);
   });
 });
 
