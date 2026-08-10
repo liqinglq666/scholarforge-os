@@ -2,6 +2,7 @@ import { MAX_REQUEST_BYTES } from '@/lib/config';
 import { reviewWithModel } from '@/lib/review/model';
 import { parseReviewRequest, ValidationError } from '@/lib/review/validation';
 import { checkRateLimit, RATE_LIMITS, releaseRateLimitSlot } from '@/lib/security/rate-limit';
+import { readRequestTextWithLimit, RequestBodyTooLargeError } from '@/lib/security/request-body';
 import type { ApiErrorPayload } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -23,6 +24,10 @@ function errorPayload(error: string, code: string, requestId: string, detail?: s
   return { error, code, requestId, ...(detail ? { detail } : {}) };
 }
 
+function requestTooLarge(requestId: string) {
+  return json(errorPayload('请求内容超过 80 KB 限制。你的浏览器草稿未受影响。', 'REQUEST_TOO_LARGE', requestId), 413);
+}
+
 function logUnexpectedFailure(requestId: string, error: unknown) {
   const name = error instanceof Error ? error.name : 'UnknownError';
   console.error(`[ScholarForge:${requestId}] review failed (${name})`);
@@ -31,16 +36,18 @@ function logUnexpectedFailure(requestId: string, error: unknown) {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   const contentLength = Number(request.headers.get('content-length') || 0);
-  if (contentLength > MAX_REQUEST_BYTES) {
-    return json(errorPayload('请求内容超过 80 KB 限制。你的浏览器草稿未受影响。', 'REQUEST_TOO_LARGE', requestId), 413);
+  if (contentLength > MAX_REQUEST_BYTES) return requestTooLarge(requestId);
+
+  let raw: string;
+  try {
+    raw = await readRequestTextWithLimit(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return requestTooLarge(requestId);
+    return json(errorPayload('无法读取请求正文。', 'INVALID_REQUEST_BODY', requestId), 400);
   }
 
   let body: unknown;
   try {
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
-      return json(errorPayload('请求内容超过 80 KB 限制。你的浏览器草稿未受影响。', 'REQUEST_TOO_LARGE', requestId), 413);
-    }
     body = JSON.parse(raw) as unknown;
   } catch {
     return json(errorPayload('请求正文必须是有效 JSON。', 'INVALID_JSON', requestId), 400);
