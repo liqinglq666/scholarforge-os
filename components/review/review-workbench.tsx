@@ -15,6 +15,7 @@ import {
   undoWorkspace,
 } from '@/lib/editing/apply';
 import { exportCleanDocx, exportReviewReport, exportWorkingText } from '@/lib/exports/files';
+import { runExportAction } from '@/lib/exports/run';
 import type { IssueDecision, IssueSeverity, ReviewIssue, WorkspaceState } from '@/lib/types';
 
 type TextView = 'author' | 'suggested' | 'original';
@@ -22,6 +23,7 @@ type DecisionFilter = 'all' | IssueDecision;
 type SeverityFilter = 'all' | IssueSeverity;
 type WorkbenchStage = 'review' | 'edit' | 'export';
 type PassportGateState = 'passed' | 'quarantined' | 'unverified';
+type ExportKind = 'txt' | 'md' | 'docx';
 
 const DECISION_LABELS: Record<IssueDecision, string> = {
   pending: '待处理',
@@ -155,6 +157,7 @@ export function ReviewWorkbench({
   const [selectedId, setSelectedId] = useState(result?.issues[0]?.id || '');
   const [message, setMessage] = useState('');
   const [pendingDecision, setPendingDecision] = useState<{ issueId: string; decision: IssueDecision } | null>(null);
+  const [exporting, setExporting] = useState<ExportKind | null>(null);
 
   const filteredIssues = useMemo(() => (result?.issues || []).filter((issue) => {
     const decision = workspace.decisions[issue.id] || 'pending';
@@ -205,6 +208,18 @@ export function ReviewWorkbench({
     onUpdate(removeAppliedIssueFromWorkspace(workspace, issue.id));
     setTextView('author');
     setMessage('已从作者工作稿撤回这一条建议，作者决定仍保留为“已接受”。');
+  }
+
+  async function performExport(
+    kind: ExportKind,
+    action: () => void | Promise<void>,
+    successMessage: string,
+  ) {
+    if (exporting) return;
+    setExporting(kind);
+    const outcome = await runExportAction(action, successMessage);
+    setMessage(outcome.message);
+    setExporting(null);
   }
 
   const safetyGateMissing = !result.safetyGate;
@@ -341,10 +356,10 @@ export function ReviewWorkbench({
             <p>{pending ? `仍有 ${pending} 条问题待处理。可以导出，但应在提交或发表前逐条核对。` : '所有问题都已有作者决定。仍需进行最终事实、引用和版式核对。'}</p>
             <ul><li>导出内容来自作者工作稿，不是完整 AI 候选稿。</li><li>原始 DOCX 的复杂排版、公式、批注和修订痕迹不会原样保留。</li><li>安全门降低风险，但不替代科学与伦理审核。</li></ul>
           </div>
-          <div className="export-option-list">
-            <button aria-label="作者工作稿 TXT" onClick={() => exportWorkingText(workspace)} type="button"><span>TXT</span><div><strong>作者工作稿</strong><small>纯文本，适合复制到其他编辑器</small></div><b>导出</b></button>
-            <button aria-label="审校报告 Markdown" onClick={() => exportReviewReport(workspace)} type="button"><span>MD</span><div><strong>审校报告</strong><small>包含问题、作者决定与安全门结果</small></div><b>导出</b></button>
-            <button aria-label="清洁 DOCX" onClick={() => void exportCleanDocx(workspace)} type="button"><span>DOCX</span><div><strong>清洁文档</strong><small>根据作者工作稿重新生成</small></div><b>导出</b></button>
+          <div className="export-option-list" aria-busy={Boolean(exporting)}>
+            <button disabled={Boolean(exporting)} aria-label="作者工作稿 TXT" onClick={() => void performExport('txt', () => exportWorkingText(workspace), '作者工作稿 TXT 已生成并发起下载。')} type="button"><span>TXT</span><div><strong>作者工作稿</strong><small>纯文本，适合复制到其他编辑器</small></div><b>{exporting === 'txt' ? '导出中…' : '导出'}</b></button>
+            <button disabled={Boolean(exporting)} aria-label="审校报告 Markdown" onClick={() => void performExport('md', () => exportReviewReport(workspace), '审校报告 Markdown 已生成并发起下载。')} type="button"><span>MD</span><div><strong>审校报告</strong><small>包含问题、作者决定与安全门结果</small></div><b>{exporting === 'md' ? '导出中…' : '导出'}</b></button>
+            <button disabled={Boolean(exporting)} aria-label="清洁 DOCX" onClick={() => void performExport('docx', () => exportCleanDocx(workspace), '清洁 DOCX 已生成并发起下载。')} type="button"><span>DOCX</span><div><strong>清洁文档</strong><small>根据作者工作稿重新生成</small></div><b>{exporting === 'docx' ? '生成中…' : '导出'}</b></button>
           </div>
         </section>
       ) : null}
