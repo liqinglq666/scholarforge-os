@@ -4,13 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AuthStatus } from '@/lib/types';
 
 const AUTH_STATUS_CACHE_MS = 10_000;
-
-const FALLBACK_AUTH_STATUS: AuthStatus = {
-  configured: false,
-  authenticated: false,
-  user: null,
-  message: '暂时无法读取账户状态，仍可使用游客本地模式。',
-};
+const AUTH_UNAVAILABLE_MESSAGE = '暂时无法确认账户状态。现有登录凭据已保留，仍可使用本地工作区。';
 
 type AuthStatusSnapshot = {
   status: AuthStatus;
@@ -24,16 +18,63 @@ function hasFreshSnapshot() {
   return cachedSnapshot && Date.now() - cachedSnapshot.fetchedAt < AUTH_STATUS_CACHE_MS;
 }
 
+export function preserveAuthStatusDuringOutage(
+  previous: AuthStatus | null,
+  message = AUTH_UNAVAILABLE_MESSAGE,
+): AuthStatus {
+  return {
+    configured: previous?.configured ?? true,
+    authenticated: previous?.authenticated ?? false,
+    user: previous?.user ?? null,
+    unavailable: true,
+    message,
+  };
+}
+
+function isAuthStatusPayload(value: unknown): value is AuthStatus {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Partial<AuthStatus>;
+  if (
+    typeof payload.configured !== 'boolean'
+    || typeof payload.authenticated !== 'boolean'
+    || typeof payload.message !== 'string'
+  ) return false;
+  if (payload.user !== null && typeof payload.user !== 'object') return false;
+  return true;
+}
+
+async function readResponse(response: Response): Promise<AuthStatus> {
+  let payload: unknown;
+  try {
+    payload = await response.json() as unknown;
+  } catch {
+    return preserveAuthStatusDuringOutage(cachedSnapshot?.status || null);
+  }
+
+  if (!response.ok) {
+    const message = payload && typeof payload === 'object'
+      ? (payload as { message?: unknown; error?: unknown }).message
+        || (payload as { error?: unknown }).error
+      : null;
+    return preserveAuthStatusDuringOutage(
+      cachedSnapshot?.status || null,
+      typeof message === 'string' && message.trim() ? message : AUTH_UNAVAILABLE_MESSAGE,
+    );
+  }
+
+  if (!isAuthStatusPayload(payload)) {
+    return preserveAuthStatusDuringOutage(cachedSnapshot?.status || null);
+  }
+  return { ...payload, unavailable: payload.unavailable === true };
+}
+
 async function fetchAuthStatus(force = false): Promise<AuthStatus> {
   if (!force && hasFreshSnapshot() && cachedSnapshot) return cachedSnapshot.status;
   if (pendingRequest) return pendingRequest;
 
   pendingRequest = fetch('/api/auth/session', { cache: 'no-store' })
-    .then(async (response) => {
-      if (!response.ok) return FALLBACK_AUTH_STATUS;
-      return response.json() as Promise<AuthStatus>;
-    })
-    .catch(() => FALLBACK_AUTH_STATUS)
+    .then(readResponse)
+    .catch(() => preserveAuthStatusDuringOutage(cachedSnapshot?.status || null))
     .then((status) => {
       cachedSnapshot = { status, fetchedAt: Date.now() };
       return status;
