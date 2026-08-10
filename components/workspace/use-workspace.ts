@@ -15,10 +15,13 @@ export function useWorkspace() {
   const [saveMessage, setSaveMessage] = useState('正在恢复本地工作区…');
   const skipNextSave = useRef(true);
   const latestData = useRef(data);
+  const explicitlySavedData = useRef<PersistedWorkspace | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setData(readWorkspaceData());
+      const restored = readWorkspaceData();
+      latestData.current = restored;
+      setData(restored);
       setReady(true);
       setSaveState('saved');
       setSaveMessage('已恢复本地工作区');
@@ -32,12 +35,19 @@ export function useWorkspace() {
       skipNextSave.current = false;
       return;
     }
+    if (explicitlySavedData.current === data) {
+      explicitlySavedData.current = null;
+      setSaveState('saved');
+      setSaveMessage('已保存到此浏览器');
+      return;
+    }
     setSaveState('saving');
     setSaveMessage('正在保存…');
     const timer = window.setTimeout(() => {
       try {
         const next = { ...data, updatedAt: new Date().toISOString() };
         writeWorkspaceData(next);
+        latestData.current = next;
         setSaveState('saved');
         setSaveMessage('已保存到此浏览器');
       } catch (error) {
@@ -69,12 +79,15 @@ export function useWorkspace() {
       const history = current.currentResult
         ? [createHistoryEntry(current), ...previous.history.filter((entry) => entry.id !== current.currentResult?.id)].slice(0, MAX_HISTORY_ENTRIES)
         : previous.history;
-      return { ...previous, current, history, updatedAt: new Date().toISOString() };
+      const next = { ...previous, current, history, updatedAt: new Date().toISOString() };
+      latestData.current = next;
+      return next;
     });
   }, []);
 
   const replaceData = useCallback((next: PersistedWorkspace) => {
     skipNextSave.current = false;
+    latestData.current = next;
     setData(next);
   }, []);
 
@@ -82,6 +95,8 @@ export function useWorkspace() {
     const value = nextData || data;
     try {
       writeWorkspaceData(value);
+      latestData.current = value;
+      if (nextData) explicitlySavedData.current = value;
       setSaveState('saved');
       setSaveMessage('已保存到此浏览器');
       return true;
