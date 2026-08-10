@@ -7,28 +7,26 @@ import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import {
-  MAX_HISTORY_ENTRIES,
   MAX_SOURCE_CHARACTERS,
   SECTION_OPTIONS,
   TASK_DESCRIPTIONS,
   TASK_LABELS,
 } from '@/lib/config';
 import { analyzeProjectConsistency } from '@/lib/project/consistency';
-import { getProject, removeProjectChapter, upsertProject } from '@/lib/project/workspace';
+import {
+  getProject,
+  openProjectChapterInWorkspace,
+  removeProjectChapter,
+  upsertProject,
+} from '@/lib/project/workspace';
 import type {
   ConsistencyIssue,
   ManuscriptChapter,
   ManuscriptProject,
   SectionType,
   TaskType,
-  TerminologyLock,
 } from '@/lib/types';
-import {
-  createDraft,
-  createHistoryEntry,
-  createManuscriptChapter,
-  createWorkspaceState,
-} from '@/lib/workspace/schema';
+import { createManuscriptChapter } from '@/lib/workspace/schema';
 
 const TASKS = Object.keys(TASK_LABELS) as TaskType[];
 
@@ -36,16 +34,6 @@ function formatDate(value?: string) {
   if (!value) return '尚未审校';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString('zh-CN');
-}
-
-function mergeTerminologyLocks(projectLocks: TerminologyLock[], personalLocks: TerminologyLock[]) {
-  const seen = new Set<string>();
-  return [...projectLocks, ...personalLocks].flatMap((item) => {
-    const key = item.source.toLocaleLowerCase();
-    if (seen.has(key)) return [];
-    seen.add(key);
-    return [{ ...item, id: crypto.randomUUID() }];
-  }).slice(0, 20);
 }
 
 export function ProjectManager({ projectId }: { projectId: string }) {
@@ -56,6 +44,7 @@ export function ProjectManager({ projectId }: { projectId: string }) {
   const [report, setReport] = useState<ConsistencyIssue[] | null>(null);
   const [reviewTask, setReviewTask] = useState<TaskType>(data.preferences.defaultTaskType);
   const [pendingChapterDelete, setPendingChapterDelete] = useState<{ id: string; title: string } | null>(null);
+  const [pendingChapterReview, setPendingChapterReview] = useState<{ id: string; title: string } | null>(null);
   const project = getProject(data, projectId);
   const activeChapter = useMemo(() => {
     if (!project) return null;
@@ -108,8 +97,10 @@ export function ProjectManager({ projectId }: { projectId: string }) {
     const preferred = termPreferred.trim();
     if (!source || !preferred || project.terminologyLocks.length >= 20) return;
     if (project.terminologyLocks.some((item) => item.source.toLocaleLowerCase() === source.toLocaleLowerCase())) return;
-    const term: TerminologyLock = { id: crypto.randomUUID(), source, preferred };
-    commitProject({ ...project, terminologyLocks: [...project.terminologyLocks, term] });
+    commitProject({
+      ...project,
+      terminologyLocks: [...project.terminologyLocks, { id: crypto.randomUUID(), source, preferred }],
+    });
     setTermSource('');
     setTermPreferred('');
   }
@@ -120,37 +111,22 @@ export function ProjectManager({ projectId }: { projectId: string }) {
   }
 
   function openChapterInWorkspace(chapter: ManuscriptChapter) {
-    if (!project) return;
-    if (chapter.text.trim().length < 40) {
-      window.alert('章节正文至少需要 40 个字符，才能进入审校。');
+    if (!project || chapter.text.trim().length < 40) return;
+    const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
+    if (hasCurrentWork) {
+      setPendingChapterReview({ id: chapter.id, title: chapter.title || '未命名章节' });
       return;
     }
-    const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
-    if (hasCurrentWork && !window.confirm('打开本章节会替换当前快速审校内容。当前草稿或结果会先保留到本地历史。确定继续吗？')) return;
-    const preserved = hasCurrentWork ? createHistoryEntry(data.current) : null;
-    const history = [
-      ...(preserved ? [preserved] : []),
-      ...data.history.filter((item) => item.id !== preserved?.id),
-    ].slice(0, MAX_HISTORY_ENTRIES);
-    const draft = createDraft({
-      projectName: project.name || chapter.title,
-      taskType: reviewTask,
-      sectionType: chapter.sectionType,
-      targetJournal: project.targetJournal,
-      sourceText: chapter.text,
-      terminologyLocks: mergeTerminologyLocks(project.terminologyLocks, data.preferences.customWritingRules),
-      linkedProjectId: project.id,
-      linkedChapterId: chapter.id,
-    });
-    const nextProject = { ...project, activeChapterId: chapter.id, updatedAt: new Date().toISOString() };
-    const nextData = upsertProject({
-      ...data,
-      current: createWorkspaceState(draft),
-      history,
-      updatedAt: new Date().toISOString(),
-    }, nextProject);
-    replaceData(nextData);
-    saveNow(nextData);
+    openChapterConfirmed(chapter.id);
+  }
+
+  function openChapterConfirmed(chapterId: string) {
+    if (!project) return;
+    const result = openProjectChapterInWorkspace(data, project.id, chapterId, reviewTask);
+    setPendingChapterReview(null);
+    if (result.status !== 'ready') return;
+    replaceData(result.data);
+    saveNow(result.data);
     router.push(`/projects/${project.id}/review`);
   }
 
@@ -275,6 +251,17 @@ export function ProjectManager({ projectId }: { projectId: string }) {
           ) : <StatusBanner tone="success" title="未发现当前规则覆盖的跨章节冲突">仍需人工核对统计口径、图表、引用、方法和结论。</StatusBanner>
         ) : <div className="empty-state project-report-empty"><strong>尚未运行检查</strong><p>至少填写两个章节后运行，结果更有价值。</p></div>}
       </section>
+
+      <ConfirmDialog
+        cancelLabel="继续当前任务"
+        confirmLabel="保存当前任务并打开章节"
+        description={`当前快速审校内容会先保存到“最近任务”，随后以“${pendingChapterReview?.title || '当前章节'}”创建本次${TASK_LABELS[reviewTask]}任务。项目章节不会自动被工作台覆盖，完成核对后仍需明确保存回项目。`}
+        eyebrow="打开项目章节"
+        onCancel={() => setPendingChapterReview(null)}
+        onConfirm={() => pendingChapterReview && openChapterConfirmed(pendingChapterReview.id)}
+        open={Boolean(pendingChapterReview)}
+        title={`打开“${pendingChapterReview?.title || '当前章节'}”进入审校？`}
+      />
 
       <ConfirmDialog
         confirmLabel="永久删除章节"
