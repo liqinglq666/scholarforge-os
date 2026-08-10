@@ -16,6 +16,7 @@ export const MAX_BACKUP_BYTES = 8_000_000;
 export const MAX_DOCX_BYTES = 8_000_000;
 export const MAX_TERMINOLOGY_LOCKS = 20;
 export const MODEL_TIMEOUT_MS = 55_000;
+export const SUPABASE_REQUEST_TIMEOUT_MS = 12_000;
 
 export const TASK_LABELS: Record<TaskType, string> = {
   translate: '科研中译英',
