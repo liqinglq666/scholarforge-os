@@ -1,19 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import {
+  MAX_REQUEST_BYTES,
+  MAX_SOURCE_CHARACTERS,
+  REVIEW_RATE_WINDOW_MINUTES,
+  REVIEW_REQUESTS_PER_WINDOW,
+} from '@/lib/config';
 import type { ReviewServiceStatus } from '@/lib/types';
 
 const SERVICE_STATUS_CACHE_MS = 30_000;
+export const SERVICE_STATUS_RETRY_MS = 10_000;
 
 const FALLBACK_SERVICE_STATUS: ReviewServiceStatus = {
   configured: false,
   model: null,
   message: '暂时无法确认服务状态。为了保护正文，分析按钮已禁用；本地编辑和导出仍可使用。',
   limits: {
-    maxCharacters: 12_000,
-    maxRequestBytes: 80_000,
-    requestsPerWindow: 6,
-    windowMinutes: 10,
+    maxCharacters: MAX_SOURCE_CHARACTERS,
+    maxRequestBytes: MAX_REQUEST_BYTES,
+    requestsPerWindow: REVIEW_REQUESTS_PER_WINDOW,
+    windowMinutes: REVIEW_RATE_WINDOW_MINUTES,
   },
 };
 
@@ -30,14 +37,54 @@ function hasFreshSnapshot() {
   return cachedSnapshot && Date.now() - cachedSnapshot.fetchedAt < SERVICE_STATUS_CACHE_MS;
 }
 
+function isPositiveFiniteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+export function parseReviewServiceStatus(value: unknown): ReviewServiceStatus | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const payload = value as Partial<ReviewServiceStatus>;
+  if (typeof payload.configured !== 'boolean' || typeof payload.message !== 'string') return null;
+  const normalizedModel = typeof payload.model === 'string' ? payload.model.trim() : '';
+  if (payload.configured) {
+    if (!normalizedModel) return null;
+  } else if (payload.model !== null) {
+    return null;
+  }
+
+  const limits = payload.limits;
+  if (!limits || typeof limits !== 'object') return null;
+  if (
+    !isPositiveFiniteNumber(limits.maxCharacters)
+    || !isPositiveFiniteNumber(limits.maxRequestBytes)
+    || !isPositiveFiniteNumber(limits.requestsPerWindow)
+    || !isPositiveFiniteNumber(limits.windowMinutes)
+  ) return null;
+
+  return {
+    configured: payload.configured,
+    model: payload.configured ? normalizedModel : null,
+    message: payload.message,
+    limits: {
+      maxCharacters: limits.maxCharacters,
+      maxRequestBytes: limits.maxRequestBytes,
+      requestsPerWindow: limits.requestsPerWindow,
+      windowMinutes: limits.windowMinutes,
+    },
+  };
+}
+
 async function fetchServiceStatus(force = false): Promise<ServiceStatusSnapshot> {
   if (!force && hasFreshSnapshot() && cachedSnapshot) return cachedSnapshot;
-  if (!force && pendingRequest) return pendingRequest;
+  if (pendingRequest) return pendingRequest;
 
   pendingRequest = fetch('/api/health', { cache: 'no-store' })
     .then(async (response) => {
       if (!response.ok) throw new Error('health check failed');
-      return response.json() as Promise<ReviewServiceStatus>;
+      const payload = await response.json() as unknown;
+      const status = parseReviewServiceStatus(payload);
+      if (!status) throw new Error('invalid health payload');
+      return status;
     })
     .then((status) => ({ status, failed: false, fetchedAt: Date.now() }))
     .catch(() => ({ status: FALLBACK_SERVICE_STATUS, failed: true, fetchedAt: Date.now() }))
@@ -71,6 +118,14 @@ export function useReviewServiceStatus() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!snapshot?.failed) return;
+    const timer = window.setTimeout(() => {
+      void reloadStatus();
+    }, SERVICE_STATUS_RETRY_MS);
+    return () => window.clearTimeout(timer);
+  }, [reloadStatus, snapshot?.failed, snapshot?.fetchedAt]);
 
   return {
     status: snapshot?.status || null,
