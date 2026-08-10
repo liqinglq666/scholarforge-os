@@ -101,7 +101,7 @@ describe('review model provider response handling', () => {
 
     expect(result.taskId).toBe(reviewRequest.taskId);
     expect(result.summary).toBe('No unsafe change was required.');
-    expect(result.suggestedText).toBe(reviewRequest.text);
+    expect(result.suggestedText).toBe(reviewRequest.text.trim());
     expect(result.safetyGate).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0];
