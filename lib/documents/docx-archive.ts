@@ -111,7 +111,7 @@ export function inspectDocxArchive(arrayBuffer: ArrayBuffer): DocxArchiveInspect
 
     declaredUncompressedBytes += uncompressedSize;
     if (declaredUncompressedBytes > MAX_DOCX_UNCOMPRESSED_BYTES) {
-      const limitMb = Math.floor(MAX_DOCX_UNCOMPRESSED_BYTES / (1024 * 1024));
+      const limitMb = Math.floor(MAX_DOCX_UNCOMPRESSED_BYTES / 1_000_000);
       throw new Error(`DOCX 解压后的声明内容超过 ${limitMb} MB 安全限制。请移除异常大的嵌入内容或拆分文档后重试。`);
     }
 
