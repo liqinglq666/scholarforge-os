@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useAuthStatus } from '@/components/account/use-auth-status';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { SECTION_OPTIONS, TASK_LABELS } from '@/lib/config';
 import type {
   AcademicStage,
-  AuthStatus,
   ChapterTemplateItem,
   EnglishVariant,
   ExplanationLevel,
@@ -41,8 +41,8 @@ function clonePreferences(value: UserPreferences): UserPreferences {
 
 export function PreferencesManager() {
   const { data, ready, saveState, saveMessage, replaceData, saveNow } = useWorkspace();
+  const { status: auth } = useAuthStatus();
   const [draft, setDraft] = useState<UserPreferences>(() => createUserPreferences());
-  const [auth, setAuth] = useState<AuthStatus | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -55,13 +55,6 @@ export function PreferencesManager() {
     const timer = window.setTimeout(() => setDraft(clonePreferences(data.preferences)), 0);
     return () => window.clearTimeout(timer);
   }, [data.preferences, ready]);
-
-  useEffect(() => {
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthStatus>)
-      .then(setAuth)
-      .catch(() => setAuth({ configured: false, authenticated: false, user: null, message: '账户状态不可用。' }));
-  }, []);
 
   function patch(patchValue: Partial<UserPreferences>) {
     setDraft((previous) => ({ ...previous, ...patchValue }));
