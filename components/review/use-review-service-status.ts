@@ -45,8 +45,9 @@ export function parseReviewServiceStatus(value: unknown): ReviewServiceStatus | 
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const payload = value as Partial<ReviewServiceStatus>;
   if (typeof payload.configured !== 'boolean' || typeof payload.message !== 'string') return null;
+  const normalizedModel = typeof payload.model === 'string' ? payload.model.trim() : '';
   if (payload.configured) {
-    if (typeof payload.model !== 'string' || !payload.model.trim()) return null;
+    if (!normalizedModel) return null;
   } else if (payload.model !== null) {
     return null;
   }
@@ -62,7 +63,7 @@ export function parseReviewServiceStatus(value: unknown): ReviewServiceStatus | 
 
   return {
     configured: payload.configured,
-    model: payload.configured ? payload.model.trim() : null,
+    model: payload.configured ? normalizedModel : null,
     message: payload.message,
     limits: {
       maxCharacters: limits.maxCharacters,
