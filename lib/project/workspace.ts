@@ -1,7 +1,12 @@
-import { MAX_PROJECTS, TASK_LABELS } from '@/lib/config';
+import { MAX_HISTORY_ENTRIES, MAX_PROJECTS, TASK_LABELS } from '@/lib/config';
 import { compareRevisionTexts } from '@/lib/project/revisions';
-import type { ManuscriptProject, PersistedWorkspace } from '@/lib/types';
-import { createRevisionComparison } from '@/lib/workspace/schema';
+import type { ManuscriptProject, PersistedWorkspace, TaskType, TerminologyLock } from '@/lib/types';
+import {
+  createDraft,
+  createHistoryEntry,
+  createRevisionComparison,
+  createWorkspaceState,
+} from '@/lib/workspace/schema';
 
 export function getProject(data: PersistedWorkspace, projectId?: string | null) {
   const requestedId = projectId || data.activeProjectId;
@@ -25,6 +30,64 @@ export function upsertProject(data: PersistedWorkspace, project: ManuscriptProje
     activeProjectId: project.id,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function mergeProjectTerminologyLocks(projectLocks: TerminologyLock[], personalLocks: TerminologyLock[]) {
+  const seen = new Set<string>();
+  return [...projectLocks, ...personalLocks].flatMap((item) => {
+    const key = item.source.toLocaleLowerCase();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ ...item, id: crypto.randomUUID() }];
+  }).slice(0, 20);
+}
+
+export type ProjectChapterOpenStatus = 'missing-project' | 'missing-chapter' | 'too-short' | 'ready';
+
+export interface ProjectChapterOpenResult {
+  data: PersistedWorkspace;
+  status: ProjectChapterOpenStatus;
+}
+
+export function openProjectChapterInWorkspace(
+  data: PersistedWorkspace,
+  projectId: string,
+  chapterId: string,
+  taskType: TaskType,
+): ProjectChapterOpenResult {
+  const project = getProject(data, projectId);
+  if (!project) return { data, status: 'missing-project' };
+
+  const chapter = project.chapters.find((item) => item.id === chapterId);
+  if (!chapter) return { data, status: 'missing-chapter' };
+  if (chapter.text.trim().length < 40) return { data, status: 'too-short' };
+
+  const now = new Date().toISOString();
+  const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
+  const preserved = hasCurrentWork ? createHistoryEntry(data.current) : null;
+  const history = [
+    ...(preserved ? [preserved] : []),
+    ...data.history.filter((item) => item.id !== preserved?.id),
+  ].slice(0, MAX_HISTORY_ENTRIES);
+  const draft = createDraft({
+    projectName: project.name || chapter.title,
+    taskType,
+    sectionType: chapter.sectionType,
+    targetJournal: project.targetJournal,
+    sourceText: chapter.text,
+    terminologyLocks: mergeProjectTerminologyLocks(project.terminologyLocks, data.preferences.customWritingRules),
+    linkedProjectId: project.id,
+    linkedChapterId: chapter.id,
+  });
+  const nextProject: ManuscriptProject = { ...project, activeChapterId: chapter.id, updatedAt: now };
+  const nextData = upsertProject({
+    ...data,
+    current: createWorkspaceState(draft),
+    history,
+    updatedAt: now,
+  }, nextProject);
+
+  return { data: nextData, status: 'ready' };
 }
 
 export type ProjectSaveBackStatus = 'missing-link' | 'missing-chapter' | 'unchanged' | 'saved-review' | 'saved-revision';
