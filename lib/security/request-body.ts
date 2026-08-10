@@ -19,7 +19,11 @@ export async function readRequestTextWithLimit(request: Request, maxBytes: numbe
       if (done) break;
       totalBytes += value.byteLength;
       if (totalBytes > maxBytes) {
-        await reader.cancel();
+        try {
+          await reader.cancel();
+        } catch {
+          // The size violation is authoritative even if the underlying stream cannot cancel cleanly.
+        }
         throw new RequestBodyTooLargeError(maxBytes);
       }
       text += decoder.decode(value, { stream: true });
