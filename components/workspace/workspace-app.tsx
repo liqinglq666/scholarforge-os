@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { TaskSetup } from '@/components/task-setup/task-setup';
 import { ReviewWorkbench } from '@/components/review/review-workbench';
+import { useReviewServiceStatus } from '@/components/review/use-review-service-status';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
@@ -12,7 +13,7 @@ import { MAX_HISTORY_ENTRIES, TASK_LABELS } from '@/lib/config';
 import { findResearchExample } from '@/lib/examples';
 import { compareRevisionTexts } from '@/lib/project/revisions';
 import { getProject, upsertProject } from '@/lib/project/workspace';
-import type { ApiErrorPayload, ReviewResult, ReviewServiceStatus, TaskType, WorkspaceDraft } from '@/lib/types';
+import type { ApiErrorPayload, ReviewResult, TaskType, WorkspaceDraft } from '@/lib/types';
 import { createDraft, createDraftFromPreferences, createHistoryEntry, createRevisionComparison, createWorkspaceState } from '@/lib/workspace/schema';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
@@ -29,8 +30,7 @@ const CLIENT_ANALYSIS_TIMEOUT_MS = 65_000;
 export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const { data, ready, saveState, saveMessage, updateCurrent, replaceData, saveNow } = useWorkspace();
-  const [service, setService] = useState<ReviewServiceStatus | null>(null);
-  const [serviceLoading, setServiceLoading] = useState(true);
+  const { status: service, loading: serviceLoading } = useReviewServiceStatus();
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null);
   const [pageError, setPageError] = useState('');
   const [projectMessage, setProjectMessage] = useState('');
@@ -43,26 +43,6 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
     if (!project || draft.linkedProjectId !== project.id || !draft.linkedChapterId) return null;
     return project.chapters.find((chapter) => chapter.id === draft.linkedChapterId) || null;
   })();
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/health', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('无法确认分析服务状态。');
-        return response.json() as Promise<ReviewServiceStatus>;
-      })
-      .then((value) => { if (active) setService(value); })
-      .catch(() => {
-        if (active) setService({
-          configured: false,
-          model: null,
-          message: '暂时无法确认服务状态。为了保护正文，分析按钮已禁用；本地编辑和导出仍可使用。',
-          limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 6, windowMinutes: 10 },
-        });
-      })
-      .finally(() => { if (active) setServiceLoading(false); });
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     if (projectId || !ready || entryParamAppliedRef.current) return;
