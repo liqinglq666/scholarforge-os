@@ -10,12 +10,13 @@ import type { ReviewServiceStatus } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export function GET() {
-  const configured = Boolean(process.env.DASHSCOPE_API_KEY);
+  const configured = Boolean(process.env.DASHSCOPE_API_KEY?.trim());
+  const model = process.env.DASHSCOPE_MODEL?.trim() || 'qwen-plus';
   const payload: ReviewServiceStatus & { service: string; version: string } = {
     service: APP_NAME,
     version: APP_VERSION,
     configured,
-    model: configured ? process.env.DASHSCOPE_MODEL || 'qwen-plus' : null,
+    model: configured ? model : null,
     message: configured
       ? '分析服务已配置。只有在你确认并开始分析后，所选文本才会发送给模型。'
       : '分析服务未配置。仍可编辑、保存、恢复和导出本地工作区；不会生成模拟结果。',
