@@ -7,6 +7,7 @@ import {
   parseAuthSession,
   readSupabaseError,
   resolveAuthSession,
+  SupabaseRequestFailure,
   supabaseRequest,
 } from '@/lib/auth/supabase';
 import { MAX_AUTH_REQUEST_BYTES } from '@/lib/config';
@@ -16,6 +17,15 @@ import { cleanSingleLine, isRecord } from '@/lib/validation/common';
 
 export async function GET() {
   const session = await resolveAuthSession();
+  if (session.unavailable) {
+    return NextResponse.json<AuthStatus>({
+      configured: true,
+      authenticated: false,
+      user: null,
+      message: '账户服务暂时不可用。现有登录凭据已保留，请稍后重试。',
+    }, { status: 503 });
+  }
+
   const payload: AuthStatus = session.configured
     ? session.user
       ? { configured: true, authenticated: true, user: session.user, message: '账户已登录。论文正文仍保存在当前浏览器。' }
@@ -65,10 +75,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '请输入有效邮箱和至少 8 位密码。' }, { status: 400 });
   }
 
-  const upstream = await supabaseRequest('/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+  let upstream: Response;
+  try {
+    upstream = await supabaseRequest('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  } catch (error) {
+    if (error instanceof SupabaseRequestFailure) {
+      return NextResponse.json({ error: '账户服务暂时不可用，请稍后重试。' }, { status: 503 });
+    }
+    throw error;
+  }
   if (!upstream.ok) {
     await readSupabaseError(upstream, '邮箱或密码不正确。');
     return NextResponse.json({ error: '邮箱或密码不正确，或邮箱尚未完成确认。' }, { status: 401 });
