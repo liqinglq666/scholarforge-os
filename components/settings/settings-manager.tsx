@@ -71,6 +71,23 @@ export function SettingsManager() {
 
   if (!ready) return <div className="loading-state" role="status"><span className="spinner" /><strong>正在读取设置</strong></div>;
 
+  const accountTitle = auth?.unavailable
+    ? '账户状态暂不可确认'
+    : auth?.authenticated
+      ? '账户已登录'
+      : auth?.configured
+        ? '账户可用'
+        : '游客模式';
+  const accountDescription = auth?.unavailable
+    ? auth.user?.email
+      ? `账户服务暂时不可用。最近一次已确认账户：${auth.user.email}。现有登录凭据已保留，本地功能可继续使用。`
+      : '账户服务暂时不可用。现有登录凭据已保留，本地功能可继续使用。'
+    : auth?.authenticated
+      ? `当前账户：${auth.user?.email || ''}。只同步偏好。`
+      : auth?.configured
+        ? '登录后可跨设备同步个性化偏好。'
+        : '账户服务未配置，全部核心功能仍可本地使用。';
+
   return (
     <div className="settings-content">
       <div className="page-heading">
@@ -98,7 +115,7 @@ export function SettingsManager() {
         <div><span className="step-number">02</span><h2 id="personal-title">账户与个性化</h2></div>
         <div className="privacy-grid">
           <article><strong>个性化偏好</strong><p>设置学科、英美拼写、默认任务、解释详细度、自定义术语规则和论文章节模板。</p><Link className="secondary-link" href="/preferences">管理个性化</Link></article>
-          <article><strong>{auth?.authenticated ? '账户已登录' : auth?.configured ? '账户可用' : '游客模式'}</strong><p>{auth?.authenticated ? `当前账户：${auth.user?.email || ''}。只同步偏好。` : auth?.configured ? '登录后可跨设备同步个性化偏好。' : '账户服务未配置，全部核心功能仍可本地使用。'}</p><Link className="secondary-link" href="/account">查看账户</Link></article>
+          <article><strong>{accountTitle}</strong><p>{accountDescription}</p><Link className="secondary-link" href="/account">查看账户</Link></article>
         </div>
       </section>
 
