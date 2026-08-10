@@ -1,28 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { ReviewServiceStatus } from '@/lib/types';
+import { useReviewServiceStatus } from '@/components/review/use-review-service-status';
 
 export function TryServiceStatus() {
-  const [status, setStatus] = useState<ReviewServiceStatus | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/health', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('health check failed');
-        return response.json() as Promise<ReviewServiceStatus>;
-      })
-      .then((value) => { if (active) setStatus(value); })
-      .catch(() => { if (active) setFailed(true); });
-    return () => { active = false; };
-  }, []);
+  const { status, loading, failed } = useReviewServiceStatus();
 
   if (failed) {
     return <span className="try-service-state unavailable" role="status"><i aria-hidden="true" />暂时无法确认模型状态</span>;
   }
-  if (!status) {
+  if (loading || !status) {
     return <span className="try-service-state checking" role="status"><i aria-hidden="true" />正在确认模型状态</span>;
   }
   return (
