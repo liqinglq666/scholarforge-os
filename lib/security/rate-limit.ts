@@ -1,12 +1,19 @@
+import {
+  REVIEW_MAX_CONCURRENT,
+  REVIEW_RATE_WINDOW_MINUTES,
+  REVIEW_REQUESTS_PER_IP_WINDOW,
+  REVIEW_REQUESTS_PER_WINDOW,
+} from '@/lib/config';
+
 interface Bucket {
   count: number;
   resetAt: number;
 }
 
-const WINDOW_MS = 10 * 60 * 1000;
-const REQUESTS_PER_SESSION = 8;
-const REQUESTS_PER_IP = 40;
-const MAX_CONCURRENT = 6;
+const WINDOW_MS = REVIEW_RATE_WINDOW_MINUTES * 60 * 1000;
+const REQUESTS_PER_SESSION = REVIEW_REQUESTS_PER_WINDOW;
+const REQUESTS_PER_IP = REVIEW_REQUESTS_PER_IP_WINDOW;
+const MAX_CONCURRENT = REVIEW_MAX_CONCURRENT;
 const sessionBuckets = new Map<string, Bucket>();
 const ipBuckets = new Map<string, Bucket>();
 let activeRequests = 0;
@@ -134,7 +141,7 @@ export function releaseRateLimitSlot() {
 
 export const RATE_LIMITS = {
   requestsPerWindow: REQUESTS_PER_SESSION,
-  windowMinutes: WINDOW_MS / 60_000,
+  windowMinutes: REVIEW_RATE_WINDOW_MINUTES,
   maxConcurrent: MAX_CONCURRENT,
   requestsPerIpWindow: REQUESTS_PER_IP,
 };
