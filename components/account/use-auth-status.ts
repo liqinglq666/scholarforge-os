@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AuthStatus } from '@/lib/types';
+import type { AuthStatus, AuthUser } from '@/lib/types';
 
 const AUTH_STATUS_CACHE_MS = 10_000;
 const AUTH_UNAVAILABLE_MESSAGE = '暂时无法确认账户状态。现有登录凭据已保留，仍可使用本地工作区。';
@@ -31,6 +31,12 @@ export function preserveAuthStatusDuringOutage(
   };
 }
 
+function isAuthUser(value: unknown): value is AuthUser {
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Partial<AuthUser>;
+  return typeof user.id === 'string' && typeof user.email === 'string';
+}
+
 function isAuthStatusPayload(value: unknown): value is AuthStatus {
   if (!value || typeof value !== 'object') return false;
   const payload = value as Partial<AuthStatus>;
@@ -38,8 +44,11 @@ function isAuthStatusPayload(value: unknown): value is AuthStatus {
     typeof payload.configured !== 'boolean'
     || typeof payload.authenticated !== 'boolean'
     || typeof payload.message !== 'string'
+    || (payload.unavailable !== undefined && typeof payload.unavailable !== 'boolean')
   ) return false;
-  if (payload.user !== null && typeof payload.user !== 'object') return false;
+  if (payload.user !== null && !isAuthUser(payload.user)) return false;
+  if (payload.authenticated && !payload.user) return false;
+  if (!payload.configured && payload.authenticated) return false;
   return true;
 }
 
