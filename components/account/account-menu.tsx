@@ -1,31 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import type { AuthStatus } from '@/lib/types';
+import { useAuthStatus } from '@/components/account/use-auth-status';
 
 export function AccountMenu() {
-  const [status, setStatus] = useState<AuthStatus | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const response = await fetch('/api/auth/session', { cache: 'no-store' });
-        const value = await response.json() as AuthStatus;
-        if (active) setStatus(value);
-      } catch {
-        if (active) setStatus({ configured: false, authenticated: false, user: null, message: '游客模式' });
-      }
-    }
-    void load();
-    window.addEventListener('scholarforge-auth-change', load);
-    return () => {
-      active = false;
-      window.removeEventListener('scholarforge-auth-change', load);
-    };
-  }, []);
-
+  const { status } = useAuthStatus();
   const label = !status
     ? '账户'
     : status.authenticated && status.user
