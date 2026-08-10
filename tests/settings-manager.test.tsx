@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsManager } from '@/components/settings/settings-manager';
+import { MAX_BACKUP_BYTES } from '@/lib/config';
 import { createBackup, createDraft, createPersistedWorkspace, createWorkspaceState } from '@/lib/workspace/schema';
 
 const workspaceMock = vi.hoisted(() => ({
@@ -32,7 +33,7 @@ vi.mock('@/components/review/use-review-service-status', () => ({
       configured: true,
       model: 'qwen-plus',
       message: '分析服务可用。',
-      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 6, windowMinutes: 10 },
+      limits: { maxCharacters: 12_000, maxRequestBytes: 80_000, requestsPerWindow: 8, windowMinutes: 10 },
     },
     loading: false,
   }),
@@ -77,7 +78,12 @@ describe('SettingsManager', () => {
       sourceText: 'Imported manuscript text remains protected until explicit confirmation. '.repeat(2),
     }));
     const backupText = JSON.stringify(createBackup(imported));
-    const file = { text: vi.fn().mockResolvedValue(backupText) };
+    const file = {
+      name: 'scholarforge-workspace.json',
+      type: 'application/json',
+      size: new Blob([backupText]).size,
+      text: vi.fn().mockResolvedValue(backupText),
+    };
     render(<SettingsManager />);
 
     const input = screen.getByLabelText('导入备份') as HTMLInputElement;
@@ -97,6 +103,26 @@ describe('SettingsManager', () => {
         draft: expect.objectContaining({ projectName: 'Imported task' }),
       }),
     }));
+  });
+
+  it('rejects an oversized backup without reading it or opening the replacement dialog', async () => {
+    const readText = vi.fn().mockResolvedValue('should not be read');
+    const file = {
+      name: 'oversized.json',
+      type: 'application/json',
+      size: MAX_BACKUP_BYTES + 1,
+      text: readText,
+    };
+    render(<SettingsManager />);
+
+    const input = screen.getByLabelText('导入备份') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText(/备份文件超过 8 MB 限制/)).toBeInTheDocument();
+    expect(readText).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: '确认替换当前本地数据？' })).not.toBeInTheDocument();
+    expect(storageMock.write).not.toHaveBeenCalled();
+    expect(workspaceMock.replaceData).not.toHaveBeenCalled();
   });
 
   it('does not clear browser data until the destructive confirmation is accepted', async () => {
