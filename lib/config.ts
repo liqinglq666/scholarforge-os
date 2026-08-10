@@ -16,6 +16,10 @@ export const MAX_BACKUP_BYTES = 8_000_000;
 export const MAX_DOCX_BYTES = 8_000_000;
 export const MAX_TERMINOLOGY_LOCKS = 20;
 export const MODEL_TIMEOUT_MS = 55_000;
+export const REVIEW_RATE_WINDOW_MINUTES = 10;
+export const REVIEW_REQUESTS_PER_WINDOW = 8;
+export const REVIEW_REQUESTS_PER_IP_WINDOW = 40;
+export const REVIEW_MAX_CONCURRENT = 6;
 
 export const TASK_LABELS: Record<TaskType, string> = {
   translate: '科研中译英',
