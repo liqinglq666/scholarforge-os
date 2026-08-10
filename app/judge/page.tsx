@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { JudgeExperience } from '@/components/judge/judge-experience';
+import '../judge.css';
 
 export const metadata: Metadata = {
   title: '90 秒评审体验',
