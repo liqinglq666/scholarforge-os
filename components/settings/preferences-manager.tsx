@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuthStatus } from '@/components/account/use-auth-status';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { SECTION_OPTIONS, TASK_LABELS } from '@/lib/config';
@@ -31,6 +32,10 @@ const EXPLANATIONS: Array<[ExplanationLevel, string]> = [
   ['detailed', '详细：提供更多语言与科研表达说明'],
 ];
 
+type PendingPreferenceAction =
+  | { kind: 'reset-template' }
+  | { kind: 'apply-cloud'; preferences: UserPreferences };
+
 function clonePreferences(value: UserPreferences): UserPreferences {
   return {
     ...value,
@@ -49,6 +54,7 @@ export function PreferencesManager() {
   const [ruleSource, setRuleSource] = useState('');
   const [rulePreferred, setRulePreferred] = useState('');
   const [ruleNote, setRuleNote] = useState('');
+  const [pendingAction, setPendingAction] = useState<PendingPreferenceAction | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -109,8 +115,7 @@ export function PreferencesManager() {
   }
 
   function resetTemplate() {
-    if (!window.confirm('恢复标准六章节模板？当前个性化模板会被替换，但已有论文项目不会改变。')) return;
-    patch({ chapterTemplate: createUserPreferences().chapterTemplate });
+    setPendingAction({ kind: 'reset-template' });
   }
 
   async function uploadCloud() {
@@ -145,13 +150,8 @@ export function PreferencesManager() {
         setMessage('账户中还没有云端偏好。请先保存并上传一次。');
         return;
       }
-      if (!window.confirm('用云端偏好替换此浏览器中的个性化设置？现有论文和任务不会改变。')) return;
       const preferences = parseUserPreferences(payload.preferences);
-      const nextData = { ...data, preferences, updatedAt: new Date().toISOString() };
-      replaceData(nextData);
-      saveNow(nextData);
-      setDraft(clonePreferences(preferences));
-      setMessage('已把云端偏好载入此浏览器。');
+      setPendingAction({ kind: 'apply-cloud', preferences });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法读取云端偏好。');
     } finally {
@@ -159,7 +159,26 @@ export function PreferencesManager() {
     }
   }
 
+  function confirmPendingAction() {
+    const action = pendingAction;
+    if (!action) return;
+    setPendingAction(null);
+
+    if (action.kind === 'reset-template') {
+      patch({ chapterTemplate: createUserPreferences().chapterTemplate });
+      return;
+    }
+
+    const nextData = { ...data, preferences: action.preferences, updatedAt: new Date().toISOString() };
+    replaceData(nextData);
+    saveNow(nextData);
+    setDraft(clonePreferences(action.preferences));
+    setMessage('已把云端偏好载入此浏览器。');
+  }
+
   if (!ready) return <div className="loading-state" role="status"><span className="spinner" /><strong>正在读取个性化偏好</strong></div>;
+
+  const applyingCloud = pendingAction?.kind === 'apply-cloud';
 
   return (
     <div className="preferences-content">
@@ -226,6 +245,19 @@ export function PreferencesManager() {
           <article><strong>账户偏好</strong><p>{auth?.authenticated ? `已登录 ${auth.user?.email || ''}。只同步本页设置，不同步论文正文。` : auth?.configured ? '登录后可在设备之间同步本页偏好。' : '账户服务未配置，仍可正常使用本地偏好。'}</p>{auth?.authenticated ? <div><button disabled={syncing} onClick={() => void uploadCloud()} type="button">上传当前偏好</button><button disabled={syncing} onClick={() => void downloadCloud()} type="button">载入云端偏好</button></div> : <Link className="secondary-link" href="/account">{auth?.configured ? '前往登录' : '查看账户配置'}</Link>}</article>
         </div>
       </section>
+
+      <ConfirmDialog
+        cancelLabel={applyingCloud ? '保留此浏览器设置' : '保留当前模板'}
+        confirmLabel={applyingCloud ? '用云端偏好替换' : '恢复标准模板'}
+        description={applyingCloud
+          ? '此浏览器中的个性化设置将替换为账户云端偏好。现有论文项目、当前任务正文、分析结果和历史记录不会改变。'
+          : '当前个性化章节模板将替换为标准章节模板。已有论文项目、本页其他偏好和当前任务不会改变。'}
+        eyebrow={applyingCloud ? '载入账户偏好' : '恢复章节模板'}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={confirmPendingAction}
+        open={Boolean(pendingAction)}
+        title={applyingCloud ? '载入云端偏好？' : '恢复标准章节模板？'}
+      />
     </div>
   );
 }
