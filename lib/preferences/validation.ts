@@ -35,7 +35,7 @@ export class CloudPreferencesValidationError extends Error {
   }
 }
 
-function invalid(field: string) {
+function invalid(field: string): never {
   throw new CloudPreferencesValidationError(`偏好字段“${field}”格式无效。`);
 }
 
