@@ -91,12 +91,11 @@ export function useWorkspace() {
     setData(next);
   }, []);
 
-  const saveNow = useCallback((nextData?: PersistedWorkspace) => {
-    const value = nextData || data;
+  const saveNow = useCallback((nextData: PersistedWorkspace) => {
     try {
-      writeWorkspaceData(value);
-      latestData.current = value;
-      if (nextData) explicitlySavedData.current = value;
+      writeWorkspaceData(nextData);
+      latestData.current = nextData;
+      explicitlySavedData.current = nextData;
       setSaveState('saved');
       setSaveMessage('已保存到此浏览器');
       return true;
@@ -105,7 +104,7 @@ export function useWorkspace() {
       setSaveMessage(error instanceof Error ? error.message : '保存失败，请导出备份。');
       return false;
     }
-  }, [data]);
+  }, []);
 
   return { data, ready, saveState, saveMessage, updateCurrent, replaceData, saveNow };
 }
