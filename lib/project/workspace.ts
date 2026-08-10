@@ -106,6 +106,45 @@ export function saveWorkspaceBackToProject(data: PersistedWorkspace, routeProjec
   };
 }
 
+export function removeProjectChapter(data: PersistedWorkspace, projectId: string, chapterId: string): PersistedWorkspace {
+  const project = getProject(data, projectId);
+  if (!project || project.chapters.length <= 1 || !project.chapters.some((chapter) => chapter.id === chapterId)) return data;
+
+  const now = new Date().toISOString();
+  const chapters = project.chapters.filter((chapter) => chapter.id !== chapterId);
+  const nextProject: ManuscriptProject = {
+    ...project,
+    chapters,
+    activeChapterId: project.activeChapterId === chapterId
+      ? chapters[0]?.id
+      : project.activeChapterId || chapters[0]?.id,
+    supervisorFeedback: project.supervisorFeedback.map((item) => item.chapterId === chapterId
+      ? { ...item, chapterId: undefined, updatedAt: now }
+      : item),
+    revisionComparisons: project.revisionComparisons.filter((item) => item.chapterId !== chapterId),
+    updatedAt: now,
+  };
+
+  const nextData = upsertProject(data, nextProject);
+  const currentLinkedToRemovedChapter = data.current.draft.linkedProjectId === projectId
+    && data.current.draft.linkedChapterId === chapterId;
+  if (!currentLinkedToRemovedChapter) return nextData;
+
+  return {
+    ...nextData,
+    current: {
+      ...nextData.current,
+      draft: {
+        ...nextData.current.draft,
+        linkedProjectId: undefined,
+        linkedChapterId: undefined,
+        updatedAt: now,
+      },
+    },
+    updatedAt: now,
+  };
+}
+
 export function removeProject(data: PersistedWorkspace, projectId: string): PersistedWorkspace {
   const projects = data.projects.filter((project) => project.id !== projectId);
   const activeProjectId = data.activeProjectId === projectId ? projects[0]?.id : data.activeProjectId;
