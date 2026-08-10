@@ -1,4 +1,4 @@
-import type { AppliedEdit, ReviewIssue, UndoFrame, WorkspaceState } from '@/lib/types';
+import type { AppliedEdit, IssueDecision, ReviewIssue, UndoFrame, WorkspaceState } from '@/lib/types';
 import { hasDangerousPlaceholder } from '@/lib/validation/common';
 
 export type AnchorState =
@@ -169,6 +169,29 @@ export function removeAppliedIssueFromWorkspace(state: WorkspaceState, issueId: 
     appliedEdits,
     undoStack: [...state.undoStack.slice(-24), frameFrom(state)],
     redoStack: [],
+  };
+}
+
+export function issueDecisionRequiresAppliedEditRemoval(
+  state: WorkspaceState,
+  issueId: string,
+  decision: IssueDecision,
+) {
+  return decision !== 'accepted' && state.appliedEdits.some((edit) => edit.issueId === issueId);
+}
+
+export function setIssueDecisionInWorkspace(
+  state: WorkspaceState,
+  issueId: string,
+  decision: IssueDecision,
+): WorkspaceState {
+  const next = issueDecisionRequiresAppliedEditRemoval(state, issueId, decision)
+    ? removeAppliedIssueFromWorkspace(state, issueId)
+    : state;
+  if (next.decisions[issueId] === decision) return next;
+  return {
+    ...next,
+    decisions: { ...next.decisions, [issueId]: decision },
   };
 }
 
