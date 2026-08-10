@@ -6,7 +6,6 @@ import './examples.css';
 import './project.css';
 import './revision.css';
 import './preferences.css';
-import './login.css';
 import './ui-system.css';
 import './competition.css';
 import './editorial-base.css';
@@ -14,8 +13,6 @@ import './editorial-try.css';
 import './editorial-workspace.css';
 import './editorial-review.css';
 import './editorial-responsive.css';
-import './judge.css';
-import './edit-passport.css';
 import './professional-ui.css';
 
 export const metadata: Metadata = {
