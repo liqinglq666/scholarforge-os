@@ -17,7 +17,7 @@ import { createPersistedWorkspace, parseBackupText } from '@/lib/workspace/schem
 export function SettingsManager() {
   const router = useRouter();
   const { data, ready, replaceData } = useWorkspace();
-  const { status: service, loading: serviceLoading } = useReviewServiceStatus();
+  const { status: service, loading: serviceLoading, failed: serviceFailed } = useReviewServiceStatus();
   const { status: auth } = useAuthStatus();
   const [message, setMessage] = useState('');
   const [importPreview, setImportPreview] = useState<WorkspaceBackup | null>(null);
@@ -83,11 +83,13 @@ export function SettingsManager() {
         <div><span className="step-number">01</span><h2 id="service-title">分析服务</h2></div>
         {serviceLoading
           ? <StatusBanner tone="neutral" title="正在确认状态">正在读取分析服务配置，不会发送论文文本。</StatusBanner>
-          : service
-            ? <StatusBanner tone={service.configured ? 'success' : 'warning'} title={service.configured ? '已配置' : '未配置'}>{service.message}</StatusBanner>
-            : <StatusBanner tone="warning" title="状态暂时不可用">无法连接健康检查接口。为保护正文，工作台会禁用分析。</StatusBanner>}
+          : serviceFailed
+            ? <StatusBanner tone="warning" title="状态暂时不可用">{service?.message || '无法连接健康检查接口。为保护正文，工作台会禁用分析。'}</StatusBanner>
+            : service
+              ? <StatusBanner tone={service.configured ? 'success' : 'warning'} title={service.configured ? '已配置' : '未配置'}>{service.message}</StatusBanner>
+              : <StatusBanner tone="warning" title="状态暂时不可用">无法连接健康检查接口。为保护正文，工作台会禁用分析。</StatusBanner>}
         <dl className="settings-facts">
-          <div><dt>模型</dt><dd>{service?.model || '未启用'}</dd></div>
+          <div><dt>模型</dt><dd>{serviceFailed ? '状态未知' : service?.model || '未启用'}</dd></div>
           <div><dt>文本上限</dt><dd>{service?.limits.maxCharacters.toLocaleString() || '12,000'} 字符</dd></div>
           <div><dt>请求限制</dt><dd>{service ? `${service.limits.windowMinutes} 分钟 ${service.limits.requestsPerWindow} 次` : '状态未知'}</dd></div>
           <div><dt>未配置时</dt><dd>返回 503，不生成模拟结果</dd></div>
