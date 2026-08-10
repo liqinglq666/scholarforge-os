@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { SUPABASE_REQUEST_TIMEOUT_MS } from '@/lib/config';
 import type { AuthUser } from '@/lib/types';
 import { isRecord } from '@/lib/validation/common';
 
@@ -17,7 +18,15 @@ export interface ResolvedAuthSession {
   configured: boolean;
   accessToken: string | null;
   user: AuthUser | null;
+  unavailable: boolean;
   refreshedSession?: SupabaseAuthSession;
+}
+
+export class SupabaseRequestFailure extends Error {
+  constructor(public readonly reason: 'timeout' | 'network') {
+    super(reason === 'timeout' ? 'Supabase request timed out.' : 'Supabase request failed.');
+    this.name = 'SupabaseRequestFailure';
+  }
 }
 
 export function isSafePublishableKey(value: string) {
@@ -81,7 +90,26 @@ export async function supabaseRequest(
   headers.set('apikey', config.publishableKey);
   headers.set('Content-Type', 'application/json');
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-  return fetch(`${config.url}${path}`, { ...init, headers, cache: 'no-store' });
+
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, SUPABASE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${config.url}${path}`, {
+      ...init,
+      headers,
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch {
+    throw new SupabaseRequestFailure(timedOut ? 'timeout' : 'network');
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function parseAuthUser(value: unknown): AuthUser | null {
@@ -143,21 +171,36 @@ export function clearAuthCookies(response: NextResponse) {
   response.cookies.set(REFRESH_COOKIE, '', options);
 }
 
+function isCredentialRejection(status: number) {
+  return status === 400 || status === 401 || status === 403;
+}
+
 export async function resolveAuthSession(): Promise<ResolvedAuthSession> {
-  if (!getSupabaseConfig()) return { configured: false, accessToken: null, user: null };
+  if (!getSupabaseConfig()) {
+    return { configured: false, accessToken: null, user: null, unavailable: false };
+  }
   const store = await cookies();
   const accessToken = store.get(ACCESS_COOKIE)?.value || null;
   const refreshToken = store.get(REFRESH_COOKIE)?.value || null;
+  let transientFailure = false;
 
   if (accessToken) {
     try {
       const response = await supabaseRequest('/auth/v1/user', { method: 'GET' }, accessToken);
       if (response.ok) {
-        const user = parseAuthUser(await response.json());
-        if (user) return { configured: true, accessToken, user };
+        try {
+          const user = parseAuthUser(await response.json());
+          if (user) return { configured: true, accessToken, user, unavailable: false };
+          transientFailure = true;
+        } catch {
+          transientFailure = true;
+        }
+      } else if (!isCredentialRejection(response.status)) {
+        transientFailure = true;
       }
-    } catch {
-      // Refresh below when possible.
+    } catch (error) {
+      if (error instanceof SupabaseRequestFailure) transientFailure = true;
+      else throw error;
     }
   }
 
@@ -168,22 +211,34 @@ export async function resolveAuthSession(): Promise<ResolvedAuthSession> {
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
       if (response.ok) {
-        const refreshedSession = parseAuthSession(await response.json());
-        if (refreshedSession) {
-          return {
-            configured: true,
-            accessToken: refreshedSession.accessToken,
-            user: refreshedSession.user,
-            refreshedSession,
-          };
+        try {
+          const refreshedSession = parseAuthSession(await response.json());
+          if (refreshedSession) {
+            return {
+              configured: true,
+              accessToken: refreshedSession.accessToken,
+              user: refreshedSession.user,
+              unavailable: false,
+              refreshedSession,
+            };
+          }
+          transientFailure = true;
+        } catch {
+          transientFailure = true;
         }
+      } else if (!isCredentialRejection(response.status)) {
+        transientFailure = true;
       }
-    } catch {
-      // Treat invalid/expired sessions as signed out.
+    } catch (error) {
+      if (error instanceof SupabaseRequestFailure) transientFailure = true;
+      else throw error;
     }
   }
 
-  return { configured: true, accessToken: null, user: null };
+  if (transientFailure) {
+    return { configured: true, accessToken: null, user: null, unavailable: true };
+  }
+  return { configured: true, accessToken: null, user: null, unavailable: false };
 }
 
 export async function readSupabaseError(response: Response, fallback: string) {

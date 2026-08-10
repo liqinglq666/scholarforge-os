@@ -56,6 +56,7 @@ export interface AuthStatus {
   authenticated: boolean;
   user: AuthUser | null;
   message: string;
+  unavailable?: boolean;
 }
 
 export interface ImportedDocument {

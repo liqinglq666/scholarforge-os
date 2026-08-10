@@ -5,6 +5,7 @@ import {
   getSupabaseConfig,
   parseAuthSession,
   readSupabaseError,
+  SupabaseRequestFailure,
   supabaseRequest,
 } from '@/lib/auth/supabase';
 import { MAX_AUTH_REQUEST_BYTES } from '@/lib/config';
@@ -15,6 +16,11 @@ import { cleanSingleLine, isRecord } from '@/lib/validation/common';
 function hasPendingSignupUser(value: unknown) {
   if (!isRecord(value) || !isRecord(value.user)) return false;
   return typeof value.user.id === 'string' && typeof value.user.email === 'string';
+}
+
+function retryAfterSeconds(response: Response, fallback = 30) {
+  const parsed = Number.parseInt(response.headers.get('retry-after') || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 3600) : fallback;
 }
 
 export async function POST(request: Request) {
@@ -56,20 +62,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '请输入有效邮箱和 8–128 位密码。' }, { status: 400 });
   }
 
-  const upstream = await supabaseRequest('/auth/v1/signup', {
-    method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-      data: displayName ? { display_name: displayName } : {},
-    }),
-  });
+  let upstream: Response;
+  try {
+    upstream = await supabaseRequest('/auth/v1/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+        data: displayName ? { display_name: displayName } : {},
+      }),
+    });
+  } catch (error) {
+    if (error instanceof SupabaseRequestFailure) {
+      return NextResponse.json({ error: '账户服务暂时不可用，请稍后重试。' }, { status: 503 });
+    }
+    throw error;
+  }
   if (!upstream.ok) {
+    if (upstream.status === 429) {
+      const retryAfter = retryAfterSeconds(upstream);
+      return NextResponse.json(
+        { error: '注册请求过于频繁，请稍后重试。', retryAfter },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
+    }
+    if (upstream.status === 408 || upstream.status >= 500) {
+      return NextResponse.json({ error: '账户服务暂时不可用，请稍后重试。' }, { status: 503 });
+    }
     await readSupabaseError(upstream, '注册失败，请稍后重试。');
-    const error = upstream.status === 429
-      ? '注册请求过于频繁，请稍后重试。'
-      : '无法完成注册。如果该邮箱已注册，请直接登录；否则请稍后重试。';
-    return NextResponse.json({ error }, { status: upstream.status === 429 ? 429 : 400 });
+    return NextResponse.json({
+      error: '无法完成注册。如果该邮箱已注册，请直接登录；否则请稍后重试。',
+    }, { status: 400 });
   }
 
   let payload: unknown;

@@ -242,7 +242,23 @@ export function PreferencesManager() {
         <div><span className="step-number">05</span><h2 id="sync-title">保存与账户同步</h2></div>
         <div className="preference-sync-grid">
           <article><strong>此浏览器</strong><p>保存全部个性化偏好，立即用于之后的新任务和项目。</p><button className="primary-button" onClick={() => persistLocal()} type="button">保存本地偏好</button></article>
-          <article><strong>账户偏好</strong><p>{auth?.authenticated ? `已登录 ${auth.user?.email || ''}。只同步本页设置，不同步论文正文。` : auth?.configured ? '登录后可在设备之间同步本页偏好。' : '账户服务未配置，仍可正常使用本地偏好。'}</p>{auth?.authenticated ? <div><button disabled={syncing} onClick={() => void uploadCloud()} type="button">上传当前偏好</button><button disabled={syncing} onClick={() => void downloadCloud()} type="button">载入云端偏好</button></div> : <Link className="secondary-link" href="/account">{auth?.configured ? '前往登录' : '查看账户配置'}</Link>}</article>
+          <article>
+            <strong>账户偏好</strong>
+            <p>{auth?.unavailable
+              ? '账户服务暂时不可用。现有登录凭据已保留；本地偏好仍可正常保存，云端同步将在服务恢复后继续。'
+              : auth?.authenticated
+                ? `已登录 ${auth.user?.email || ''}。只同步本页设置，不同步论文正文。`
+                : auth?.configured
+                  ? '登录后可在设备之间同步本页偏好。'
+                  : '账户服务未配置，仍可正常使用本地偏好。'}</p>
+            {auth?.unavailable ? (
+              <Link className="secondary-link" href="/account">查看并重试账户状态</Link>
+            ) : auth?.authenticated ? (
+              <div><button disabled={syncing} onClick={() => void uploadCloud()} type="button">上传当前偏好</button><button disabled={syncing} onClick={() => void downloadCloud()} type="button">载入云端偏好</button></div>
+            ) : (
+              <Link className="secondary-link" href="/account">{auth?.configured ? '前往登录' : '查看账户配置'}</Link>
+            )}
+          </article>
         </div>
       </section>
 

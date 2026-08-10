@@ -75,7 +75,20 @@ export function AccountManager() {
       {message ? <StatusBanner tone="success" title="账户状态">{message}</StatusBanner> : null}
       {error ? <StatusBanner tone="danger" title="账户操作未完成">{error}</StatusBanner> : null}
 
-      {!status.configured ? (
+      {status.unavailable ? (
+        <section className="account-panel account-unconfigured">
+          <span className="eyebrow">账户连接暂时中断</span>
+          <h2>账户服务暂时不可用，登录凭据没有被删除</h2>
+          <p>{status.user
+            ? `最近一次已确认的账户是 ${status.user.email}。当前无法重新验证会话，因此不会把你误判为退出登录。`
+            : '当前无法确认账户会话。已有登录凭据会保留在浏览器中，服务恢复后可以重新验证。'}</p>
+          <p className="account-note">论文正文、项目和历史任务仍保存在当前浏览器，本地工作不受账户服务影响。</p>
+          <div className="account-actions">
+            <button className="primary-button" onClick={() => void reloadStatus()} type="button">重试账户状态</button>
+            <Link className="secondary-link" href="/workspace">继续本地工作</Link>
+          </div>
+        </section>
+      ) : !status.configured ? (
         <section className="account-panel account-unconfigured">
           <span className="eyebrow">当前为游客本地模式</span>
           <h2>账户服务尚未配置</h2>
