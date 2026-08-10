@@ -5,6 +5,7 @@ import {
   clearAuthCookies,
   readSupabaseError,
   resolveAuthSession,
+  SupabaseRequestFailure,
   supabaseRequest,
 } from '@/lib/auth/supabase';
 import { MAX_REQUEST_BYTES } from '@/lib/config';
@@ -29,18 +30,43 @@ function requestTooLarge() {
   return NextResponse.json({ error: '偏好请求超过 80 KB 限制。' }, { status: 413 });
 }
 
+function accountUnavailable() {
+  return NextResponse.json({ error: '账户服务暂时不可用。现有登录凭据已保留，请稍后重试。' }, { status: 503 });
+}
+
 export async function GET() {
   const session = await resolveAuthSession();
   if (!session.configured) return NextResponse.json({ error: '账户服务未配置。' }, { status: 503 });
+  if (session.unavailable) return accountUnavailable();
   if (!session.user || !session.accessToken) return unauthorized(true);
 
   const path = `/rest/v1/user_preferences?user_id=eq.${encodeURIComponent(session.user.id)}&select=preferences,updated_at&limit=1`;
-  const upstream = await supabaseRequest(path, { method: 'GET' }, session.accessToken);
+  let upstream: Response;
+  try {
+    upstream = await supabaseRequest(path, { method: 'GET' }, session.accessToken);
+  } catch (error) {
+    if (error instanceof SupabaseRequestFailure) {
+      const response = accountUnavailable();
+      if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+      return response;
+    }
+    throw error;
+  }
   if (!upstream.ok) {
     const error = await readSupabaseError(upstream, '无法读取云端偏好。请确认已执行数据库迁移。');
-    return NextResponse.json({ error }, { status: 502 });
+    const response = NextResponse.json({ error }, { status: 502 });
+    if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+    return response;
   }
-  const rows = await upstream.json() as unknown;
+
+  let rows: unknown;
+  try {
+    rows = await upstream.json() as unknown;
+  } catch {
+    const response = NextResponse.json({ error: '账户服务返回了无法解析的云端偏好。' }, { status: 502 });
+    if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+    return response;
+  }
   const first = Array.isArray(rows) && isRecord(rows[0]) ? rows[0] : null;
   const response = NextResponse.json({
     preferences: first ? parseUserPreferences(first.preferences) : null,
@@ -58,6 +84,7 @@ export async function PUT(request: Request) {
   }
   const session = await resolveAuthSession();
   if (!session.configured) return NextResponse.json({ error: '账户服务未配置。' }, { status: 503 });
+  if (session.unavailable) return accountUnavailable();
   if (!session.user || !session.accessToken) return unauthorized(true);
 
   const contentLength = Number(request.headers.get('content-length') || 0);
@@ -90,14 +117,26 @@ export async function PUT(request: Request) {
   }
 
   const updatedAt = new Date().toISOString();
-  const upstream = await supabaseRequest('/rest/v1/user_preferences?on_conflict=user_id', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify({ user_id: session.user.id, preferences, updated_at: updatedAt }),
-  }, session.accessToken);
+  let upstream: Response;
+  try {
+    upstream = await supabaseRequest('/rest/v1/user_preferences?on_conflict=user_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ user_id: session.user.id, preferences, updated_at: updatedAt }),
+    }, session.accessToken);
+  } catch (error) {
+    if (error instanceof SupabaseRequestFailure) {
+      const response = accountUnavailable();
+      if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+      return response;
+    }
+    throw error;
+  }
   if (!upstream.ok) {
     const error = await readSupabaseError(upstream, '无法保存云端偏好。请确认已执行数据库迁移。');
-    return NextResponse.json({ error }, { status: 502 });
+    const response = NextResponse.json({ error }, { status: 502 });
+    if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
+    return response;
   }
   const response = NextResponse.json({ preferences, updatedAt, message: '个性化偏好已同步。论文正文没有上传。' });
   if (session.refreshedSession) applyAuthCookies(response, session.refreshedSession);
