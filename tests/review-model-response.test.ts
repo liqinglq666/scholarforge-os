@@ -89,12 +89,17 @@ describe('review model provider response handling', () => {
       suggestedText: reviewRequest.text,
       issues: [],
     });
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
-      choices: [{ finish_reason: 'stop', message: { content } }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('https://provider.example/v1/chat/completions');
+      capturedInit = init;
+      return new Response(JSON.stringify({
+        choices: [{ finish_reason: 'stop', message: { content } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await reviewWithModel(reviewRequest);
@@ -104,8 +109,7 @@ describe('review model provider response handling', () => {
     expect(result.suggestedText).toBe(reviewRequest.text.trim());
     expect(result.safetyGate).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0];
-    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
-    expect(String(init?.body)).not.toContain('test-key');
+    expect((capturedInit?.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    expect(String(capturedInit?.body)).not.toContain('test-key');
   });
 });
