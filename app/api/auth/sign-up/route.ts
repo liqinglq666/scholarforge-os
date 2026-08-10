@@ -5,6 +5,7 @@ import {
   getSupabaseConfig,
   parseAuthSession,
   readSupabaseError,
+  SupabaseRequestFailure,
   supabaseRequest,
 } from '@/lib/auth/supabase';
 import { MAX_AUTH_REQUEST_BYTES } from '@/lib/config';
@@ -56,14 +57,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '请输入有效邮箱和 8–128 位密码。' }, { status: 400 });
   }
 
-  const upstream = await supabaseRequest('/auth/v1/signup', {
-    method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-      data: displayName ? { display_name: displayName } : {},
-    }),
-  });
+  let upstream: Response;
+  try {
+    upstream = await supabaseRequest('/auth/v1/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+        data: displayName ? { display_name: displayName } : {},
+      }),
+    });
+  } catch (error) {
+    if (error instanceof SupabaseRequestFailure) {
+      return NextResponse.json({ error: '账户服务暂时不可用，请稍后重试。' }, { status: 503 });
+    }
+    throw error;
+  }
   if (!upstream.ok) {
     await readSupabaseError(upstream, '注册失败，请稍后重试。');
     const error = upstream.status === 429
