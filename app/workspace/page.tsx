@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { WorkspaceApp } from '@/components/workspace/workspace-app';
+import '../editorial-workspace.css';
+import '../editorial-review.css';
 import '../edit-passport.css';
 import '../professional-ui-fixes.css';
 
