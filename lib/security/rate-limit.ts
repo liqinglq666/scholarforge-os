@@ -20,6 +20,10 @@ export interface RateLimitDecision {
   reason?: 'client' | 'concurrency' | 'budget';
 }
 
+interface BucketCheck extends RateLimitDecision {
+  bucket: Bucket;
+}
+
 function ipKey(request: Request) {
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return forwarded || request.headers.get('x-real-ip') || 'anonymous-ip';
@@ -38,7 +42,7 @@ function refreshBudgetDay(now: number) {
   }
 }
 
-function consumeBucket(map: Map<string, Bucket>, key: string, limit: number, now: number) {
+function inspectBucket(map: Map<string, Bucket>, key: string, limit: number, now: number): BucketCheck {
   const current = map.get(key);
   const bucket = !current || current.resetAt <= now ? { count: 0, resetAt: now + WINDOW_MS } : current;
   if (bucket.count >= limit) {
@@ -46,11 +50,19 @@ function consumeBucket(map: Map<string, Bucket>, key: string, limit: number, now
       allowed: false,
       retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
       remaining: 0,
+      bucket,
     };
   }
-  bucket.count += 1;
-  map.set(key, bucket);
-  return { allowed: true, retryAfter: 0, remaining: limit - bucket.count };
+  return {
+    allowed: true,
+    retryAfter: 0,
+    remaining: limit - bucket.count - 1,
+    bucket,
+  };
+}
+
+function commitBucket(map: Map<string, Bucket>, key: string, bucket: Bucket) {
+  map.set(key, { ...bucket, count: bucket.count + 1 });
 }
 
 export function checkRateLimit(request: Request, now = Date.now()): RateLimitDecision {
@@ -64,22 +76,56 @@ export function checkRateLimit(request: Request, now = Date.now()): RateLimitDec
   }
 
   const session = sessionKey(request);
-  const sessionDecision = consumeBucket(
-    session ? sessionBuckets : ipBuckets,
-    session || ipKey(request),
-    REQUESTS_PER_SESSION,
-    now,
-  );
-  if (!sessionDecision.allowed) return { ...sessionDecision, reason: 'client' };
-
-  if (session) {
-    const ipDecision = consumeBucket(ipBuckets, ipKey(request), REQUESTS_PER_IP, now);
-    if (!ipDecision.allowed) return { ...ipDecision, reason: 'client' };
+  const ip = ipKey(request);
+  if (!session) {
+    const anonymousDecision = inspectBucket(ipBuckets, ip, REQUESTS_PER_SESSION, now);
+    if (!anonymousDecision.allowed) {
+      return {
+        allowed: false,
+        retryAfter: anonymousDecision.retryAfter,
+        remaining: 0,
+        reason: 'client',
+      };
+    }
+    commitBucket(ipBuckets, ip, anonymousDecision.bucket);
+    dailyRequests += 1;
+    activeRequests += 1;
+    return {
+      allowed: true,
+      retryAfter: 0,
+      remaining: anonymousDecision.remaining,
+    };
   }
 
+  const sessionDecision = inspectBucket(sessionBuckets, session, REQUESTS_PER_SESSION, now);
+  if (!sessionDecision.allowed) {
+    return {
+      allowed: false,
+      retryAfter: sessionDecision.retryAfter,
+      remaining: 0,
+      reason: 'client',
+    };
+  }
+
+  const ipDecision = inspectBucket(ipBuckets, ip, REQUESTS_PER_IP, now);
+  if (!ipDecision.allowed) {
+    return {
+      allowed: false,
+      retryAfter: ipDecision.retryAfter,
+      remaining: 0,
+      reason: 'client',
+    };
+  }
+
+  commitBucket(sessionBuckets, session, sessionDecision.bucket);
+  commitBucket(ipBuckets, ip, ipDecision.bucket);
   dailyRequests += 1;
   activeRequests += 1;
-  return sessionDecision;
+  return {
+    allowed: true,
+    retryAfter: 0,
+    remaining: sessionDecision.remaining,
+  };
 }
 
 export function releaseRateLimitSlot() {
