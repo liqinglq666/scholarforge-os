@@ -9,6 +9,8 @@ import {
   resolveAuthSession,
   supabaseRequest,
 } from '@/lib/auth/supabase';
+import { MAX_AUTH_REQUEST_BYTES } from '@/lib/config';
+import { RequestBodyTooLargeError, readRequestTextWithLimit } from '@/lib/security/request-body';
 import type { AuthStatus } from '@/lib/types';
 import { cleanSingleLine, isRecord } from '@/lib/validation/common';
 
@@ -35,9 +37,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '账户服务未配置。请设置 SUPABASE_URL 和 SUPABASE_PUBLISHABLE_KEY。' }, { status: 503 });
   }
 
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_AUTH_REQUEST_BYTES) {
+    return NextResponse.json({ error: '登录请求过大。' }, { status: 413 });
+  }
+
+  let raw: string;
+  try {
+    raw = await readRequestTextWithLimit(request, MAX_AUTH_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ error: '登录请求过大。' }, { status: 413 });
+    }
+    return NextResponse.json({ error: '无法读取登录请求。' }, { status: 400 });
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(raw) as unknown;
   } catch {
     return NextResponse.json({ error: '登录请求不是有效 JSON。' }, { status: 400 });
   }
@@ -56,7 +73,14 @@ export async function POST(request: Request) {
     await readSupabaseError(upstream, '邮箱或密码不正确。');
     return NextResponse.json({ error: '邮箱或密码不正确，或邮箱尚未完成确认。' }, { status: 401 });
   }
-  const session = parseAuthSession(await upstream.json());
+
+  let payload: unknown;
+  try {
+    payload = await upstream.json() as unknown;
+  } catch {
+    return NextResponse.json({ error: '账户服务返回了无法解析的会话。' }, { status: 502 });
+  }
+  const session = parseAuthSession(payload);
   if (!session) return NextResponse.json({ error: '账户服务返回了无效会话。' }, { status: 502 });
 
   const response = NextResponse.json<AuthStatus>({
