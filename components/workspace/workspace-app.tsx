@@ -11,11 +11,11 @@ import { StatusBanner } from '@/components/feedback/status-banner';
 import { ProjectToolNav } from '@/components/project/project-tool-nav';
 import { useWorkspace } from '@/components/workspace/use-workspace';
 import { MAX_HISTORY_ENTRIES } from '@/lib/config';
-import { findResearchExample } from '@/lib/examples';
+import { findResearchExample, type ResearchExample } from '@/lib/examples';
 import { getProject, saveWorkspaceBackToProject } from '@/lib/project/workspace';
 import type { ApiErrorPayload, ReviewResult, TaskType, WorkspaceDraft } from '@/lib/types';
-import { createDraft, createHistoryEntry, createWorkspaceState } from '@/lib/workspace/schema';
-import { startNewTaskWorkspace } from '@/lib/workspace/transitions';
+import { createHistoryEntry } from '@/lib/workspace/schema';
+import { loadResearchExampleWorkspace, startNewTaskWorkspace } from '@/lib/workspace/transitions';
 
 type AnalysisStage = 'preparing' | 'reviewing' | 'organizing';
 
@@ -36,6 +36,7 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
   const [pageError, setPageError] = useState('');
   const [projectMessage, setProjectMessage] = useState('');
   const [newTaskConfirmOpen, setNewTaskConfirmOpen] = useState(false);
+  const [pendingEntryExample, setPendingEntryExample] = useState<ResearchExample | null>(null);
   const analysisControllerRef = useRef<AbortController | null>(null);
   const entryParamAppliedRef = useRef(false);
   const routeProject = projectId ? getProject(data, projectId) : null;
@@ -55,29 +56,11 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
 
     if (requestedExample) {
       const hasCurrentWork = Boolean(data.current.currentResult || data.current.draft.sourceText.trim());
-      if (hasCurrentWork && !window.confirm('载入示例会开始一个新任务。当前草稿或分析结果会先保存到最近任务。确定继续吗？')) {
-        window.history.replaceState(null, '', '/workspace');
-        return;
+      if (hasCurrentWork) {
+        const timer = window.setTimeout(() => setPendingEntryExample(requestedExample), 0);
+        return () => window.clearTimeout(timer);
       }
-      const preservedCurrent = hasCurrentWork ? createHistoryEntry(data.current) : null;
-      const history = [
-        ...(preservedCurrent ? [preservedCurrent] : []),
-        ...data.history.filter((item) => item.id !== preservedCurrent?.id),
-      ].slice(0, MAX_HISTORY_ENTRIES);
-      const draft = createDraft({
-        projectName: requestedExample.projectName,
-        taskType: requestedExample.taskType,
-        sectionType: requestedExample.sectionType,
-        targetJournal: requestedExample.targetJournal,
-        sourceText: requestedExample.sourceText,
-        terminologyLocks: requestedExample.terminologyLocks.map((term) => ({ ...term })),
-      });
-      const nextData = {
-        ...data,
-        current: createWorkspaceState(draft),
-        history,
-        updatedAt: new Date().toISOString(),
-      };
+      const nextData = loadResearchExampleWorkspace(data, requestedExample);
       replaceData(nextData);
       saveNow(nextData);
       window.history.replaceState(null, '', '/workspace');
@@ -198,6 +181,21 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
     analysisControllerRef.current?.abort();
   }
 
+  function confirmEntryExample() {
+    const example = pendingEntryExample;
+    if (!example) return;
+    const nextData = loadResearchExampleWorkspace(data, example);
+    setPendingEntryExample(null);
+    replaceData(nextData);
+    saveNow(nextData);
+    window.history.replaceState(null, '', '/workspace');
+  }
+
+  function cancelEntryExample() {
+    setPendingEntryExample(null);
+    window.history.replaceState(null, '', '/workspace');
+  }
+
   function startNew() {
     setNewTaskConfirmOpen(true);
   }
@@ -278,6 +276,16 @@ export function WorkspaceApp({ projectId }: { projectId?: string } = {}) {
       {data.current.currentResult
         ? <ReviewWorkbench onStartNew={startNew} onUpdate={updateCurrent} workspace={data.current} />
         : <TaskSetup analyzing={data.current.status === 'analyzing'} draft={data.current.draft} onAnalyze={() => void analyze()} onChange={updateDraft} service={service} serviceLoading={serviceLoading} />}
+      <ConfirmDialog
+        cancelLabel="保留当前任务"
+        confirmLabel="保存并载入示例"
+        description="当前正文、分析结果和作者决定会先保存到“最近任务”，然后以公开合成示例创建新的审校任务。取消后当前工作区保持不变。"
+        eyebrow="载入公开合成示例"
+        onCancel={cancelEntryExample}
+        onConfirm={confirmEntryExample}
+        open={Boolean(pendingEntryExample)}
+        title={`载入“${pendingEntryExample?.projectName || '公开合成示例'}”？`}
+      />
       <ConfirmDialog
         cancelLabel="继续当前任务"
         confirmLabel="保存并开始新任务"
