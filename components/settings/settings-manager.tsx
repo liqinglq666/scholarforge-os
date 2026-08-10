@@ -1,36 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWorkspace } from '@/components/workspace/use-workspace';
+import { useAuthStatus } from '@/components/account/use-auth-status';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { StatusBanner } from '@/components/feedback/status-banner';
+import { useReviewServiceStatus } from '@/components/review/use-review-service-status';
+import { useWorkspace } from '@/components/workspace/use-workspace';
 import { APP_VERSION } from '@/lib/config';
 import { exportWorkspaceBackup } from '@/lib/exports/files';
-import type { AuthStatus, ReviewServiceStatus, WorkspaceBackup } from '@/lib/types';
+import type { WorkspaceBackup } from '@/lib/types';
 import { clearWorkspaceData, writeWorkspaceData } from '@/lib/workspace/storage';
 import { createPersistedWorkspace, parseBackupText } from '@/lib/workspace/schema';
 
 export function SettingsManager() {
   const router = useRouter();
   const { data, ready, replaceData } = useWorkspace();
-  const clearRef = useRef<HTMLDialogElement>(null);
-  const importRef = useRef<HTMLDialogElement>(null);
-  const [service, setService] = useState<ReviewServiceStatus | null>(null);
-  const [auth, setAuth] = useState<AuthStatus | null>(null);
+  const { status: service, loading: serviceLoading } = useReviewServiceStatus();
+  const { status: auth } = useAuthStatus();
   const [message, setMessage] = useState('');
   const [importPreview, setImportPreview] = useState<WorkspaceBackup | null>(null);
-
-  useEffect(() => {
-    fetch('/api/health', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<ReviewServiceStatus>)
-      .then(setService)
-      .catch(() => setService(null));
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthStatus>)
-      .then(setAuth)
-      .catch(() => setAuth(null));
-  }, []);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   async function chooseBackup(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -40,7 +31,6 @@ export function SettingsManager() {
     try {
       const preview = parseBackupText(await file.text());
       setImportPreview(preview);
-      importRef.current?.showModal();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '备份导入失败。当前工作区没有改变。');
     }
@@ -71,6 +61,7 @@ export function SettingsManager() {
     try {
       clearWorkspaceData();
       replaceData(createPersistedWorkspace());
+      setClearConfirmOpen(false);
       setMessage('此浏览器中的论文项目、草稿、结果、历史和本地偏好已清除。账户中的云端偏好没有删除。');
       router.push('/workspace');
     } catch (error) {
@@ -90,7 +81,11 @@ export function SettingsManager() {
 
       <section className="settings-section" aria-labelledby="service-title">
         <div><span className="step-number">01</span><h2 id="service-title">分析服务</h2></div>
-        {service ? <StatusBanner tone={service.configured ? 'success' : 'warning'} title={service.configured ? '已配置' : '未配置'}>{service.message}</StatusBanner> : <StatusBanner tone="warning" title="状态暂时不可用">无法连接健康检查接口。为保护正文，工作台会禁用分析。</StatusBanner>}
+        {serviceLoading
+          ? <StatusBanner tone="neutral" title="正在确认状态">正在读取分析服务配置，不会发送论文文本。</StatusBanner>
+          : service
+            ? <StatusBanner tone={service.configured ? 'success' : 'warning'} title={service.configured ? '已配置' : '未配置'}>{service.message}</StatusBanner>
+            : <StatusBanner tone="warning" title="状态暂时不可用">无法连接健康检查接口。为保护正文，工作台会禁用分析。</StatusBanner>}
         <dl className="settings-facts">
           <div><dt>模型</dt><dd>{service?.model || '未启用'}</dd></div>
           <div><dt>文本上限</dt><dd>{service?.limits.maxCharacters.toLocaleString() || '12,000'} 字符</dd></div>
@@ -123,7 +118,7 @@ export function SettingsManager() {
         <div className="settings-actions">
           <button onClick={() => exportWorkspaceBackup(data)} type="button">导出完整工作区备份</button>
           <label className="file-button"><input accept="application/json,.json" onChange={(event) => void chooseBackup(event)} type="file" />导入备份</label>
-          <button className="danger-button" onClick={() => clearRef.current?.showModal()} type="button">清除此浏览器数据</button>
+          <button className="danger-button" onClick={() => setClearConfirmOpen(true)} type="button">清除此浏览器数据</button>
         </div>
       </section>
 
@@ -139,22 +134,30 @@ export function SettingsManager() {
         <p className="version-line">ScholarForge OS v{APP_VERSION}</p>
       </section>
 
-      <dialog className="confirm-dialog" ref={importRef}>
-        <form method="dialog">
-          <span className="eyebrow">导入预览</span><h2>确认替换当前本地数据？</h2>
-          <p>备份包含“{importPreview?.current.draft.projectName || '未命名任务'}”、{importPreview?.history.length || 0} 条历史，以及 {importPreview?.projects.length || 0} 个论文项目。个性化偏好也会一并替换。</p>
-          <div className="responsibility-note"><strong>安全恢复</strong><span>篡改、越界、冲突或无法根据当前问题重新定位的编辑会被丢弃。</span></div>
-          <div className="dialog-actions"><button value="cancel">取消</button><button className="primary-button" onClick={confirmImport} value="confirm">确认导入</button></div>
-        </form>
-      </dialog>
+      <ConfirmDialog
+        cancelLabel="保留当前数据"
+        confirmLabel="确认导入"
+        description={`备份包含“${importPreview?.current.draft.projectName || '未命名任务'}”、${importPreview?.history.length || 0} 条历史，以及 ${importPreview?.projects.length || 0} 个论文项目。确认后当前本地工作区和个性化偏好会被替换。`}
+        eyebrow="导入预览"
+        onCancel={() => setImportPreview(null)}
+        onConfirm={confirmImport}
+        open={Boolean(importPreview)}
+        title="确认替换当前本地数据？"
+      >
+        <div className="responsibility-note"><strong>安全恢复</strong><span>篡改、越界、冲突或无法根据当前问题重新定位的编辑会被丢弃。</span></div>
+      </ConfirmDialog>
 
-      <dialog className="confirm-dialog" ref={clearRef}>
-        <form method="dialog">
-          <span className="eyebrow">不可撤销操作</span><h2>清除此浏览器中的全部数据？</h2>
-          <p>全部论文项目、章节、意见、版本记录、当前草稿、分析结果、历史和本地偏好都会被删除。账户中的云端偏好与已下载文件不受影响。</p>
-          <div className="dialog-actions"><button value="cancel">保留数据</button><button className="danger-button" onClick={confirmClear} value="confirm">确认清除</button></div>
-        </form>
-      </dialog>
+      <ConfirmDialog
+        cancelLabel="保留数据"
+        confirmLabel="确认清除"
+        description="全部论文项目、章节、意见、版本记录、当前草稿、分析结果、历史和本地偏好都会从此浏览器删除。账户中的云端偏好与已下载文件不受影响。"
+        eyebrow="不可撤销操作"
+        onCancel={() => setClearConfirmOpen(false)}
+        onConfirm={confirmClear}
+        open={clearConfirmOpen}
+        title="清除此浏览器中的全部数据？"
+        tone="danger"
+      />
     </div>
   );
 }
