@@ -89,7 +89,7 @@ describe('review model provider response handling', () => {
       suggestedText: reviewRequest.text,
       issues: [],
     });
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
       choices: [{ finish_reason: 'stop', message: { content } }],
     }), {
       status: 200,
